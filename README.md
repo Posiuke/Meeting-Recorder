@@ -1,4 +1,4 @@
-# BBB Recorder v3
+# Meeting Recorder
 
 Bot-System für BigBlueButton im Intranet: Bots treten Meeting-Räumen bei,
 zeichnen Audio auf, transkribieren per Whisper und erstellen KI-Zusammenfassungen

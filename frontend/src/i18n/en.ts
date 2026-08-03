@@ -39,7 +39,7 @@ export const en: typeof de = {
   },
 
   app: {
-    brand: 'BBB Recorder',
+    brand: 'Meeting Recorder',
     nav: {
       bots: 'Bots',
       recordings: 'Recordings',

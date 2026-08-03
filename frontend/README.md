@@ -1,4 +1,4 @@
-# BBB Recorder – Frontend
+# Meeting Recorder – Frontend
 
 React-Frontend (Vite + React 18 + TypeScript + Redux Toolkit) für den BigBlueButton-Aufzeichnungs-Bot.
 

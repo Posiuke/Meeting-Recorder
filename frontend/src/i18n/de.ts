@@ -41,7 +41,7 @@ export const de = {
   },
 
   app: {
-    brand: 'BBB Recorder',
+    brand: 'Meeting Recorder',
     nav: {
       bots: 'Bots',
       recordings: 'Aufnahmen',

@@ -1,4 +1,4 @@
-# BBB Recorder
+# Meeting Recorder
 
 Aufnahme-Bot für **BigBlueButton / Nextcloud-Meetings**: Ein Bot tritt einem Raum
 über die fertige Raum-URL bei (keine BBB-API/Checksums nötig), zeichnet das

@@ -1,4 +1,4 @@
-// API-Typen des BBB-Recorder-Backends
+// API-Typen des Meeting-Recorder-Backends
 
 export interface UserView {
   id: string;
