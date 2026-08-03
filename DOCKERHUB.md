@@ -217,3 +217,17 @@ maximale Länge und Sprache der Zusammenfassung setzen — praktisch für
 hochgeladene Dateien, die kein Meeting sind. Die Einstellungen wirken bei der
 nächsten Auswertung („Jetzt auswerten", „Erneut auswerten" oder „Transkription
 neu erstellen").
+
+## Quellcode, Fehler und Feature-Wünsche
+
+Der Quellcode liegt öffentlich auf GitHub:
+[Posiuke/Meeting-Recorder](https://github.com/Posiuke/Meeting-Recorder).
+
+Fehlermeldungen und Feature-Wünsche sind willkommen — von jedem, direkt als
+Issue:
+[Bug melden](https://github.com/Posiuke/Meeting-Recorder/issues/new?template=bug_report.yml)
+· [Feature wünschen](https://github.com/Posiuke/Meeting-Recorder/issues/new?template=feature_request.yml)
+· [alle Issues](https://github.com/Posiuke/Meeting-Recorder/issues).
+
+Bitte in Logs vorher Zugangsdaten, API-Keys, interne Hostnamen und
+Meeting-Inhalte entfernen — Issues sind öffentlich lesbar.

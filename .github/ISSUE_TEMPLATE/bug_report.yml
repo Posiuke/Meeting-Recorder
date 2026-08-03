@@ -1,0 +1,67 @@
+name: Fehler melden
+description: Etwas funktioniert nicht wie erwartet
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke, dass du dir die Zeit nimmst! Je konkreter die Beschreibung,
+        desto schneller lässt sich das Problem nachstellen.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Was ist passiert?
+      description: Beschreibe das Problem und was du stattdessen erwartet hättest.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Schritte zum Nachstellen
+      placeholder: |
+        1. Bot für Raum X starten
+        2. Aufnahme beenden
+        3. Fehler erscheint in ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Betroffener Bereich
+      options:
+        - Bot / Aufzeichnung
+        - Bildschirmaufnahme im Browser
+        - Transkription (Whisper)
+        - KI-Zusammenfassung (LLM)
+        - Weboberfläche
+        - Anmeldung / Active Directory
+        - Installation / Docker
+        - Sonstiges oder unklar
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs oder Fehlermeldungen
+      description: |
+        Relevante Ausschnitte aus Backend-Log, Browser-Konsole oder
+        `docker logs`. **Bitte vorher Zugangsdaten, Tokens, interne
+        Hostnamen und personenbezogene Meeting-Inhalte entfernen.**
+      render: shell
+
+  - type: input
+    id: version
+    attributes:
+      label: Version / Commit
+      description: Verwendeter Image-Tag oder Commit-Hash, falls bekannt.
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Umgebung
+      placeholder: |
+        Betriebssystem, Browser, Docker-Version, BigBlueButton-Version

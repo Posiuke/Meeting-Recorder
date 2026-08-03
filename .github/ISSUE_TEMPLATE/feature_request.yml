@@ -1,0 +1,48 @@
+name: Feature-Wunsch
+description: Eine Idee oder Verbesserung vorschlagen
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature-Wünsche sind ausdrücklich willkommen — auch grobe Ideen,
+        die noch nicht durchdacht sind.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Welches Problem soll gelöst werden?
+      description: Was ist heute umständlich, fehlt oder kostet dich Zeit?
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: Wie könnte die Lösung aussehen?
+      description: Kein fertiges Konzept nötig — eine Richtung genügt.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Betroffener Bereich
+      options:
+        - Bot / Aufzeichnung
+        - Bildschirmaufnahme im Browser
+        - Transkription (Whisper)
+        - KI-Zusammenfassung (LLM)
+        - Weboberfläche
+        - Anmeldung / Rechte
+        - API / Integration
+        - Installation / Betrieb
+        - Sonstiges
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativen oder Workarounds
+      description: Wie behilfst du dir aktuell?

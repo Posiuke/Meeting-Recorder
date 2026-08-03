@@ -29,3 +29,11 @@ unbekannte Pfade auf `index.html` umschreiben (`try_files $uri /index.html;`).
   `GET /api/auth/me` validiert. Bei HTTP 401 erfolgt ein automatischer Logout.
 - Audio-Streams und Zusammenfassungs-Downloads übergeben das Token als Query-Parameter `?token=...`,
   da `<audio>`-Elemente keine Header setzen können.
+
+## Fehler melden und Features vorschlagen
+
+Fehler in der Oberfläche und Verbesserungsideen gerne als GitHub-Issue melden:
+[Bug melden](https://github.com/Posiuke/Meeting-Recorder/issues/new?template=bug_report.yml)
+· [Feature wünschen](https://github.com/Posiuke/Meeting-Recorder/issues/new?template=feature_request.yml)
+· [alle Issues](https://github.com/Posiuke/Meeting-Recorder/issues).
+Details im [Haupt-README](../README.md#fehler-melden-und-features-vorschlagen).

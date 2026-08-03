@@ -437,9 +437,31 @@ umgestellt wird (inkl. Offline-Modell-Beschaffung):
 - Das Playwright-Java-Runtime-Image bringt Chromium bereits mit; es findet
   kein Browser-Download zur Laufzeit statt.
 
+## Fehler melden und Features vorschlagen
+
+Rückmeldungen sind ausdrücklich willkommen — von jedem, nicht nur von
+Mitwirkenden am Code. Wer über einen Fehler stolpert oder eine Idee hat,
+kann das direkt als GitHub-Issue eintragen:
+
+- **Fehler melden:**
+  [neues Bug-Issue anlegen](https://github.com/Posiuke/Meeting-Recorder/issues/new?template=bug_report.yml)
+- **Feature wünschen:**
+  [neuen Feature-Wunsch anlegen](https://github.com/Posiuke/Meeting-Recorder/issues/new?template=feature_request.yml)
+- **Alle offenen Punkte ansehen:**
+  [Issue-Übersicht](https://github.com/Posiuke/Meeting-Recorder/issues)
+
+Für beides gibt es eine kurze Vorlage, die nach den wichtigsten Angaben
+fragt. Ein Blick in die bestehenden Issues lohnt sich vorab, damit nichts
+doppelt landet — ein zusätzlicher Kommentar an einem passenden Issue hilft
+oft mehr als ein neuer Eintrag.
+
+Ein Hinweis zu Log-Auszügen: Bitte vor dem Absenden Zugangsdaten, API-Keys,
+interne Hostnamen und Meeting-Inhalte entfernen. Issues in diesem Repository
+sind öffentlich lesbar.
+
 ## Historie
 
 Die Vorgängerversion (Node.js/TypeScript-Einzelprozess-Bot mit
-Gitea-Upload) ist in der Git-Historie und unter `docs/legacy/` dokumentiert.
+Gitea-Upload) ist unter `docs/legacy/` dokumentiert.
 Der Gitea/Obsidian-Upload ist entfallen — Ansehen und Herunterladen läuft
 jetzt über das Frontend.
