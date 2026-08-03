@@ -327,6 +327,12 @@ export const de = {
     diarize: 'Sprechererkennung (wer hat was gesagt – Auswertung dauert länger)',
   },
 
+  markdown: {
+    mermaidLoading: 'Diagramm wird gezeichnet…',
+    mermaidFailed:
+      'Dieses Mermaid-Diagramm konnte nicht gezeichnet werden – die Syntax ist fehlerhaft. Der Quelltext steht unverändert darunter und lässt sich über „Bearbeiten" korrigieren.',
+  },
+
   capture: {
     title: 'Bildschirm aufnehmen',
     notSupported: {
@@ -406,8 +412,12 @@ export const de = {
     templatesError: 'Eigene Vorlagen konnten nicht geladen werden: {{message}}',
     promptLabel: 'Auswertungs-Prompt',
     promptHelp:
-      'Die Arbeitsanweisung an die KI: Sie bestimmt, wie der Inhalt interpretiert wird und welche Struktur und Schwerpunkte die Zusammenfassung bekommt (z.B. Beschlüsse und Aufgaben bei Meetings, Kernaussagen bei Vorträgen). Leer = Standardvorgabe des Administrators.',
+      'Die Arbeitsanweisung an die KI: Sie bestimmt, wie der Inhalt interpretiert wird und welche Struktur und Schwerpunkte die Zusammenfassung bekommt (z.B. Beschlüsse und Aufgaben bei Meetings, Kernaussagen bei Vorträgen). Leer = Standardvorgabe des Administrators. Die Zusammenfassung wird als Markdown dargestellt – Tabellen und Mermaid-Diagramme (```mermaid-Block) kannst du hier ausdrücklich anfordern.',
     promptPlaceholder: 'Standardvorgabe des Administrators:',
+    loadDefault: 'Standard übernehmen',
+    loadDefaultHint:
+      'Schreibt die Standardvorgabe des Administrators in das Feld – so kannst du sie anpassen statt sie vollständig zu ersetzen',
+    loadDefaultUnavailable: 'Der Administrator hat keine Standardvorgabe hinterlegt.',
     templateNamePlaceholder: 'Name der Vorlage',
     templateSaving: 'Speichert…',
     saveAsTemplate: 'Als Vorlage speichern',

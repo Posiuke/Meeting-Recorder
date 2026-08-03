@@ -216,7 +216,14 @@ eigenen Auswertungs-Prompt (mit Vorlagen für Vortrag, Interview, Sprachnotiz),
 maximale Länge und Sprache der Zusammenfassung setzen — praktisch für
 hochgeladene Dateien, die kein Meeting sind. Die Einstellungen wirken bei der
 nächsten Auswertung („Jetzt auswerten", „Erneut auswerten" oder „Transkription
-neu erstellen").
+neu erstellen"). Die Standardvorgabe des Administrators lässt sich über
+**„Standard übernehmen"** in das Feld holen und dort anpassen, statt sie
+vollständig ersetzen zu müssen.
+
+Zusammenfassung und geglättetes Transkript werden als GitHub-Markdown angezeigt
+— Tabellen und Aufgabenlisten erscheinen als solche. Codeblöcke mit der Sprache
+`mermaid` werden als Diagramm gezeichnet; anfordern lässt sich das über den
+Auswertungs-Prompt („… zusätzlich als Mermaid-Flussdiagramm").
 
 ## Quellcode, Fehler und Feature-Wünsche
 

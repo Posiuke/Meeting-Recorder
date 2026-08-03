@@ -324,6 +324,12 @@ export const en: typeof de = {
     diarize: 'Speaker recognition (who said what – analysis takes longer)',
   },
 
+  markdown: {
+    mermaidLoading: 'Drawing diagram…',
+    mermaidFailed:
+      'This Mermaid diagram could not be drawn – its syntax is invalid. The source is shown unchanged below and can be fixed via “Edit”.',
+  },
+
   capture: {
     title: 'Record screen',
     notSupported: {
@@ -403,8 +409,12 @@ export const en: typeof de = {
     templatesError: 'Your own templates could not be loaded: {{message}}',
     promptLabel: 'Analysis prompt',
     promptHelp:
-      'The instruction given to the AI: it determines how the content is interpreted and which structure and focus the summary gets (e.g. decisions and tasks for meetings, key statements for talks). Empty = the administrator default.',
+      'The instruction given to the AI: it determines how the content is interpreted and which structure and focus the summary gets (e.g. decisions and tasks for meetings, key statements for talks). Empty = the administrator default. The summary is rendered as Markdown – you can explicitly ask for tables and Mermaid diagrams (```mermaid block) here.',
     promptPlaceholder: 'Administrator default:',
+    loadDefault: 'Load default',
+    loadDefaultHint:
+      'Writes the administrator default into the field – so you can adjust it instead of replacing it entirely',
+    loadDefaultUnavailable: 'The administrator has not configured a default prompt.',
     templateNamePlaceholder: 'Template name',
     templateSaving: 'Saving…',
     saveAsTemplate: 'Save as template',

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import ReactMarkdown from 'react-markdown';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
   clearDetail,
@@ -19,6 +18,7 @@ import StatusBadge from '../components/StatusBadge';
 import Spinner from '../components/Spinner';
 import Alert from '../components/Alert';
 import ConfirmDialog from '../components/ConfirmDialog';
+import Markdown from '../components/Markdown';
 import ShareDialog from '../components/ShareDialog';
 import SummaryOptionsDialog from '../components/SummaryOptionsDialog';
 import TagEditor from '../components/TagEditor';
@@ -510,9 +510,7 @@ export default function RecordingDetailPage() {
               activeEntries.length > 0 ? (
                 <TranscriptList entries={activeEntries} participants={detail.participants} />
               ) : activeTranscriptText ? (
-                <div className="markdown-body">
-                  <ReactMarkdown>{activeTranscriptText}</ReactMarkdown>
-                </div>
+                <Markdown>{activeTranscriptText}</Markdown>
               ) : (
                 <p className="muted">{t('recordingDetail.transcriptEmpty')}</p>
               )
@@ -1076,9 +1074,7 @@ function SummaryTab({
           ) : summary.status === 'FAILED' ? (
             <Alert kind="error">{summary.error ?? t('recordingDetail.summaryFailed')}</Alert>
           ) : summary.markdown ? (
-            <div className="markdown-body">
-              <ReactMarkdown>{summary.markdown}</ReactMarkdown>
-            </div>
+            <Markdown>{summary.markdown}</Markdown>
           ) : (
             <p className="muted">{t('recordingDetail.noContent')}</p>
           )}

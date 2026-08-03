@@ -319,6 +319,35 @@ Log samt `finish_reason` und Länge des Reasonings.
 Ein Hinweis zum Modell: Für deutsche Besprechungstexte ist ein **Instruct**-Modell
 die bessere Wahl als ein Coder-Modell (`llm.model`).
 
+## Darstellung von Zusammenfassung und Transkript (Markdown, Mermaid)
+
+Zusammenfassung und geglättetes Transkript werden als **GitHub-Markdown**
+dargestellt (GFM): Tabellen, Aufgabenlisten (`- [ ]`), Durchstreichungen und
+Fußnoten erscheinen als solche und nicht als rohe Sonderzeichen. Rohes HTML im
+Text wird bewusst **nicht** ausgeführt — der Inhalt kommt aus einem Sprachmodell
+und ist vom Besitzer frei editierbar.
+
+Codeblöcke mit der Sprache `mermaid` werden als **Diagramm** gezeichnet:
+
+````markdown
+```mermaid
+graph TD;
+  Antrag --> Prüfung;
+  Prüfung --> Freigabe;
+```
+````
+
+Das ist rein die Darstellungsseite — ob ein Diagramm entsteht, entscheidet der
+Auswertungs-Prompt. Wer eines möchte, fordert es dort ausdrücklich an, z.B.
+„Stelle den beschlossenen Ablauf zusätzlich als Mermaid-Flussdiagramm dar".
+Enthält eine Zusammenfassung keinen Mermaid-Block, wird die Diagramm-Bibliothek
+gar nicht geladen (eigener Lazy-Chunk, rund 1,5 MB). Ist die Diagramm-Syntax
+fehlerhaft, erscheint ein Hinweis samt unverändertem Quelltext — korrigieren
+lässt er sich über **Bearbeiten** an der Zusammenfassung.
+
+Mermaid läuft im Strict-Modus: Beschriftungen werden als Text behandelt, HTML in
+Labels ist abgeschaltet.
+
 ## Schlagworte und Suche
 
 Auf der Detailseite einer eigenen Aufnahme lassen sich unter **Schlagworte**
@@ -436,6 +465,10 @@ umgestellt wird (inkl. Offline-Modell-Beschaffung):
   auflösen (`~/.m2/settings.xml` bzw. `.npmrc` mit Mirror konfigurieren).
 - Das Playwright-Java-Runtime-Image bringt Chromium bereits mit; es findet
   kein Browser-Download zur Laufzeit statt.
+- Die Diagramm-Darstellung braucht `mermaid` als npm-Abhängigkeit (samt
+  `cytoscape` und `katex` als Unterabhängigkeiten). Das Paket muss im internen
+  Mirror liegen, sonst schlägt bereits `npm ci` im Frontend-Build fehl. Zur
+  Laufzeit wird nichts nachgeladen — alles liegt im Image.
 
 ## Fehler melden und Features vorschlagen
 

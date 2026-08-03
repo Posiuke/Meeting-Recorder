@@ -77,6 +77,7 @@ export default function SummaryOptionsDialog({
     }
   }, [dispatch, templatesLoaded, templatesLoading]);
 
+  const defaultPrompt = (options.defaultPrompt ?? '').trim();
   const maxWordsNum = maxWords.trim() === '' ? null : Number(maxWords);
   const maxWordsInvalid =
     maxWordsNum !== null && (!Number.isInteger(maxWordsNum) || maxWordsNum < 10 || maxWordsNum > 10000);
@@ -97,6 +98,18 @@ export default function SummaryOptionsDialog({
       const found = PRESET_KEYS.find((p) => p.key === key);
       if (found) setPrompt(t(found.promptKey));
     }
+  };
+
+  /**
+   * Standardvorgabe des Administrators in das Eingabefeld holen, damit sie sich
+   * anpassen laesst statt nur komplett ersetzt werden zu koennen. Die Auswahl
+   * springt dabei zurueck auf "Standard", sonst wuerde ein anschliessendes
+   * "Vorlage aktualisieren" die zuvor gewaehlte eigene Vorlage mit dem
+   * Standardtext ueberschreiben.
+   */
+  const applyDefaultPrompt = () => {
+    setPreset('');
+    setPrompt(options.defaultPrompt ?? '');
   };
 
   const handleCreateTemplate = async () => {
@@ -277,6 +290,19 @@ export default function SummaryOptionsDialog({
             </form>
           ) : (
             <>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={busy || templateBusy || defaultPrompt === '' || prompt.trim() === defaultPrompt}
+                title={
+                  defaultPrompt === ''
+                    ? t('summaryOptions.loadDefaultUnavailable')
+                    : t('summaryOptions.loadDefaultHint')
+                }
+                onClick={applyDefaultPrompt}
+              >
+                {t('summaryOptions.loadDefault')}
+              </button>
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
