@@ -1,0 +1,40 @@
+# Java / Maven
+backend/target/
+*.class
+
+# Node / Frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# Laufzeitdaten (Aufnahmen, DB-Volumes)
+recordings/
+data/
+*.log
+
+# Environment
+.env
+.env.local
+
+# OS / Temp
+.DS_Store
+Thumbs.db
+*.tmp
+.tmp/
+
+# lokale Claude-Einstellungen
+.claude/
+
+# Offline-Modellpakete (mehrere GB, gehoeren nicht ins Repo - README bleibt getrackt)
+transfer/whisper-diarization/hf-cache/
+transfer/whisper-diarization/torch-cache/
+transfer/whisper-diarization/whisper-models/

@@ -1,0 +1,227 @@
+package bbbbot.api;
+
+import bbbbot.domain.AppUser;
+import bbbbot.domain.BotSession;
+import bbbbot.domain.Participant;
+import bbbbot.domain.ProcessingJob;
+import bbbbot.domain.PromptTemplate;
+import bbbbot.domain.Recording;
+import bbbbot.domain.RecordingSegment;
+import bbbbot.domain.ShareGrant;
+import bbbbot.domain.Summary;
+import bbbbot.domain.UserGroup;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+/** API-Datentransfer-Objekte. */
+public final class Dtos {
+
+    private Dtos() {}
+
+    public record UserView(UUID id, String username, String displayName, String email, boolean admin,
+                           boolean local, boolean mustChangePassword, String language) {
+        public static UserView of(AppUser u) {
+            boolean local = u.getPasswordHash() != null && !u.getPasswordHash().isBlank();
+            return new UserView(u.getId(), u.getUsername(), u.getDisplayName(), u.getEmail(), u.isAdmin(),
+                    local, u.isMustChangePassword(), u.getLanguage());
+        }
+    }
+
+    /** Oberflaechensprache des angemeldeten Nutzers setzen. */
+    public record LanguageRequest(String language) {}
+
+    public record LoginRequest(String username, String password) {}
+
+    public record LoginResponse(String token, UserView user) {}
+
+    public record ChangePasswordRequest(String currentPassword, String newPassword) {}
+
+    public record LdapTestRequest(String username, String password) {}
+
+    public record LdapTestResult(boolean success, String message, String displayName, String email) {}
+
+    /** Ergebnis eines Verbindungstests (Whisper/LLM) aus dem Admin-Bereich. */
+    public record ConnectionTestResult(boolean success, String message, long durationMs) {}
+
+    public record StartBotRequest(String meetingUrl, String botName, Boolean autoRecord,
+                                  Boolean recordVideo, Boolean aiAnalysis, Boolean diarize) {}
+
+    public record BotView(UUID sessionId, String status, String meetingUrl, String roomName,
+                          String botName, boolean autoRecord, boolean recordVideo, boolean aiAnalysis,
+                          UUID recordingId, int participants, int audioTracks,
+                          String lastError, Instant createdAt, boolean mine) {}
+
+    public record SegmentView(UUID id, int seq, String status, Long durationMs, Long sizeBytes,
+                              boolean hasAudio, boolean hasTranscript) {
+        public static SegmentView of(RecordingSegment s) {
+            return new SegmentView(s.getId(), s.getSeq(), s.getStatus().name(), s.getDurationMs(),
+                    s.getSizeBytes(), s.getMp3Path() != null,
+                    s.getTranscriptText() != null && !s.getTranscriptText().isBlank());
+        }
+    }
+
+    public record SummaryView(UUID id, String status, String markdown, String model,
+                              String error, Instant createdAt, Instant finishedAt) {
+        public static SummaryView of(Summary s) {
+            return new SummaryView(s.getId(), s.getStatus().name(), s.getMarkdown(), s.getModel(),
+                    s.getError(), s.getCreatedAt(), s.getFinishedAt());
+        }
+    }
+
+    /** Haendisch bearbeiteter Inhalt einer Zusammenfassung. */
+    public record SummaryUpdateRequest(String markdown) {}
+
+    public record JobView(UUID id, String status, boolean immediate, boolean transcribeOnly,
+                          int attempts, String lastError, Instant createdAt, Instant finishedAt) {
+        public static JobView of(ProcessingJob j) {
+            return new JobView(j.getId(), j.getStatus().name(), j.isImmediate(), j.isTranscribeOnly(),
+                    j.getAttempts(), j.getLastError(), j.getCreatedAt(), j.getFinishedAt());
+        }
+    }
+
+    public record RecordingView(UUID id, String title, String status, String meetingUrl,
+                                Instant startedAt, Instant endedAt, Long durationMs,
+                                String discardReason, boolean recordVideo, boolean aiAnalysis,
+                                String videoStatus, String source, List<String> tags,
+                                boolean mine, UserView owner) {
+        public static RecordingView of(Recording r, boolean mine, AppUser owner) {
+            return of(r, mine, owner, List.of());
+        }
+
+        public static RecordingView of(Recording r, boolean mine, AppUser owner, List<String> tags) {
+            Recording.Source src = r.getSource() == null ? Recording.Source.BOT : r.getSource();
+            return new RecordingView(r.getId(), r.getTitle(), r.getStatus().name(), r.getMeetingUrl(),
+                    r.getStartedAt(), r.getEndedAt(), r.getDurationMs(), r.getDiscardReason(),
+                    r.isRecordVideo(), r.isAiAnalysis(),
+                    r.getVideoStatus() == null ? null : r.getVideoStatus().name(),
+                    src.name(), tags == null ? List.of() : tags,
+                    mine, owner == null ? null : UserView.of(owner));
+        }
+    }
+
+    public record RecordingDetail(RecordingView recording, List<SegmentView> segments,
+                                  List<SummaryView> summaries, List<JobView> jobs,
+                                  List<ParticipantView> participants,
+                                  String participantsLog, String chatLog,
+                                  SummaryOptionsView summaryOptions) {}
+
+    /**
+     * Teilnehmer einer Aufnahme: aus der Diarisierung erkannter Sprecher
+     * (speakerLabel) mit editierbarem Anzeigenamen.
+     */
+    public record ParticipantView(UUID id, String speakerLabel, String displayName) {
+        public static ParticipantView of(Participant p) {
+            return new ParticipantView(p.getId(), p.getSpeakerLabel(), p.getDisplayName());
+        }
+    }
+
+    public record ParticipantUpdateRequest(String displayName) {}
+
+    /** Schlagwort mit Anzahl der Aufnahmen (Filterleiste, Vorschlagsliste). */
+    public record TagCountView(String name, long count) {}
+
+    public record TagRequest(String name) {}
+
+    /**
+     * Pro-Aufnahme-Einstellungen fuer die Zusammenfassung (null = Admin-Standard).
+     * Die Defaults werden mitgeliefert, damit das Frontend anzeigen kann, was
+     * "Standard" konkret bedeutet.
+     */
+    public record SummaryOptionsView(String prompt, Integer maxWords, String language,
+                                     String defaultPrompt, String defaultLanguage) {}
+
+    public record SummaryOptionsRequest(String prompt, Integer maxWords, String language) {}
+
+    /** Persoenliche Promptvorlage des angemeldeten Nutzers. */
+    public record PromptTemplateView(UUID id, String name, String prompt,
+                                     Instant createdAt, Instant updatedAt) {
+        public static PromptTemplateView of(PromptTemplate t) {
+            return new PromptTemplateView(t.getId(), t.getName(), t.getPrompt(),
+                    t.getCreatedAt(), t.getUpdatedAt());
+        }
+    }
+
+    public record PromptTemplateRequest(String name, String prompt) {}
+
+    /** Eintrag im persoenlichen Glossar (Abkuerzung/Fachbegriff mit Bedeutung). */
+    public record GlossaryEntryView(UUID id, String term, String meaning,
+                                    Instant createdAt, Instant updatedAt) {
+        public static GlossaryEntryView of(bbbbot.domain.GlossaryEntry e) {
+            return new GlossaryEntryView(e.getId(), e.getTerm(), e.getMeaning(),
+                    e.getCreatedAt(), e.getUpdatedAt());
+        }
+    }
+
+    public record GlossaryEntryRequest(String term, String meaning) {}
+
+    /**
+     * API-Schluessel in der Uebersicht. Das Token selbst kommt hier bewusst NICHT
+     * vor - gespeichert ist nur sein Abdruck, angezeigt wird der Anfang
+     * ({@code prefix}) zum Wiedererkennen.
+     */
+    public record ApiKeyView(UUID id, String name, String prefix, boolean readOnly,
+                             Instant createdAt, Instant expiresAt, Instant lastUsedAt,
+                             boolean expired) {
+        public static ApiKeyView of(bbbbot.domain.ApiKey k) {
+            return new ApiKeyView(k.getId(), k.getName(), k.getTokenPrefix(), k.isReadOnly(),
+                    k.getCreatedAt(), k.getExpiresAt(), k.getLastUsedAt(),
+                    k.isExpired(Instant.now()));
+        }
+    }
+
+    /** Antwort beim Anlegen: einmalig mit dem Klartext-Token. */
+    public record ApiKeyCreated(ApiKeyView key, String token) {}
+
+    /** @param expiresAt ISO-Zeitpunkt oder leer fuer unbegrenzt gueltig */
+    public record ApiKeyRequest(String name, Boolean readOnly, String expiresAt) {}
+
+    /**
+     * Direkte Transkription per API: Zustand eines Auftrags. {@code text} ist
+     * erst bei {@code status=DONE} gefuellt, {@code error} nur bei FAILED.
+     */
+    public record TranscriptionView(UUID id, String status, String text,
+                                    List<TranscriptEntry> entries, Long durationMs,
+                                    String error) {}
+
+    /** Ein Eintrag des zusammengefuehrten Transkripts (Startzeit ab Aufnahmebeginn). */
+    public record TranscriptEntry(long startSeconds, String speaker, String text) {}
+
+    /**
+     * Transkript in beiden Fassungen: {@code transcript}/{@code entries} ist das
+     * Whisper-Original, {@code corrected*} die KI-geglaettete Fassung. Beide werden
+     * zusammen geliefert, damit der Umschalter im Frontend ohne Nachladen wirkt;
+     * ohne Glaettung sind die corrected-Felder leer und {@code hasCorrected} false.
+     */
+    public record TranscriptView(String transcript, List<TranscriptEntry> entries,
+                                 String correctedTranscript, List<TranscriptEntry> correctedEntries,
+                                 boolean hasCorrected, String correctionStatus) {}
+
+    public record ShareRequest(UUID userId, UUID groupId) {}
+
+    public record ShareView(UUID id, UUID recordingId, UserView user, GroupView group, Instant createdAt) {}
+
+    public record GroupView(UUID id, String name, UUID ownerId, boolean mine, Instant createdAt) {
+        public static GroupView of(UserGroup g, UUID currentUserId) {
+            return new GroupView(g.getId(), g.getName(), g.getOwnerId(),
+                    g.getOwnerId().equals(currentUserId), g.getCreatedAt());
+        }
+    }
+
+    public record GroupMemberView(UUID userId, String username, String displayName, Instant addedAt) {}
+
+    public record CreateGroupRequest(String name) {}
+
+    public record AddMemberRequest(UUID userId) {}
+
+    public record SetAdminRequest(boolean admin) {}
+
+    public record BotSessionHistoryView(UUID id, String meetingUrl, String roomName, String botName,
+                                        String status, Instant createdAt, Instant endedAt, String lastError) {
+        public static BotSessionHistoryView of(BotSession s) {
+            return new BotSessionHistoryView(s.getId(), s.getMeetingUrl(), s.getRoomName(), s.getBotName(),
+                    s.getStatus().name(), s.getCreatedAt(), s.getEndedAt(), s.getLastError());
+        }
+    }
+}

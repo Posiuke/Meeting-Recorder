@@ -1,0 +1,74 @@
+spring:
+  application:
+    name: bbb-bot-backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/bbbbot}
+    username: ${DB_USER:bbbbot}
+    password: ${DB_PASSWORD:bbbbot}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      # Meeting-Videos koennen mehrere GB gross sein; per MAX_UPLOAD_SIZE anpassbar.
+      max-file-size: ${MAX_UPLOAD_SIZE:4GB}
+      max-request-size: ${MAX_UPLOAD_SIZE:4GB}
+
+server:
+  port: ${SERVER_PORT:8080}
+  # Hinter einem Reverse Proxy (TLS-Terminierung) die X-Forwarded-*-Header
+  # auswerten, damit die Anwendung Schema und Host des Proxys kennt. Noetig fuer
+  # die Bildschirmaufnahme, die nur im sicheren Kontext (HTTPS) laeuft -
+  # siehe docs/SCREEN_CAPTURE.md.
+  forward-headers-strategy: framework
+  error:
+    # Fehlerbegruendungen (z.B. Validierungsmeldungen) ans Frontend durchreichen -
+    # der Standard "never" laesst nur ein nichtssagendes "Internal Server Error" durch.
+    include-message: always
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  health:
+    ldap:
+      # Die AD-Anbindung laeuft ueber den Security-Provider, nicht ueber
+      # spring.ldap - der Standard-LDAP-Healthcheck wuerde sonst immer DOWN melden
+      enabled: false
+
+bbbbot:
+  storage:
+    # Wurzelverzeichnis fuer Aufnahmen, Transkripte und Zusammenfassungen
+    root-dir: ${STORAGE_DIR:./data/recordings}
+  bots:
+    # Maximale Anzahl gleichzeitiger Bot-Instanzen (jede Instanz = eine Chromium-Instanz)
+    max-concurrent: ${MAX_CONCURRENT_BOTS:5}
+    chrome-path: ${CHROME_PATH:}
+    headless: ${HEADLESS:true}
+    insecure-tls: ${INSECURE_TLS:true}
+    join-timeout-ms: 120000
+    audio-ready-timeout-ms: 90000
+  media:
+    ffmpeg-path: ${FFMPEG_PATH:ffmpeg}
+    ffprobe-path: ${FFPROBE_PATH:ffprobe}
+  auth:
+    # LDAP/Active Directory wird vollstaendig im Admin-Bereich (in der DB) verwaltet.
+    # Hier nur noch: JWT-Signatur und das lokale Admin-Konto.
+    jwt-secret: ${JWT_SECRET:}
+    # Login-Session-Dauer (Standard 168 h = 7 Tage)
+    jwt-ttl-hours: ${JWT_TTL_HOURS:168}
+    # Lokales Admin-Konto (funktioniert immer, auch ohne/bei kaputtem LDAP).
+    # Wird nur beim allerersten Start angelegt; Initialpasswort muss beim ersten
+    # Login geaendert werden.
+    admin-username: ${ADMIN_USERNAME:admin}
+    admin-initial-password: ${ADMIN_INITIAL_PASSWORD:admin}
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [bot:%X{bot:-system}] %logger{36} - %msg%n"
+  level:
+    bbbbot: INFO

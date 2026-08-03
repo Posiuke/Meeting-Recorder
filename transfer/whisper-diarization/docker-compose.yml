@@ -1,0 +1,63 @@
+# Whisper-ASR mit WhisperX-Engine (Diarisierung + VAD) - fertige Compose fuer
+# den KI-Server, abgeleitet von der bisherigen Datei (compose/whisper/).
+#
+# Warum der Engine-Wechsel: die bisherige Engine `openai_whisper` unterstuetzt
+# den vad_filter-Parameter NICHT - Stille/Rauschen erzeugt dann Halluzinationen
+# ("Vielen Dank." / "Danke." alle 30 Sekunden). WhisperX filtert Stille per VAD,
+# transkribiert schneller und liefert auf Wunsch Sprecher-Labels (diarize=true).
+#
+# Vorbereitung (einmalig, Details in README.md daneben):
+#   1. hf-cache/ und torch-cache/ aus diesem Transfer-Paket auf den Server:
+#        scp -r hf-cache torch-cache benutzer@ki-server:/opt/data/whisper-project/
+#   2. HF_TOKEN unten eintragen (Read-Token; mit vorgeladenem Cache
+#      findet KEIN Internetzugriff statt - pyannote prueft nur die Lizenz).
+#   3. docker compose down && docker compose up -d
+#   4. Test:
+#        curl -F "audio_file=@beispiel.mp3" \
+#          "http://whisper-host:11436/asr?task=transcribe&language=de&output=json&diarize=true" | head -c 2000
+#      -> segments[] mit "speaker": "SPEAKER_00"
+#   5. Im BBB-Bot: Admin -> Einstellungen -> whisper.diarize auf true
+#      (= Freischaltung; Nutzer waehlen die Sprechererkennung dann pro
+#      Aufnahme/Upload selbst).
+#
+# Rueckweg bei Problemen: ASR_ENGINE wieder auf openai_whisper stellen und
+# die beiden neuen Volumes entfernen - das models-Verzeichnis ist unveraendert.
+version: '3.8'
+
+services:
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:latest-gpu
+    container_name: whisper-asr
+    ports:
+      - "11436:9000"
+    volumes:
+      # Bisheriges .pt-Modell (nur noch Rueckweg-Fallback); :ro entfernt,
+      # weil WhisperX beim ersten Start konvertierte Dateien ablegen kann.
+      - /opt/data/whisper-project/models:/root/.cache/whisper
+      # NEU: large-v3 im CTranslate2-Format (Systran/faster-whisper-large-v3, ~5,8 GB)
+      - /opt/data/whisper-project/hf-cache:/root/.cache/huggingface
+      # NEU: pyannote-Diarisierungs- + Alignment-Modelle (~0,4 GB) -
+      # liegen im Torch-Cache, NICHT im HF-Cache!
+      - /opt/data/whisper-project/torch-cache:/root/.cache/torch
+    environment:
+      - ASR_MODEL=large-v3
+      - ASR_ENGINE=whisperx                      # GEAENDERT: vorher openai_whisper
+      - HF_TOKEN=hf_HIER_EUER_READ_TOKEN         # NEU: siehe Kopfkommentar
+      # GPU-Limitierungen (unveraendert)
+      - CUDA_VISIBLE_DEVICES=0                   # Nur GPU 0 verwenden (innerhalb des Containers)
+      - NVIDIA_VISIBLE_DEVICES=0                 # Alternative Syntax
+     # - CUDA_MPS_ACTIVE_THREAD_PERCENTAGE=50    # Max 50% GPU-Rechenleistung
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '2.0'
+          memory: 4G
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+              device_ids: ['2']
+    restart: unless-stopped

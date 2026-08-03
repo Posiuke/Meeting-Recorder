@@ -1,0 +1,98 @@
+# BBB Recorder v3 - Gesamt-Stack
+#
+# Secrets (DB-Passwort, JWT-Secret, Admin-Passwort) stehen NICHT mehr in
+# dieser Datei, sondern in einer lokalen `.env` (nicht in Git). Einrichtung:
+#
+#   cp .env.example .env   # dann DB_PASSWORD / JWT_SECRET / ... eintragen
+#   docker compose up -d
+#
+# Docker Compose liest `.env` automatisch und ersetzt die ${...}-Platzhalter
+# unten. Fehlt eine Pflicht-Variable, bricht `docker compose` mit einer
+# klaren Meldung ab (kein stiller Start mit Default-Secret).
+#
+# Das App-Image wird FERTIG aus der Registry bezogen (kein lokaler Build).
+# Neueste Version holen mit `docker compose pull`. Das Image wird per
+# scripts/docker-push.sh gebaut und gepusht.
+#
+# Frontend und Backend laufen zusammen im "app"-Container (Spring Boot
+# liefert die React-App als statische Ressourcen aus). Nur die Datenbank
+# laeuft separat. In Offline-Umgebungen die Basis-Images ueber den internen
+# Registry-Mirror beziehen (z.B. registry.example.com/...).
+#
+# Compose-Format 2.4: noetig fuer aeltere docker-compose v1 (z.B. 1.25.0);
+# nur dieses Format unterstuetzt dort die gesundheitsabhaengige
+# Startreihenfolge (depends_on -> condition: service_healthy).
+# `docker compose` v2 akzeptiert den Header ebenfalls.
+version: "2.4"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: bbbbot-db
+    environment:
+      POSTGRES_DB: bbbbot
+      POSTGRES_USER: bbbbot
+      # Aus .env (dieselbe Variable wie DB_PASSWORD beim app-Service).
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD fehlt - .env aus .env.example anlegen}
+    volumes:
+      # Von Docker verwaltetes Named Volume - vermeidet Ownership-Probleme
+      # ("data directory has wrong ownership"), die bei einem Host-Verzeichnis
+      # je nach Docker-Setup (rootless/userns) auftreten koennen.
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bbbbot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    # Fertiges Image aus der Registry (per scripts/docker-push.sh gepusht).
+    # In Offline-/Intranet-Umgebungen auf den internen Mirror umstellen,
+    # z.B. registry.example.com/posiuke/bbb-recorder:latest
+    image: posiuke/bbb-recorder:latest
+    container_name: bbbbot-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # --- Datenbank (DB_PASSWORD == POSTGRES_PASSWORD oben, aus .env) ---
+      DB_URL: jdbc:postgresql://db:5432/bbbbot
+      DB_USER: bbbbot
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD fehlt - .env aus .env.example anlegen}
+
+      # --- Sicherheit ---
+      # JWT-Signaturschluessel, min. 32 Zeichen, zufaellig (aus .env).
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET fehlt - .env aus .env.example anlegen}
+
+      # --- Authentifizierung ---
+      # LDAP/Active Directory wird komplett im Admin-Bereich konfiguriert
+      # (Admin -> Authentifizierung: aktivieren, Verbindungsdaten, Testen).
+      # Hier nur noch das lokale Admin-Konto fuer den ersten Login:
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?ADMIN_INITIAL_PASSWORD fehlt - .env aus .env.example anlegen}
+
+      # --- Uploads ---
+      # Maximale Groesse fuer hochgeladene Audio-/Videodateien
+      MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-4GB}
+
+      # --- Bots ---
+      MAX_CONCURRENT_BOTS: "5"
+      # Self-Signed-Zertifikate im Intranet akzeptieren
+      INSECURE_TLS: "true"
+
+      STORAGE_DIR: /data/recordings
+    # UI + API werden zusammen auf 8080 ausgeliefert.
+    # Links der Host-Port (im Browser aufrufen), rechts bleibt 8080.
+    ports:
+      - "8090:8080"
+    volumes:
+      - ./data/recordings:/data/recordings
+    # Chromium braucht ausreichend Shared Memory
+    shm_size: "1gb"
+    restart: unless-stopped
+
+# Von Docker verwaltete Volumes (Daten bleiben ueber Container-Neustarts hinweg
+# erhalten; werden erst bei `docker-compose down -v` geloescht).
+volumes:
+  pgdata:

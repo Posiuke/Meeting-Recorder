@@ -1,0 +1,262 @@
+import { translate } from '../i18n';
+import type { GlossaryImportResult, RecordingView } from '../types';
+
+const TOKEN_KEY = 'bbb_token';
+
+let unauthorizedHandler: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: () => void): void {
+  unauthorizedHandler = handler;
+}
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string | null): void {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+}
+
+export class ApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+/**
+ * Prüft clientseitig, ob das JWT abgelaufen ist (exp-Claim). So wird der
+ * Nutzer beim nächsten API-Aufruf sofort abgemeldet, statt erst durch die
+ * 401-Antwort des Servers. Nicht dekodierbare Tokens gelten als abgelaufen.
+ */
+export function isTokenExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))) as {
+      exp?: number;
+    };
+    if (typeof payload.exp !== 'number') return false;
+    return payload.exp * 1000 <= Date.now();
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Abmeldung auslösen, wenn ein Aufruf außerhalb von {@link api} eine 401
+ * erhält (z.B. der rohe Chunk-Upload der Bildschirmaufnahme).
+ */
+export function notifyUnauthorized(): void {
+  unauthorizedHandler?.();
+}
+
+/** Abgelaufene Session zentral beenden; wirft den passenden 401-Fehler. */
+function rejectExpiredSession(): ApiError {
+  setToken(null);
+  unauthorizedHandler?.();
+  return new ApiError(401, translate('errors.sessionExpired'));
+}
+
+interface RequestOptions {
+  method?: string;
+  /** Objekt (wird als JSON gesendet) oder FormData für Datei-Uploads. */
+  body?: unknown;
+}
+
+/**
+ * Fetch-Wrapper: setzt Authorization-Header, parst JSON und behandelt Fehler.
+ * Bei HTTP 401 (außer beim Login) wird der registrierte Handler aufgerufen,
+ * der den Nutzer automatisch abmeldet.
+ */
+export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token && isTokenExpired(token) && !path.startsWith('/api/auth/login')) {
+    throw rejectExpiredSession();
+  }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  // Bei FormData setzt der Browser den Content-Type samt Boundary selbst –
+  // ein eigener Header würde den Upload unbrauchbar machen.
+  const isFormData = options.body instanceof FormData;
+  if (options.body !== undefined && !isFormData) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  const response = await fetch(path, {
+    method: options.method ?? 'GET',
+    headers,
+    body:
+      options.body === undefined
+        ? undefined
+        : isFormData
+          ? (options.body as FormData)
+          : JSON.stringify(options.body),
+  });
+
+  if (response.status === 401 && !path.startsWith('/api/auth/login')) {
+    unauthorizedHandler?.();
+    throw new ApiError(401, translate('errors.sessionExpired'));
+  }
+
+  if (!response.ok) {
+    let message = translate('errors.generic', { status: response.status });
+    try {
+      const data: unknown = await response.json();
+      if (data && typeof data === 'object') {
+        const obj = data as Record<string, unknown>;
+        if (typeof obj.message === 'string' && obj.message) {
+          message = obj.message;
+        } else if (typeof obj.error === 'string' && obj.error) {
+          message = obj.error;
+        }
+      }
+    } catch {
+      // Antwort ohne JSON-Körper – Standardmeldung verwenden
+    }
+    throw new ApiError(response.status, message);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+  const text = await response.text();
+  return (text ? JSON.parse(text) : undefined) as T;
+}
+
+/** Fehlermeldung aus beliebigen Fehlern (Error, rejectWithValue-String, ...) extrahieren. */
+export function errorMessage(e: unknown): string {
+  if (typeof e === 'string') return e;
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === 'object' && 'message' in e) {
+    const msg = (e as { message: unknown }).message;
+    if (typeof msg === 'string') return msg;
+  }
+  return translate('errors.unknown');
+}
+
+export interface UploadRecordingOptions {
+  title?: string;
+  aiAnalysis: boolean;
+  processNow: boolean;
+  diarize?: boolean;
+}
+
+export interface UploadConfig {
+  /** Upload-Limit, damit zu große Dateien gar nicht erst hochgeladen werden. */
+  maxFileSizeBytes: number;
+  /** Hat der Admin die Sprechererkennung (Diarisierung) freigeschaltet? */
+  diarizeAllowed: boolean;
+}
+
+export function fetchUploadConfig(): Promise<UploadConfig> {
+  return api<UploadConfig>('/api/recordings/upload-config');
+}
+
+/**
+ * Lädt eine Audio-/Videodatei als neue Aufnahme hoch. Nutzt XMLHttpRequest
+ * statt fetch, damit der Upload-Fortschritt gemeldet werden kann.
+ */
+export function uploadRecording(
+  file: File,
+  options: UploadRecordingOptions,
+  onProgress?: (percent: number) => void,
+): Promise<RecordingView> {
+  return new Promise((resolve, reject) => {
+    const token = getToken();
+    if (token && isTokenExpired(token)) {
+      reject(rejectExpiredSession());
+      return;
+    }
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/recordings/upload');
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    }
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status === 401) {
+        unauthorizedHandler?.();
+        reject(new ApiError(401, translate('errors.sessionExpired')));
+        return;
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText) as RecordingView);
+        } catch {
+          reject(new ApiError(xhr.status, translate('errors.invalidResponse')));
+        }
+        return;
+      }
+      let message = translate('errors.generic', { status: xhr.status });
+      try {
+        const data = JSON.parse(xhr.responseText) as Record<string, unknown>;
+        if (typeof data.message === 'string' && data.message) message = data.message;
+        else if (typeof data.error === 'string' && data.error) message = data.error;
+      } catch {
+        // Antwort ohne JSON-Körper – Standardmeldung verwenden
+      }
+      reject(new ApiError(xhr.status, message));
+    };
+    xhr.onerror = () => reject(new ApiError(0, translate('errors.uploadNetwork')));
+
+    const form = new FormData();
+    form.append('file', file);
+    if (options.title?.trim()) form.append('title', options.title.trim());
+    form.append('aiAnalysis', String(options.aiAnalysis));
+    form.append('processNow', String(options.processNow));
+    form.append('diarize', String(options.diarize ?? false));
+    xhr.send(form);
+  });
+}
+
+/**
+ * Audio-URL mit Token als Query-Parameter, da <audio> keine Header setzen kann.
+ */
+export function audioUrl(recordingId: string, segmentId: string): string {
+  const token = getToken() ?? '';
+  return `/api/recordings/${recordingId}/segments/${segmentId}/audio?token=${encodeURIComponent(token)}`;
+}
+
+export function summaryDownloadUrl(recordingId: string): string {
+  const token = getToken() ?? '';
+  return `/api/recordings/${recordingId}/summary/download?token=${encodeURIComponent(token)}`;
+}
+
+/** Video-URL (MP4) mit Token als Query-Parameter, da <video> keine Header setzen kann. */
+export function videoUrl(recordingId: string): string {
+  const token = getToken() ?? '';
+  return `/api/recordings/${recordingId}/video?token=${encodeURIComponent(token)}`;
+}
+
+export function videoDownloadUrl(recordingId: string): string {
+  const token = getToken() ?? '';
+  return `/api/recordings/${recordingId}/video/download?token=${encodeURIComponent(token)}`;
+}
+
+/**
+ * Glossar als CSV-Datei. Token im Query-Parameter, weil der Download über einen
+ * normalen Link läuft (kein Header möglich).
+ */
+export function glossaryExportUrl(): string {
+  const token = getToken() ?? '';
+  return `/api/glossary/export?token=${encodeURIComponent(token)}`;
+}
+
+/** Liest eine CSV-Datei ins eigene Glossar ein (zusammenführen, nichts wird gelöscht). */
+export function importGlossary(file: File): Promise<GlossaryImportResult> {
+  const form = new FormData();
+  form.append('file', file);
+  return api<GlossaryImportResult>('/api/glossary/import', { method: 'POST', body: form });
+}

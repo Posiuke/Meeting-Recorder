@@ -1,0 +1,12 @@
+# Build-Kontext ist das Repo-Root (siehe backend/Dockerfile).
+# Alles ausschliessen, was der Build nicht braucht.
+.git
+.github
+.claude
+data
+node_modules
+**/node_modules
+frontend/dist
+backend/target
+.env
+*.log
