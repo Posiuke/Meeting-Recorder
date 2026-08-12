@@ -168,7 +168,18 @@ export const de = {
     remove: 'Entfernen',
     linkHeading: 'Link zum Teilen',
     linkIntro:
-      'Wer diesen Link kennt, sieht Video, Audio, Transkript und Zusammenfassung dieser Aufnahme – ohne Anmeldung und ohne Konto. Chat- und Sitzungsprotokoll bleiben intern. Den Link nur an Personen weitergeben, die die Aufnahme sehen dürfen; er lässt sich jederzeit widerrufen.',
+      'Ein Link, den du weitergeben kannst. Zwei Arten: kontogebunden (Empfänger meldet sich an und bekommt die Aufnahme dabei automatisch freigegeben) oder ohne Anmeldung (wer die Adresse kennt, sieht die Aufnahme). Chat- und Sitzungsprotokoll bleiben in beiden Fällen intern; jeder Link ist jederzeit widerrufbar.',
+    linkAccessLabel: 'Zugriff',
+    linkAccessLogin: 'Nur mit Anmeldung (empfohlen)',
+    linkAccessPublic: 'Ohne Anmeldung',
+    linkAccessLoginHint:
+      'Der Empfänger wird beim Öffnen zur Anmeldung geführt; danach ist die Aufnahme mit seinem Konto geteilt und erscheint oben in der Liste der Freigaben. Jeder Zugriff bleibt damit einer Person zuordenbar.',
+    linkAccessPublicHint:
+      'Video, Audio, Transkript und Zusammenfassung sind ohne Konto sichtbar – für Empfänger ohne Zugang zum System. Wer die Adresse weitergibt, gibt damit auch den Zugriff weiter.',
+    linkPublicDisabled:
+      'Freigabe-Links ohne Anmeldung sind auf diesem Server abgeschaltet. Bereits erzeugte Links verlangen ebenfalls eine Anmeldung.',
+    linkBadgeLogin: 'mit Anmeldung',
+    linkBadgePublic: 'ohne Anmeldung',
     linkExpiryLabel: 'Gültigkeit',
     linkExpiryNever: 'Bis zum Widerruf',
     linkExpiryDays: '{{days}} Tage',
@@ -589,6 +600,10 @@ export const de = {
     loading: 'Freigabe wird geladen…',
     intro:
       'Freigegebene Aufnahme – Sie sehen Video, Audio, Transkript und Zusammenfassung. Eine Anmeldung ist nicht nötig.',
+    claiming: 'Freigabe wird eingerichtet…',
+    loginRequiredTitle: 'Anmeldung erforderlich',
+    loginRequired:
+      'Diese Freigabe ist an ein Konto gebunden. Bitte melde dich an – die Aufnahme wird dir danach automatisch freigegeben und erscheint in deiner Aufnahmen-Liste.',
     sharedBy: 'Freigegeben von',
     validUntil: 'Link gültig bis',
     audioHeading: 'Audio',
@@ -627,6 +642,9 @@ export const de = {
     groupProcessingNote:
       'STT und KI-Auswertung laufen nur in diesem Zeitfenster, um tagsüber Ressourcen zu schonen. Nutzer können einzelne Aufnahmen per „Jetzt auswerten" sofort verarbeiten.',
     groupRecording: 'Aufnahme',
+    groupSharing: 'Freigabe-Links',
+    groupSharingNote:
+      'Freigabe-Links geben eine Aufnahme per Adresse weiter. Kontogebundene Links führen den Empfänger über die Anmeldung und erteilen ihm die Freigabe automatisch – jeder Zugriff bleibt einer Person zuordenbar. Wird publicLinks abgeschaltet, verlangen ALLE Links eine Anmeldung, auch bereits erzeugte.',
     groupCapture: 'Bildschirmaufnahme',
     groupCaptureNote:
       'Aufnahme des eigenen Bildschirms direkt im Browser der Nutzer. Setzt eine HTTPS-Verbindung und Chrome oder Edge voraus – Einzelheiten in docs/SCREEN_CAPTURE.md.',
@@ -688,6 +706,8 @@ export const de = {
         'Notbremse für die Satzbildung: Liefert die Spracherkennung keine Satzzeichen, wird nach so vielen Zeichen trotzdem getrennt. Sonst würde ein „Satz" beliebig lang.',
       correctionGlossaryMaxChars:
         'Wie viele Zeichen des persönlichen Glossars in den Prompt gehen (0 = unbegrenzt). Achtung: Der Block geht in JEDEN Glättungsschritt ein und kostet dort Kontext – bei sehr großen Glossaren entsprechend teurer.',
+      sharingPublicLinks:
+        'Dürfen Freigabe-Links ohne Anmeldung genutzt werden? Aus = jeder Freigabe-Link verlangt eine Anmeldung (auch bereits erzeugte), und der Empfänger bekommt die Aufnahme mit seinem Konto freigegeben. Die Datenschutz-Notbremse, wenn Zugriffe zuordenbar bleiben müssen.',
       captureEnabled:
         'Schaltet den Button „Bildschirm aufnehmen" auf der Aufnahmen-Seite frei. Ohne HTTPS bleibt die Funktion im Browser trotzdem gesperrt.',
       captureMaxMegabytes:

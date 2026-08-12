@@ -410,9 +410,14 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
           method: 'POST',
           path: '/api/recordings/{id}/share-links',
           summary:
-            'Create a public share link (owner only). Anyone who knows the address can see the video, audio, transcript and summary without signing in. Without expiresInDays the link is valid until revoked. The address is <base URL>/share/<token>.',
+            'Create a share link (owner only). The default is account-bound: the recipient signs in and the recording is shared with their account automatically. With requireLogin=false the link shows video, audio, transcript and summary without signing in. Without expiresInDays the link is valid until revoked. The address is <base URL>/share/<token>.',
           params: [
             { name: 'expiresInDays', description: 'validity in days (1–3650); omit for "until revoked"' },
+            {
+              name: 'requireLogin',
+              description:
+                'true (default) = sign-in required, the share is granted on the way; false = access without signing in. If the admin switched off sharing.publicLinks, false is rejected with 409.',
+            },
           ],
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
   -d '{"expiresInDays":30}' "$BBB/api/recordings/$ID/share-links"`,
@@ -423,7 +428,8 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
   "expiresAt": "2026-09-11T13:04:38Z",
   "expired": false,
   "views": 0,
-  "lastViewedAt": null
+  "lastViewedAt": null,
+  "requiresLogin": true
 }`,
         },
         {
@@ -432,10 +438,24 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
           summary: 'Revoke a share link – the address becomes invalid immediately.',
         },
         {
+          method: 'POST',
+          path: '/api/share-links/{token}/claim',
+          summary:
+            'Redeem an account-bound share link: the recording is shared with the signed-in user (redeeming twice still creates only one share); the response carries its id. For a link that needs no sign-in, no share is created on purpose.',
+          example: `curl -s -X POST -H "X-API-Key: $KEY" \\
+  "$BBB/api/share-links/$SHARE_TOKEN/claim"`,
+          response: `{"recordingId":"8f14e45f-...","title":"Jour Fixe","shared":true}`,
+        },
+        {
+          method: 'GET',
+          path: '/api/share-links/config',
+          summary: 'May this server share without sign-in? {"publicLinksAllowed":true}',
+        },
+        {
           method: 'GET',
           path: '/api/public/shares/{token}',
           summary:
-            'Contents of a share link: header data, audio segments, transcript and summary. Needs NO key – plus /video, /video/download, /segments/{segmentId}/audio and /summary/download. Unknown, expired and revoked tokens all answer with 404.',
+            'Contents of a share link: header data, audio segments, transcript and summary. Needs NO key – plus /video, /video/download, /segments/{segmentId}/audio and /summary/download. Unknown, expired and revoked tokens all answer with 404; an account-bound link answers with 403 (redeem it via /api/share-links/{token}/claim).',
           example: `curl -s "$BBB/api/public/shares/$SHARE_TOKEN"`,
         },
         {

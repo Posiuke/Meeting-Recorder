@@ -33,7 +33,8 @@ docs/       Anleitungen (u.a. Whisper-Diarisierung), Alt-Dokumentation
   Fachbegriffe, die der Glättung mitgegeben werden.
 - **Verwaltung**: Aufnahmen anhören (Streaming), herunterladen, löschen,
   mit Nutzern und selbst erstellten Gruppen teilen — oder per **Freigabe-Link**
-  ohne Anmeldung weitergeben (siehe unten). Admins pflegen
+  weitergeben, entweder kontogebunden (Empfänger meldet sich an und bekommt die
+  Freigabe automatisch) oder ohne Anmeldung (siehe unten). Admins pflegen
   Einstellungen (Whisper-/LLM-Parameter, Zeitfenster, Bot-Verhalten) und
   Admin-Rollen im Frontend.
 - **Datei-Upload**: Bestehende Audio-/Videodateien (MP3, WAV, M4A, MP4, …)
@@ -445,33 +446,44 @@ der Weboberfläche und mit `DELETE /api/recordings/{id}` löschbar. Bewusst kein
 automatisches Aufräumen — ein Transkript, das ein Skript verloren hat, soll nicht
 unwiederbringlich weg sein. Video wird bei diesem Weg nicht umgewandelt.
 
-## Freigabe-Link (Zugriff ohne Anmeldung)
+## Freigabe-Link
 
 Neben dem Teilen mit Nutzern und Gruppen kann der Besitzer einer Aufnahme unter
-**Teilen → Link zum Teilen** eine öffentliche Adresse erzeugen:
+**Teilen → Link zum Teilen** eine Adresse erzeugen, die er weitergibt:
 
 ```
 https://bbb.example.intern/share/<token>
 ```
 
-Wer sie kennt, sieht unter dieser Adresse **Video, Audio, Transkript und
-Zusammenfassung** — ohne Konto und ohne Anmeldung. Gedacht für Teilnehmer ohne
-Zugang zum System (Externe, Gäste, Vertretungen).
+Es gibt zwei Arten — die Wahl steht im Dialog unter **Zugriff**:
+
+| Zugriff | Verhalten |
+|---|---|
+| **Nur mit Anmeldung** (Standard) | Der Empfänger wird beim Öffnen zur Anmeldung geführt. Danach ist die Aufnahme **mit seinem Konto geteilt** (normale Freigabe, in der Liste des Besitzers sichtbar und dort widerrufbar) und er landet in der gewohnten Detailansicht. Jeder Zugriff bleibt einer Person zuordenbar. |
+| **Ohne Anmeldung** | Wer die Adresse kennt, sieht **Video, Audio, Transkript und Zusammenfassung** ohne Konto — für Empfänger ohne Zugang zum System (Externe, Gäste). |
 
 - Das Token sind 32 Byte Zufall (base64url) und steckt im Pfad; die Berechtigung
   gilt **nur für diese eine Aufnahme** und nur lesend.
-- **Nicht** enthalten sind Chat-Protokoll, Sitzungsprotokoll und die
-  Verarbeitungs-Historie — die bleiben der angemeldeten Ansicht vorbehalten.
+- In der Ansicht ohne Anmeldung sind Chat-Protokoll, Sitzungsprotokoll und die
+  Verarbeitungs-Historie **nicht** enthalten — die bleiben der angemeldeten
+  Ansicht vorbehalten. Sie startet in der Oberflächensprache des Freigebenden
+  (umschaltbar), nicht in der Browsersprache des Empfängers.
 - Laufzeit wahlweise unbegrenzt (bis zum Widerruf) oder 7/30/90 Tage. Ein
   Widerruf wirkt sofort; unbekannte, abgelaufene und widerrufene Adressen
   antworten gleich mit 404, damit Ausprobieren nichts verrät.
-- Der Dialog zeigt zu jedem Link, wie oft er aufgerufen wurde und wann zuletzt.
-- Mehrere Links pro Aufnahme sind möglich (z.B. einer je Empfängerkreis),
-  maximal 20.
+- Der Dialog zeigt zu jedem Link seine Art, wie oft er aufgerufen wurde und wann
+  zuletzt. Mehrere Links pro Aufnahme sind möglich (z.B. einer je
+  Empfängerkreis), maximal 20.
+- **Datenschutz-Notbremse:** Die Admin-Einstellung `sharing.publicLinks`
+  schaltet den Zugriff ohne Anmeldung installationsweit ab. Dann verlangen
+  **alle** Freigabe-Links eine Anmeldung — auch bereits erzeugte offene Links,
+  die damit rückwirkend zu kontogebundenen werden.
 - Endpunkte: `GET|POST /api/recordings/{id}/share-links`,
-  `DELETE /api/recordings/{id}/share-links/{linkId}` (nur Besitzer) sowie
-  ohne jede Authentifizierung `GET /api/public/shares/{token}` samt
-  `/video`, `/segments/{segmentId}/audio` und `/summary/download`.
+  `DELETE /api/recordings/{id}/share-links/{linkId}` (nur Besitzer),
+  `POST /api/share-links/{token}/claim` (angemeldet, löst einen kontogebundenen
+  Link ein) sowie ohne jede Authentifizierung
+  `GET /api/public/shares/{token}` samt `/video`,
+  `/segments/{segmentId}/audio` und `/summary/download`.
 
 Wird die Aufnahme gelöscht, verschwinden ihre Links mit ihr.
 

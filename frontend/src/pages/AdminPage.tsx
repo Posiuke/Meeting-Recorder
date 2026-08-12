@@ -34,6 +34,7 @@ const SETTING_GROUPS: SettingsGroupDef[] = [
   { titleKey: 'admin.groupProcessing', prefix: 'processing.', noteKey: 'admin.groupProcessingNote' },
   { titleKey: 'admin.groupRecording', prefix: 'recording.' },
   { titleKey: 'admin.groupCapture', prefix: 'capture.', noteKey: 'admin.groupCaptureNote' },
+  { titleKey: 'admin.groupSharing', prefix: 'sharing.', noteKey: 'admin.groupSharingNote' },
   { titleKey: 'admin.groupBot', prefix: 'bot.' },
   { titleKey: 'admin.groupCleanup', prefix: 'cleanup.' },
 ];
@@ -80,6 +81,7 @@ const KEY_HELP: Record<string, TranslationKey> = {
   'capture.enabled': 'admin.keyHelp.captureEnabled',
   'capture.maxMegabytes': 'admin.keyHelp.captureMaxMegabytes',
   'capture.staleMinutes': 'admin.keyHelp.captureStaleMinutes',
+  'sharing.publicLinks': 'admin.keyHelp.sharingPublicLinks',
 };
 
 type AdminTab = 'settings' | 'auth' | 'users';

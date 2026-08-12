@@ -102,6 +102,12 @@ public class SettingsService {
     /** Nach so vielen Minuten ohne neue Daten gilt eine Bildschirmaufnahme als abgebrochen. */
     public static final String CAPTURE_STALE_MINUTES = "capture.staleMinutes";
 
+    /**
+     * Duerfen Freigabe-Links ohne Anmeldung genutzt werden? Aus = jeder Link
+     * verlangt eine Anmeldung, auch bereits erzeugte (Datenschutz-Notbremse).
+     */
+    public static final String SHARING_PUBLIC_LINKS = "sharing.publicLinks";
+
     public static final String CLEANUP_ENABLED = "cleanup.enabled";
     public static final String CLEANUP_OLDER_THAN_DAYS = "cleanup.olderThanDays";
 
@@ -209,6 +215,8 @@ public class SettingsService {
         DEFAULTS.put(CAPTURE_MAX_MEGABYTES, "8192");
         DEFAULTS.put(CAPTURE_STALE_MINUTES, "5");
 
+        DEFAULTS.put(SHARING_PUBLIC_LINKS, "true");
+
         DEFAULTS.put(CLEANUP_ENABLED, "true");
         DEFAULTS.put(CLEANUP_OLDER_THAN_DAYS, "90");
     }
@@ -279,7 +287,8 @@ public class SettingsService {
                 case LLM_TEMPERATURE, BOT_RECONNECT_BACKOFF_FACTOR -> Double.parseDouble(value.trim());
                 case WHISPER_VAD_FILTER, WHISPER_DIARIZE, LLM_DISABLE_THINKING,
                      BOT_SEND_CHAT_WARNING, BOT_KEEPALIVE_ENABLED,
-                     BOT_AUTO_RECONNECT, CAPTURE_ENABLED, CORRECTION_ENABLED, CLEANUP_ENABLED -> {
+                     BOT_AUTO_RECONNECT, CAPTURE_ENABLED, CORRECTION_ENABLED, CLEANUP_ENABLED,
+                     SHARING_PUBLIC_LINKS -> {
                     if (!value.trim().equalsIgnoreCase("true") && !value.trim().equalsIgnoreCase("false")) {
                         throw new IllegalArgumentException("erwartet true/false");
                     }

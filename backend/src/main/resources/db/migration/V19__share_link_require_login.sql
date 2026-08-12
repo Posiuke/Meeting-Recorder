@@ -1,0 +1,11 @@
+-- Zweite Art von Freigabe-Link: kontogebunden statt oeffentlich.
+--
+-- require_login = TRUE  -> Der Empfaenger muss sich anmelden; beim Oeffnen wird
+--                          die Aufnahme automatisch mit seinem Konto geteilt
+--                          (share_grant). Jeder Zugriff ist damit einem Konto
+--                          zuzuordnen - das ist der neue Standard.
+-- require_login = FALSE -> Zugriff allein ueber die Adresse, ohne Anmeldung.
+--
+-- Bestehende Links behalten ihr Verhalten (FALSE): Sie wurden bewusst als
+-- offene Links erzeugt und weitergegeben.
+ALTER TABLE share_link ADD COLUMN require_login BOOLEAN NOT NULL DEFAULT FALSE;

@@ -7,11 +7,13 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.options.AriaRole;
+import com.microsoft.playwright.options.BoundingBox;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.nio.file.Path;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -43,8 +45,11 @@ class UiShareLinkSmokeTest {
             DiagnosticsCapture diag = new DiagnosticsCapture(Path.of("target", "it-diag", "ui-share"));
             // Deutsch erzwingen: Die Oberflaeche folgt sonst der Browsersprache,
             // und dieser Test sucht Knoepfe an ihrer deutschen Beschriftung.
-            BrowserContext context = browser.newContext(
-                    new Browser.NewContextOptions().setLocale("de-DE"));
+            BrowserContext context = browser.newContext(new Browser.NewContextOptions()
+                    .setLocale("de-DE")
+                    // Ohne diese Freigabe schlaegt das Schreiben in die Zwischenablage
+                    // fehl und die Bestaetigung "Kopiert" erscheint nie.
+                    .setPermissions(java.util.List.of("clipboard-read", "clipboard-write")));
             Page page = context.newPage();
             diag.attachConsole(page);
 
@@ -87,6 +92,7 @@ class UiShareLinkSmokeTest {
                     new Page.GetByRoleOptions().setName("Teilen").setExact(true)).click();
             page.waitForSelector("#share-link-expiry",
                     new Page.WaitForSelectorOptions().setTimeout(15_000));
+            page.selectOption("#share-link-access", "public");
             page.selectOption("#share-link-expiry", "30");
             page.getByRole(AriaRole.BUTTON,
                     new Page.GetByRoleOptions().setName("Link erzeugen")).click();
@@ -96,6 +102,20 @@ class UiShareLinkSmokeTest {
             diag.capture(page, "share-dialog");
             assertNotNull(shareUrl);
             assertTrue(shareUrl.contains("/share/"), "Unerwartete Freigabe-Adresse: " + shareUrl);
+
+            // "Kopieren" -> "Kopiert" darf die Adresse daneben NICHT umbrechen:
+            // Der Knopf ist so breit wie das laengere Wort und bleibt es.
+            BoundingBox before = linkCode.first().boundingBox();
+            page.locator(".share-link-item .token-reveal button").first().click();
+            page.waitForSelector(".share-link-item .token-reveal button:has-text('Kopiert')",
+                    new Page.WaitForSelectorOptions().setTimeout(5_000));
+            BoundingBox after = linkCode.first().boundingBox();
+            assertEquals(before.width, after.width, 0.5,
+                    "Die Adresse wird beim Wechsel auf 'Kopiert' anders umbrochen (Breite)");
+            assertEquals(before.height, after.height, 0.5,
+                    "Die Adresse wird beim Wechsel auf 'Kopiert' anders umbrochen (Hoehe)");
+            assertEquals(shareUrl, linkCode.first().textContent(),
+                    "Die angezeigte Adresse hat sich beim Kopieren veraendert");
 
             // Frischer Kontext = kein Login-Token, keine Sitzung: genau die Lage
             // eines Empfaengers, der den Link bekommt.
@@ -113,6 +133,41 @@ class UiShareLinkSmokeTest {
             // Die Ansicht laeuft ohne Anmeldung - keine Umleitung auf /login
             assertTrue(shared.url().contains("/share/"),
                     "Freigabe-Ansicht wurde umgeleitet: " + shared.url());
+
+            // Zweiter Link, diesmal kontogebunden: ohne Anmeldung nur die
+            // Aufforderung, sich anzumelden - kein Inhalt.
+            page.selectOption("#share-link-access", "login");
+            page.getByRole(AriaRole.BUTTON,
+                    new Page.GetByRoleOptions().setName("Link erzeugen")).click();
+            // Der neueste Link steht oben; auf einen zweiten Eintrag warten
+            page.waitForFunction(
+                    "document.querySelectorAll('.share-link-item').length >= 2");
+            String accountUrl = linkCode.first().textContent();
+            assertNotNull(accountUrl);
+            assertTrue(!accountUrl.equals(shareUrl), "Der zweite Link ist derselbe wie der erste");
+            diag.capture(page, "share-dialog-account-link");
+
+            BrowserContext guest = browser.newContext(
+                    new Browser.NewContextOptions().setLocale("de-DE"));
+            Page invited = guest.newPage();
+            diag.attachConsole(invited);
+            invited.navigate(accountUrl);
+            invited.waitForSelector("text=Anmeldung erforderlich",
+                    new Page.WaitForSelectorOptions().setTimeout(15_000));
+            diag.capture(invited, "account-link-login-prompt");
+            assertTrue(invited.locator("audio").count() == 0,
+                    "Kontogebundener Link liefert Inhalte ohne Anmeldung");
+
+            // Nach der Anmeldung wird die Aufnahme automatisch freigegeben und
+            // die Detailansicht geoeffnet.
+            invited.getByRole(AriaRole.BUTTON,
+                    new Page.GetByRoleOptions().setName("Anmelden")).click();
+            invited.fill("#login-username", user);
+            invited.fill("#login-password", password);
+            invited.click("button[type=submit]");
+            invited.waitForURL(url -> url.contains("/recordings/"),
+                    new Page.WaitForURLOptions().setTimeout(20_000));
+            diag.capture(invited, "account-link-claimed");
             diag.flush();
         }
     }

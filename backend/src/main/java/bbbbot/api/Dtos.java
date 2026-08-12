@@ -208,17 +208,33 @@ public final class Dtos {
      * seine eigene oeffentliche Adresse nicht kennen muss.
      *
      * @param expiresInDays Laufzeit in Tagen oder {@code null} fuer "bis zum Widerruf"
+     * @param requireLogin  true (Standard) = Empfaenger muss sich anmelden und
+     *                      bekommt die Aufnahme dabei mit seinem Konto freigegeben;
+     *                      false = Zugriff allein ueber die Adresse
      */
-    public record ShareLinkRequest(Integer expiresInDays) {}
+    public record ShareLinkRequest(Integer expiresInDays, Boolean requireLogin) {}
 
+    /**
+     * @param requiresLogin was fuer diesen Link tatsaechlich gilt - der Wunsch des
+     *                      Besitzers ODER die Admin-Notbremse (Zugriff ohne
+     *                      Anmeldung installationsweit abgeschaltet)
+     */
     public record ShareLinkView(UUID id, String token, Instant createdAt, Instant expiresAt,
-                                boolean expired, int views, Instant lastViewedAt) {
-        public static ShareLinkView of(ShareLink link) {
+                                boolean expired, int views, Instant lastViewedAt,
+                                boolean requiresLogin) {
+        public static ShareLinkView of(ShareLink link, boolean requiresLogin) {
             return new ShareLinkView(link.getId(), link.getToken(), link.getCreatedAt(),
                     link.getExpiresAt(), link.isExpired(Instant.now()),
-                    link.getViews(), link.getLastViewedAt());
+                    link.getViews(), link.getLastViewedAt(), requiresLogin);
         }
     }
+
+    /**
+     * Ergebnis des Einloesens eines Freigabe-Links.
+     *
+     * @param shared true = die Aufnahme wurde dabei neu mit dem Konto geteilt
+     */
+    public record ShareLinkClaimView(UUID recordingId, String title, boolean shared) {}
 
     /**
      * Alles, was die oeffentliche Freigabe-Ansicht zeigt: Kopfdaten, Video,
@@ -228,13 +244,17 @@ public final class Dtos {
      *
      * @param transcript Zusammengefuehrtes Transkript (geglaettete Fassung, falls vorhanden)
      * @param summary    Neueste fertige Zusammenfassung als Markdown; null wenn keine existiert
+     * @param language   Oberflaechensprache des Freigebenden (null = nie gewaehlt). Die
+     *                   Freigabe-Ansicht startet damit statt mit der Browsersprache des
+     *                   Empfaengers: Inhalt und Beschriftung passen so eher zusammen.
      */
     public record PublicShareView(String title, Instant startedAt, Instant endedAt, Long durationMs,
                                   String source, String sharedBy, boolean hasVideo,
                                   List<PublicSegmentView> segments,
                                   String summary, Instant summaryCreatedAt,
                                   String transcript, List<TranscriptEntry> entries,
-                                  List<ParticipantView> participants, Instant expiresAt) {}
+                                  List<ParticipantView> participants, Instant expiresAt,
+                                  String language) {}
 
     /** Abspielbares Audio-Segment in der Freigabe-Ansicht. */
     public record PublicSegmentView(UUID id, int seq, Long durationMs, Long sizeBytes) {

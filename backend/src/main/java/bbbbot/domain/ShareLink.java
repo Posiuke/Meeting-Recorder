@@ -9,8 +9,17 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Oeffentlicher Freigabe-Link einer Aufnahme: Wer die Adresse kennt, sieht
- * Video, Audio, Transkript und Zusammenfassung, ohne sich anzumelden.
+ * Freigabe-Link einer Aufnahme. Zwei Arten:
+ *
+ * <ul>
+ *   <li>{@code requireLogin = true} (Standard): Der Empfaenger muss sich
+ *       anmelden; beim Oeffnen wird die Aufnahme automatisch mit seinem Konto
+ *       geteilt. Datenschutzfreundlich, weil jeder Zugriff einem Konto zuzuordnen
+ *       ist und die Freigabe in der Liste des Besitzers auftaucht.</li>
+ *   <li>{@code requireLogin = false}: Wer die Adresse kennt, sieht Video, Audio,
+ *       Transkript und Zusammenfassung ohne Anmeldung - fuer Empfaenger ohne
+ *       Zugang zum System.</li>
+ * </ul>
  *
  * <p>Das Token liegt bewusst im Klartext in der Datenbank (anders als bei
  * {@link ApiKey}): Der Besitzer soll den Link auch spaeter noch kopieren
@@ -43,12 +52,20 @@ public class ShareLink {
     /** NULL = gueltig bis zum Widerruf. */
     private Instant expiresAt;
 
+    /**
+     * Anmeldung noetig? Der Standard ist bewusst {@code true}: Ein Link ohne
+     * Anmeldung entsteht nur, wenn der Besitzer ihn ausdruecklich waehlt.
+     */
+    @Column(nullable = false)
+    private boolean requireLogin = true;
+
     private Instant lastViewedAt;
 
     @Column(nullable = false)
     private int views = 0;
 
-    public static ShareLink create(UUID recordingId, String token, UUID createdBy, Instant expiresAt) {
+    public static ShareLink create(UUID recordingId, String token, UUID createdBy, Instant expiresAt,
+                                  boolean requireLogin) {
         ShareLink link = new ShareLink();
         link.id = UUID.randomUUID();
         link.recordingId = recordingId;
@@ -56,6 +73,7 @@ public class ShareLink {
         link.createdBy = createdBy;
         link.createdAt = Instant.now();
         link.expiresAt = expiresAt;
+        link.requireLogin = requireLogin;
         return link;
     }
 
@@ -69,6 +87,7 @@ public class ShareLink {
     public UUID getCreatedBy() { return createdBy; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getExpiresAt() { return expiresAt; }
+    public boolean isRequireLogin() { return requireLogin; }
     public Instant getLastViewedAt() { return lastViewedAt; }
     public void setLastViewedAt(Instant lastViewedAt) { this.lastViewedAt = lastViewedAt; }
     public int getViews() { return views; }

@@ -24,7 +24,7 @@ in **einem** Container; PostgreSQL läuft separat.
 - ⏱️ **Verarbeitungs-Zeitfenster** (STT/LLM z. B. nachts) plus „Jetzt auswerten"
 - 🧪 **Verbindungstests** für Whisper und LLM direkt im Admin-Bereich
 - 👥 **Teilen & Gruppen**, Admin-Bereich für Einstellungen und Benutzer
-- 🔗 **Freigabe-Link**: Aufnahme per Adresse weitergeben — Empfänger sehen Video, Audio, Transkript und Zusammenfassung **ohne Anmeldung**, mit optionaler Laufzeit und jederzeit widerrufbar
+- 🔗 **Freigabe-Link**: Aufnahme per Adresse weitergeben — entweder **kontogebunden** (Empfänger meldet sich an und bekommt die Freigabe automatisch, Standard) oder **ohne Anmeldung** für Externe; mit optionaler Laufzeit, jederzeit widerrufbar, per Admin-Schalter installationsweit auf „nur mit Anmeldung" begrenzbar
 - 🌐 **Oberfläche auf Deutsch und Englisch** – jeder Nutzer wählt seine Sprache selbst, gespeichert am Konto (gilt auf jedem Gerät)
 - 🔐 **Anmeldung** per lokalem Konto **oder** LDAP/Active Directory — vollständig im Admin-Bereich konfigurier- und testbar
 - 🧹 **Aufräumen**: Aufbewahrungsfrist für alte Aufnahmen, Bereinigung hängengebliebener Aufnahmen
@@ -226,17 +226,31 @@ Zusammenfassung und geglättetes Transkript werden als GitHub-Markdown angezeigt
 `mermaid` werden als Diagramm gezeichnet; anfordern lässt sich das über den
 Auswertungs-Prompt („… zusätzlich als Mermaid-Flussdiagramm").
 
-## Freigabe-Link (Zugriff ohne Anmeldung)
+## Freigabe-Link
 
 Über **Teilen → Link zum Teilen** erzeugt der Besitzer einer Aufnahme eine
-öffentliche Adresse (`https://<host>/share/<token>`). Wer sie kennt, sieht dort
-**Video, Audio, Transkript und Zusammenfassung** — ohne Konto und ohne
-Anmeldung. Gedacht für Empfänger ohne Zugang zum System.
+Adresse (`https://<host>/share/<token>`) und wählt dabei den **Zugriff**:
+
+- **Nur mit Anmeldung** (Standard): Der Empfänger wird beim Öffnen zur Anmeldung
+  geführt; danach ist die Aufnahme mit seinem Konto geteilt und erscheint in
+  seiner Aufnahmen-Liste. Jeder Zugriff bleibt einer Person zuordenbar.
+- **Ohne Anmeldung**: Wer die Adresse kennt, sieht **Video, Audio, Transkript und
+  Zusammenfassung** ohne Konto — für Empfänger ohne Zugang zum System.
 
 Chat- und Sitzungsprotokoll bleiben der angemeldeten Ansicht vorbehalten. Die
 Laufzeit ist wahlweise unbegrenzt (bis zum Widerruf) oder 7/30/90 Tage; ein
-Widerruf wirkt sofort. Der Dialog zeigt zu jedem Link die Zahl der Aufrufe und
-den letzten Zugriff. Wird die Aufnahme gelöscht, verschwinden ihre Links mit ihr.
+Widerruf wirkt sofort. Der Dialog zeigt zu jedem Link die Art, die Zahl der
+Aufrufe und den letzten Zugriff. Wird die Aufnahme gelöscht, verschwinden ihre
+Links mit ihr.
+
+Wer Zugriffe grundsätzlich zuordenbar halten muss, schaltet die Admin-Einstellung
+`sharing.publicLinks` aus: Dann verlangen **alle** Freigabe-Links eine Anmeldung,
+auch bereits erzeugte.
+
+Hinweis zu Downloads: Ob der Browser beim Herunterladen nach einem Zielordner
+fragt, ist eine Browser-Einstellung (Chrome/Edge: *Einstellungen → Downloads →
+„Vor jedem Download fragen, wo Dateien gespeichert werden sollen"*). Die
+Anwendung kann das nicht erzwingen.
 
 ## Quellcode, Fehler und Feature-Wünsche
 

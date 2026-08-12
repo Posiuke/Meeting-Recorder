@@ -1912,6 +1912,21 @@ tbody tr:hover {
   font-size: 0.85rem;
 }
 
+ /* Beide Beschriftungen des Kopier-Knopfes im gleichen Rasterfeld: Die Breite
+   richtet sich nach dem laengeren Wort und bleibt beim Wechsel stabil. */
+.copy-labels {
+  display: inline-grid;
+  justify-items: center;
+}
+
+.copy-labels > span {
+  grid-area: 1 / 1;
+}
+
+.copy-labels > span.copy-label-off {
+  visibility: hidden;
+}
+
 .upload-preset-hint {
   font-size: 0.85rem;
 }

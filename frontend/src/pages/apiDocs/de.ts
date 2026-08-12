@@ -411,9 +411,14 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           method: 'POST',
           path: '/api/recordings/{id}/share-links',
           summary:
-            'Öffentlichen Freigabe-Link erzeugen (nur Besitzer). Wer die Adresse kennt, sieht Video, Audio, Transkript und Zusammenfassung ohne Anmeldung. Ohne expiresInDays gilt der Link bis zum Widerruf. Die Adresse lautet <Basis-URL>/share/<token>.',
+            'Freigabe-Link erzeugen (nur Besitzer). Standard ist kontogebunden: Der Empfänger meldet sich an und bekommt die Aufnahme dabei automatisch freigegeben. Mit requireLogin=false entsteht ein Link, der ohne Anmeldung Video, Audio, Transkript und Zusammenfassung zeigt. Ohne expiresInDays gilt der Link bis zum Widerruf. Die Adresse lautet <Basis-URL>/share/<token>.',
           params: [
             { name: 'expiresInDays', description: 'Laufzeit in Tagen (1–3650); weglassen = bis zum Widerruf' },
+            {
+              name: 'requireLogin',
+              description:
+                'true (Standard) = Anmeldung nötig, Freigabe wird dabei erteilt; false = Zugriff ohne Anmeldung. Hat der Admin sharing.publicLinks abgeschaltet, wird false mit 409 abgewiesen.',
+            },
           ],
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
   -d '{"expiresInDays":30}' "$BBB/api/recordings/$ID/share-links"`,
@@ -424,7 +429,8 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
   "expiresAt": "2026-09-11T13:04:38Z",
   "expired": false,
   "views": 0,
-  "lastViewedAt": null
+  "lastViewedAt": null,
+  "requiresLogin": true
 }`,
         },
         {
@@ -433,10 +439,24 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           summary: 'Freigabe-Link widerrufen – die Adresse ist sofort ungültig.',
         },
         {
+          method: 'POST',
+          path: '/api/share-links/{token}/claim',
+          summary:
+            'Kontogebundenen Freigabe-Link einlösen: Die Aufnahme wird mit dem angemeldeten Nutzer geteilt (mehrfaches Einlösen erzeugt nur eine Freigabe); zurück kommt ihre Kennung. Bei einem Link ohne Anmeldepflicht wird bewusst keine Freigabe angelegt.',
+          example: `curl -s -X POST -H "X-API-Key: $KEY" \\
+  "$BBB/api/share-links/$SHARE_TOKEN/claim"`,
+          response: `{"recordingId":"8f14e45f-...","title":"Jour Fixe","shared":true}`,
+        },
+        {
+          method: 'GET',
+          path: '/api/share-links/config',
+          summary: 'Darf auf diesem Server ohne Anmeldung geteilt werden? {"publicLinksAllowed":true}',
+        },
+        {
           method: 'GET',
           path: '/api/public/shares/{token}',
           summary:
-            'Inhalt eines Freigabe-Links: Kopfdaten, Audio-Segmente, Transkript und Zusammenfassung. Braucht KEINEN Schlüssel – dazu /video, /video/download, /segments/{segmentId}/audio und /summary/download. Unbekannte, abgelaufene und widerrufene Tokens antworten gleich mit 404.',
+            'Inhalt eines Freigabe-Links: Kopfdaten, Audio-Segmente, Transkript und Zusammenfassung. Braucht KEINEN Schlüssel – dazu /video, /video/download, /segments/{segmentId}/audio und /summary/download. Unbekannte, abgelaufene und widerrufene Tokens antworten gleich mit 404; ein kontogebundener Link mit 403 (dann über /api/share-links/{token}/claim einlösen).',
           example: `curl -s "$BBB/api/public/shares/$SHARE_TOKEN"`,
         },
         {

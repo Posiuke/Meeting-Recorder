@@ -84,17 +84,24 @@ export function isLanguage(value: unknown): value is Language {
  * Sprache umstellen und überall bekannt machen: Formatierungen, das
  * `lang`-Attribut des Dokuments (für Vorlesehilfen und Silbentrennung) und der
  * lokale Merker, damit schon der Anmeldebildschirm richtig erscheint.
+ *
+ * `persist: false` lässt den lokalen Merker unberührt – für Sprachen, die die
+ * Anwendung selbst vorgibt statt der Nutzer (die Freigabe-Ansicht startet in der
+ * Sprache des Freigebenden; das soll die eigene Wahl des Betrachters nicht
+ * überschreiben).
  */
-export function setLanguage(language: Language): void {
+export function setLanguage(language: Language, persist = true): void {
   current = language;
   setFormatLocale(LOCALES[language]);
   if (typeof document !== 'undefined') {
     document.documentElement.lang = language;
   }
-  try {
-    localStorage.setItem(STORAGE_KEY, language);
-  } catch {
-    // Privater Modus ohne localStorage: Die Sprache gilt dann nur für diese Sitzung.
+  if (persist) {
+    try {
+      localStorage.setItem(STORAGE_KEY, language);
+    } catch {
+      // Privater Modus ohne localStorage: Die Sprache gilt dann nur für diese Sitzung.
+    }
   }
   listeners.forEach((listener) => listener());
 }

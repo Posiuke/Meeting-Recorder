@@ -116,11 +116,12 @@ class MigrationSchemaIT {
 
         // Oeffentlicher Freigabe-Link (V18)
         ShareLink link = ShareLink.create(recording.getId(), "token-" + UUID.randomUUID(),
-                recording.getOwnerId(), null);
+                recording.getOwnerId(), null, true);
         shareLinkRepo.saveAndFlush(link);
         assertThat(shareLinkRepo.findByToken(link.getToken()))
                 .get()
-                .satisfies(l -> assertThat(l.getViews()).isZero());
+                .satisfies(l -> assertThat(l.getViews()).isZero())
+                .satisfies(l -> assertThat(l.isRequireLogin()).isTrue());
         assertThat(shareLinkRepo.findByRecordingIdOrderByCreatedAtDesc(recording.getId()))
                 .hasSize(1);
 

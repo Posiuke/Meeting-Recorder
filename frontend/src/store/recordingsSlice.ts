@@ -340,16 +340,22 @@ export const fetchShareLinks = createAsyncThunk<ShareLinkView[], string, { rejec
   },
 );
 
-/** Öffentlichen Freigabe-Link erzeugen (`expiresInDays` null = bis zum Widerruf). */
+/**
+ * Freigabe-Link erzeugen. `expiresInDays` null = bis zum Widerruf;
+ * `requireLogin` true = Empfänger muss sich anmelden (Standard).
+ */
 export const createShareLink = createAsyncThunk<
   ShareLinkView,
-  { recordingId: string; expiresInDays: number | null },
+  { recordingId: string; expiresInDays: number | null; requireLogin: boolean },
   { rejectValue: string }
->('recordings/createShareLink', async ({ recordingId, expiresInDays }, { rejectWithValue }) => {
+>('recordings/createShareLink', async (
+  { recordingId, expiresInDays, requireLogin },
+  { rejectWithValue },
+) => {
   try {
     return await api<ShareLinkView>(`/api/recordings/${recordingId}/share-links`, {
       method: 'POST',
-      body: { expiresInDays },
+      body: { expiresInDays, requireLogin },
     });
   } catch (e) {
     return rejectWithValue(errorMessage(e));

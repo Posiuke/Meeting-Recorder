@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import Alert from '../components/Alert';
 import Markdown from '../components/Markdown';
 import Spinner from '../components/Spinner';
 import TranscriptList from '../components/TranscriptList';
+import { useAppSelector } from '../store/hooks';
 import {
+  ApiError,
+  claimShareLink,
   errorMessage,
   publicAudioUrl,
   publicShare,
@@ -13,7 +16,7 @@ import {
   publicVideoUrl,
 } from '../api/client';
 import { formatBytes, formatDateTime, formatDuration } from '../utils/format';
-import { LANGUAGES, useI18n } from '../i18n';
+import { FALLBACK_LANGUAGE, isLanguage, LANGUAGES, setLanguage as applyLanguage, useI18n } from '../i18n';
 import type { TranslationKey } from '../i18n';
 import type { PublicShareView, RecordingSource } from '../types';
 
@@ -26,6 +29,16 @@ const SOURCE_KEYS: Record<RecordingSource, TranslationKey> = {
 
 type TabKey = 'summary' | 'transcript';
 
+/** Was die Seite gerade zeigt. */
+type Mode =
+  | { kind: 'loading' }
+  | { kind: 'view'; share: PublicShareView }
+  /** Kontogebundener Link, Betrachter ist nicht angemeldet. */
+  | { kind: 'login' }
+  /** Kontogebundener Link wird eingelöst (Freigabe wird erteilt). */
+  | { kind: 'claiming' }
+  | { kind: 'error'; message: string };
+
 /**
  * Öffentliche Freigabe-Ansicht: erreichbar über einen Freigabe-Link, ohne
  * Anmeldung. Zeigt Video, Audio, Transkript und Zusammenfassung der Aufnahme –
@@ -35,79 +48,143 @@ type TabKey = 'summary' | 'transcript';
  * Browser spielt hier keine Rolle, weil sie nur den öffentlichen Endpunkt nutzt.
  */
 export default function SharePage() {
-  const { t, language, setLanguage } = useI18n();
+  const { t, language } = useI18n();
   const { token } = useParams<{ token: string }>();
-  const [share, setShare] = useState<PublicShareView | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const authStatus = useAppSelector((s) => s.auth.status);
+  const [mode, setMode] = useState<Mode>({ kind: 'loading' });
   const [tab, setTab] = useState<TabKey>('summary');
+  /** Hat der Betrachter die Sprache hier selbst umgestellt? Dann nicht überschreiben. */
+  const languageChosen = useRef(false);
 
   useEffect(() => {
-    if (!token) return;
+    // Solange ein gespeichertes Login noch geprüft wird, nicht vorschnell die
+    // Anmelde-Aufforderung zeigen - der Nutzer ist womöglich angemeldet.
+    if (!token || authStatus === 'idle' || authStatus === 'loading') return;
     let active = true;
-    setLoading(true);
+    setMode({ kind: 'loading' });
     publicShare(token)
       .then((data) => {
         if (!active) return;
-        setShare(data);
-        setError(null);
+        setMode({ kind: 'view', share: data });
         // Ohne Zusammenfassung ist das Transkript das Interessante
         if (!data.summary) setTab('transcript');
+        // In der Sprache des Freigebenden starten: Beschriftung und Inhalt passen
+        // so eher zusammen als mit der Browsersprache des Empfängers. Bewusst
+        // ohne zu speichern - die eigene Wahl des Betrachters bleibt unberührt.
+        if (!languageChosen.current) {
+          applyLanguage(isLanguage(data.language) ? data.language : FALLBACK_LANGUAGE, false);
+        }
       })
       .catch((e: unknown) => {
-        if (active) setError(errorMessage(e));
-      })
-      .finally(() => {
-        if (active) setLoading(false);
+        if (!active) return;
+        // 403 = kontogebundener Link: über die Anmeldung einlösen
+        if (e instanceof ApiError && e.status === 403) {
+          if (authStatus !== 'authenticated') {
+            setMode({ kind: 'login' });
+            return;
+          }
+          setMode({ kind: 'claiming' });
+          claimShareLink(token)
+            .then((claim) => {
+              if (active) navigate(`/recordings/${claim.recordingId}`, { replace: true });
+            })
+            .catch((claimError: unknown) => {
+              if (active) setMode({ kind: 'error', message: errorMessage(claimError) });
+            });
+          return;
+        }
+        setMode({ kind: 'error', message: errorMessage(e) });
       });
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [token, authStatus, navigate]);
 
-  if (loading) {
+  const chooseLanguage = (value: string) => {
+    if (!isLanguage(value)) return;
+    languageChosen.current = true;
+    applyLanguage(value);
+  };
+
+  /** Kopfzeile mit Marke und Sprachwahl - die Seite hat kein Layout drumherum. */
+  const head = (
+    <div className="share-page-head">
+      <span className="app-brand">
+        <span className="app-brand-dot" />
+        {t('app.brand')}
+      </span>
+      <select
+        className="language-select"
+        value={language}
+        aria-label={t('app.languageLabel')}
+        onChange={(e) => chooseLanguage(e.target.value)}
+      >
+        {LANGUAGES.map((l) => (
+          <option key={l.code} value={l.code}>
+            {l.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+
+  if (mode.kind === 'loading' || mode.kind === 'claiming' || authStatus === 'idle'
+      || authStatus === 'loading') {
     return (
       <div className="share-page">
-        <Spinner label={t('sharePage.loading')} />
+        {head}
+        <Spinner
+          label={mode.kind === 'claiming' ? t('sharePage.claiming') : t('sharePage.loading')}
+        />
       </div>
     );
   }
 
-  if (error || !share || !token) {
+  // Kontogebundener Link: erst anmelden, danach wird die Aufnahme automatisch
+  // freigegeben (die Anmeldeseite kehrt hierher zurück).
+  if (mode.kind === 'login') {
     return (
       <div className="share-page">
+        {head}
+        <div className="card">
+          <h1>{t('sharePage.loginRequiredTitle')}</h1>
+          <p className="muted">{t('sharePage.loginRequired')}</p>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => navigate('/login', { state: { from: location } })}
+          >
+            {t('login.submit')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode.kind === 'error' || !token) {
+    return (
+      <div className="share-page">
+        {head}
         <div className="card">
           <h1>{t('sharePage.unavailableTitle')}</h1>
-          <Alert kind="error">{error ?? t('sharePage.unavailable')}</Alert>
+          <Alert kind="error">
+            {mode.kind === 'error' ? mode.message : t('sharePage.unavailable')}
+          </Alert>
           <p className="muted">{t('sharePage.unavailableHint')}</p>
         </div>
       </div>
     );
   }
 
+  const share = mode.share;
   const title =
     share.title ?? t('recordingDetail.fallbackTitle', { date: formatDateTime(share.startedAt) });
 
   return (
     <div className="share-page">
-      <div className="share-page-head">
-        <span className="app-brand">
-          <span className="app-brand-dot" />
-          {t('app.brand')}
-        </span>
-        <select
-          className="language-select"
-          value={language}
-          aria-label={t('app.languageLabel')}
-          onChange={(e) => setLanguage(e.target.value as typeof language)}
-        >
-          {LANGUAGES.map((l) => (
-            <option key={l.code} value={l.code}>
-              {l.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      {head}
 
       <div className="card">
         <h1>{title}</h1>

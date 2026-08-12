@@ -8,6 +8,7 @@ import bbbbot.domain.ProcessingJob;
 import bbbbot.domain.Recording;
 import bbbbot.domain.RecordingSegment;
 import bbbbot.domain.ShareGrant;
+import bbbbot.domain.ShareLink;
 import bbbbot.domain.Summary;
 import bbbbot.domain.UserGroup;
 import bbbbot.llm.SummaryService;
@@ -564,13 +565,19 @@ public class RecordingController {
     public List<Dtos.ShareLinkView> shareLinks(@PathVariable UUID id) {
         AppUser user = CurrentUser.get();
         access.requireOwner(id, user);
-        return shareLinkService.linksOf(id).stream().map(Dtos.ShareLinkView::of).toList();
+        return shareLinkService.linksOf(id).stream()
+                .map(l -> Dtos.ShareLinkView.of(l, shareLinkService.requiresLogin(l)))
+                .toList();
     }
 
     /**
-     * Erzeugt einen oeffentlichen Freigabe-Link (nur Besitzer): Wer die Adresse
-     * kennt, sieht Video, Audio, Transkript und Zusammenfassung dieser Aufnahme
-     * ohne Anmeldung. Ohne {@code expiresInDays} gilt der Link bis zum Widerruf.
+     * Erzeugt einen Freigabe-Link (nur Besitzer). Standard ist ein
+     * kontogebundener Link: Der Empfaenger meldet sich an und bekommt die
+     * Aufnahme dabei automatisch freigegeben. Mit {@code requireLogin=false}
+     * entsteht ein offener Link - wer die Adresse kennt, sieht Video, Audio,
+     * Transkript und Zusammenfassung ohne Anmeldung; das kann der Admin
+     * installationsweit verbieten. Ohne {@code expiresInDays} gilt der Link bis
+     * zum Widerruf.
      */
     @PostMapping("/{id}/share-links")
     public Dtos.ShareLinkView createShareLink(@PathVariable UUID id,
@@ -582,12 +589,20 @@ public class RecordingController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Laufzeit muss zwischen 1 und " + ShareLinkService.MAX_EXPIRY_DAYS + " Tagen liegen");
         }
+        // Fehlende Angabe = kontogebunden: Der sicherere Fall ist der Standard.
+        boolean requireLogin = request == null || request.requireLogin() == null
+                || request.requireLogin();
+        if (!requireLogin && !shareLinkService.publicLinksAllowed()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Freigabe-Links ohne Anmeldung sind auf diesem Server abgeschaltet");
+        }
         if (shareLinkService.countOf(id) >= ShareLinkService.MAX_LINKS_PER_RECORDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Maximal " + ShareLinkService.MAX_LINKS_PER_RECORDING
                             + " Freigabe-Links pro Aufnahme - bitte nicht mehr benoetigte widerrufen");
         }
-        return Dtos.ShareLinkView.of(shareLinkService.create(id, user.getId(), days));
+        ShareLink link = shareLinkService.create(id, user.getId(), days, requireLogin);
+        return Dtos.ShareLinkView.of(link, shareLinkService.requiresLogin(link));
     }
 
     /** Widerruft einen Freigabe-Link; die Adresse ist danach sofort ungueltig. */

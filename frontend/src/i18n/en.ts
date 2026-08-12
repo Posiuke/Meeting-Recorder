@@ -166,7 +166,18 @@ export const en: typeof de = {
     remove: 'Remove',
     linkHeading: 'Link for sharing',
     linkIntro:
-      'Anyone who has this link can see the video, audio, transcript and summary of this recording – without signing in and without an account. Chat and session logs stay internal. Only pass the link on to people who are allowed to see the recording; it can be revoked at any time.',
+      'A link you can pass on. Two kinds: account-bound (the recipient signs in and the recording is shared with their account automatically) or without sign-in (anyone who knows the address can see the recording). Chat and session logs stay internal either way; every link can be revoked at any time.',
+    linkAccessLabel: 'Access',
+    linkAccessLogin: 'Sign-in required (recommended)',
+    linkAccessPublic: 'Without sign-in',
+    linkAccessLoginHint:
+      'The recipient is taken to the sign-in page; afterwards the recording is shared with their account and appears in the list of shares above. Every access stays attributable to a person.',
+    linkAccessPublicHint:
+      'Video, audio, transcript and summary are visible without an account – for recipients without access to the system. Passing on the address also passes on the access.',
+    linkPublicDisabled:
+      'Share links without sign-in are switched off on this server. Links created earlier also require signing in.',
+    linkBadgeLogin: 'sign-in required',
+    linkBadgePublic: 'no sign-in',
     linkExpiryLabel: 'Validity',
     linkExpiryNever: 'Until revoked',
     linkExpiryDays: '{{days}} days',
@@ -585,6 +596,10 @@ export const en: typeof de = {
     loading: 'Loading shared recording…',
     intro:
       'Shared recording – you can see the video, audio, transcript and summary. No sign-in required.',
+    claiming: 'Setting up access…',
+    loginRequiredTitle: 'Sign-in required',
+    loginRequired:
+      'This share is bound to an account. Please sign in – the recording will then be shared with you automatically and appears in your list of recordings.',
     sharedBy: 'Shared by',
     validUntil: 'Link valid until',
     audioHeading: 'Audio',
@@ -623,6 +638,9 @@ export const en: typeof de = {
     groupProcessingNote:
       'STT and AI analysis only run within this window to spare resources during the day. Users can process individual recordings immediately via "Analyse now".',
     groupRecording: 'Recording',
+    groupSharing: 'Share links',
+    groupSharingNote:
+      'Share links pass a recording on by address. Account-bound links take the recipient through sign-in and grant them the share automatically – every access stays attributable to a person. If publicLinks is switched off, ALL links require signing in, including ones created earlier.',
     groupCapture: 'Screen recording',
     groupCaptureNote:
       'Recording of the user\'s own screen directly in the browser. Requires an HTTPS connection and Chrome or Edge – details in docs/SCREEN_CAPTURE.md.',
@@ -682,6 +700,8 @@ export const en: typeof de = {
         'Emergency brake for sentence building: if the speech recognition provides no punctuation, a split happens after this many characters anyway. Otherwise a "sentence" could grow without limit.',
       correctionGlossaryMaxChars:
         'How many characters of the personal glossary go into the prompt (0 = unlimited). Caution: the block goes into EVERY smoothing step and costs context there – considerably more expensive with very large glossaries.',
+      sharingPublicLinks:
+        'May share links be used without signing in? Off = every share link requires signing in (including ones created earlier), and the recipient gets the recording shared with their account. The privacy fallback when every access has to stay attributable.',
       captureEnabled:
         'Enables the "Record screen" button on the recordings page. Without HTTPS the function stays blocked in the browser regardless.',
       captureMaxMegabytes:

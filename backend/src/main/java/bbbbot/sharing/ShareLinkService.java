@@ -2,6 +2,7 @@ package bbbbot.sharing;
 
 import bbbbot.domain.ShareLink;
 import bbbbot.repository.Repositories.ShareLinkRepo;
+import bbbbot.settings.SettingsService;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
@@ -37,10 +38,12 @@ public class ShareLinkService {
     private static final Duration VIEW_RESOLUTION = Duration.ofMinutes(1);
 
     private final ShareLinkRepo repo;
+    private final SettingsService settings;
     private final SecureRandom random = new SecureRandom();
 
-    public ShareLinkService(ShareLinkRepo repo) {
+    public ShareLinkService(ShareLinkRepo repo, SettingsService settings) {
         this.repo = repo;
+        this.settings = settings;
     }
 
     public List<ShareLink> linksOf(UUID recordingId) {
@@ -55,13 +58,31 @@ public class ShareLinkService {
      * Legt einen neuen Link an.
      *
      * @param expiresInDays Laufzeit in Tagen oder {@code null} fuer "bis zum Widerruf"
+     * @param requireLogin  true = Empfaenger muss sich anmelden, die Aufnahme wird
+     *                      dabei automatisch mit seinem Konto geteilt
      */
-    public ShareLink create(UUID recordingId, UUID createdBy, Integer expiresInDays) {
+    public ShareLink create(UUID recordingId, UUID createdBy, Integer expiresInDays,
+                            boolean requireLogin) {
         Instant expiresAt = expiresInDays == null ? null
                 : Instant.now().plus(expiresInDays, ChronoUnit.DAYS);
-        ShareLink link = ShareLink.create(recordingId, newToken(), createdBy, expiresAt);
+        ShareLink link = ShareLink.create(recordingId, newToken(), createdBy, expiresAt, requireLogin);
         repo.save(link);
         return link;
+    }
+
+    /** Darf ueberhaupt ohne Anmeldung zugegriffen werden? (Admin-Einstellung) */
+    public boolean publicLinksAllowed() {
+        return settings.getBool(SettingsService.SHARING_PUBLIC_LINKS);
+    }
+
+    /**
+     * Verlangt dieser Link eine Anmeldung? Neben der Wahl des Besitzers zieht
+     * hier die Admin-Einstellung: Ist der Zugriff ohne Anmeldung installationsweit
+     * abgeschaltet, gelten AUCH bereits erzeugte offene Links als kontogebunden.
+     * Das ist die Notbremse - sonst blieben alte Links weiter offen.
+     */
+    public boolean requiresLogin(ShareLink link) {
+        return link.isRequireLogin() || !publicLinksAllowed();
     }
 
     public Optional<ShareLink> findOfRecording(UUID recordingId, UUID linkId) {

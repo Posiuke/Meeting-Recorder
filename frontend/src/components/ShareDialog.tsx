@@ -15,7 +15,7 @@ import {
   removeShareLink,
 } from '../store/recordingsSlice';
 import { fetchGroups } from '../store/groupsSlice';
-import { errorMessage, shareLinkUrl } from '../api/client';
+import { errorMessage, fetchShareLinkConfig, shareLinkUrl } from '../api/client';
 import { formatDateTime } from '../utils/format';
 import { useI18n } from '../i18n';
 import type { UserView } from '../types';
@@ -38,6 +38,10 @@ export default function ShareDialog({ recordingId, onClose }: ShareDialogProps) 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [expiresInDays, setExpiresInDays] = useState('');
+  // Standard ist der kontogebundene Link: Ein Zugriff ohne Anmeldung entsteht
+  // nur, wenn der Besitzer ihn ausdrücklich wählt.
+  const [requireLogin, setRequireLogin] = useState(true);
+  const [publicLinksAllowed, setPublicLinksAllowed] = useState(true);
   const [linkBusy, setLinkBusy] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
 
@@ -46,6 +50,14 @@ export default function ShareDialog({ recordingId, onClose }: ShareDialogProps) 
     dispatch(fetchShareLinks(recordingId));
     dispatch(fetchGroups());
   }, [dispatch, recordingId]);
+
+  // Hat der Admin Links ohne Anmeldung erlaubt? Wenn nicht, wird die Auswahl
+  // gar nicht angeboten.
+  useEffect(() => {
+    fetchShareLinkConfig()
+      .then((cfg) => setPublicLinksAllowed(cfg.publicLinksAllowed))
+      .catch(() => setPublicLinksAllowed(false)); // im Zweifel die strengere Annahme
+  }, []);
 
   const shareWithUser = async (user: UserView) => {
     setError(null);
@@ -90,6 +102,7 @@ export default function ShareDialog({ recordingId, onClose }: ShareDialogProps) 
         createShareLink({
           recordingId,
           expiresInDays: expiresInDays === '' ? null : Number(expiresInDays),
+          requireLogin: requireLogin || !publicLinksAllowed,
         }),
       ).unwrap();
     } catch (e) {
@@ -184,6 +197,27 @@ export default function ShareDialog({ recordingId, onClose }: ShareDialogProps) 
       <p className="muted">{t('share.linkIntro')}</p>
 
       <div className="form-field">
+        <label htmlFor="share-link-access">{t('share.linkAccessLabel')}</label>
+        <select
+          id="share-link-access"
+          value={requireLogin ? 'login' : 'public'}
+          disabled={linkBusy || !publicLinksAllowed}
+          onChange={(e) => setRequireLogin(e.target.value === 'login')}
+        >
+          <option value="login">{t('share.linkAccessLogin')}</option>
+          <option value="public">{t('share.linkAccessPublic')}</option>
+        </select>
+        <span className="muted upload-preset-hint">
+          {requireLogin || !publicLinksAllowed
+            ? t('share.linkAccessLoginHint')
+            : t('share.linkAccessPublicHint')}
+        </span>
+        {!publicLinksAllowed && (
+          <span className="muted upload-preset-hint">{t('share.linkPublicDisabled')}</span>
+        )}
+      </div>
+
+      <div className="form-field">
         <label htmlFor="share-link-expiry">{t('share.linkExpiryLabel')}</label>
         <div className="inline-form">
           <select
@@ -224,6 +258,9 @@ export default function ShareDialog({ recordingId, onClose }: ShareDialogProps) 
           </div>
           <div className="share-link-meta">
             <span className="muted">
+              <span className={`badge ${link.requiresLogin ? 'badge-green' : 'badge-orange'}`}>
+                {link.requiresLogin ? t('share.linkBadgeLogin') : t('share.linkBadgePublic')}
+              </span>{' '}
               {t('share.linkCreated', { date: formatDateTime(link.createdAt) })}
               {' · '}
               {link.expiresAt === null

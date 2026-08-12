@@ -2,6 +2,7 @@ package bbbbot.sharing;
 
 import bbbbot.domain.ShareLink;
 import bbbbot.repository.Repositories.ShareLinkRepo;
+import bbbbot.settings.SettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -23,6 +24,7 @@ import static org.mockito.Mockito.when;
 class ShareLinkServiceTest {
 
     private ShareLinkRepo repo;
+    private SettingsService settings;
     private ShareLinkService service;
     private final Map<String, ShareLink> stored = new HashMap<>();
 
@@ -32,7 +34,9 @@ class ShareLinkServiceTest {
     @BeforeEach
     void setup() {
         repo = mock(ShareLinkRepo.class);
-        service = new ShareLinkService(repo);
+        settings = mock(SettingsService.class);
+        when(settings.getBool(SettingsService.SHARING_PUBLIC_LINKS)).thenReturn(true);
+        service = new ShareLinkService(repo, settings);
         stored.clear();
         // Gespeicherte Links merken, damit resolve() sie wiederfindet
         when(repo.save(any(ShareLink.class))).thenAnswer(inv -> {
@@ -46,8 +50,8 @@ class ShareLinkServiceTest {
 
     @Test
     void tokenIstLangUndZufaellig() {
-        String first = service.create(recordingId, ownerId, null).getToken();
-        String second = service.create(recordingId, ownerId, null).getToken();
+        String first = service.create(recordingId, ownerId, null, false).getToken();
+        String second = service.create(recordingId, ownerId, null, false).getToken();
         assertThat(first).hasSize(ShareLink.TOKEN_LENGTH).isNotEqualTo(second);
         // base64url: keine Zeichen, die in einer URL gequotet werden muessten
         assertThat(first).matches("[A-Za-z0-9_-]+");
@@ -55,7 +59,7 @@ class ShareLinkServiceTest {
 
     @Test
     void ohneLaufzeitGiltDerLinkBisZumWiderruf() {
-        ShareLink link = service.create(recordingId, ownerId, null);
+        ShareLink link = service.create(recordingId, ownerId, null, false);
         assertThat(link.getExpiresAt()).isNull();
         assertThat(link.isExpired(Instant.now().plus(3650, ChronoUnit.DAYS))).isFalse();
         assertThat(service.resolve(link.getToken())).contains(link);
@@ -63,7 +67,7 @@ class ShareLinkServiceTest {
 
     @Test
     void laufzeitWirdInTagenGerechnet() {
-        ShareLink link = service.create(recordingId, ownerId, 7);
+        ShareLink link = service.create(recordingId, ownerId, 7, false);
         assertThat(link.getExpiresAt())
                 .isAfter(Instant.now().plus(6, ChronoUnit.DAYS))
                 .isBefore(Instant.now().plus(8, ChronoUnit.DAYS));
@@ -72,7 +76,7 @@ class ShareLinkServiceTest {
     @Test
     void abgelaufeneLinksGeltenAlsUnbekannt() {
         ShareLink link = ShareLink.create(recordingId, "abgelaufen", ownerId,
-                Instant.now().minusSeconds(1));
+                Instant.now().minusSeconds(1), false);
         stored.put(link.getToken(), link);
         assertThat(service.resolve("abgelaufen")).isEmpty();
     }
@@ -86,7 +90,7 @@ class ShareLinkServiceTest {
 
     @Test
     void zugriffZaehltUndWirdNichtBeiJedemAufrufGeschrieben() {
-        ShareLink link = service.create(recordingId, ownerId, null);
+        ShareLink link = service.create(recordingId, ownerId, null, false);
 
         service.recordView(link);
         assertThat(link.getViews()).isEqualTo(1);
@@ -104,11 +108,36 @@ class ShareLinkServiceTest {
 
     @Test
     void linkEinerAnderenAufnahmeWirdNichtGefunden() {
-        ShareLink link = service.create(recordingId, ownerId, null);
+        ShareLink link = service.create(recordingId, ownerId, null, false);
         when(repo.findById(link.getId())).thenReturn(Optional.of(link));
 
         assertThat(service.findOfRecording(recordingId, link.getId())).contains(link);
         assertThat(service.findOfRecording(UUID.randomUUID(), link.getId())).isEmpty();
+    }
+
+    @Test
+    void offenerLinkVerlangtKeineAnmeldung() {
+        ShareLink link = service.create(recordingId, ownerId, null, false);
+        assertThat(link.isRequireLogin()).isFalse();
+        assertThat(service.requiresLogin(link)).isFalse();
+    }
+
+    @Test
+    void kontogebundenerLinkVerlangtAnmeldung() {
+        ShareLink link = service.create(recordingId, ownerId, null, true);
+        assertThat(link.isRequireLogin()).isTrue();
+        assertThat(service.requiresLogin(link)).isTrue();
+    }
+
+    @Test
+    void adminNotbremseMachtAuchAlteOffeneLinksKontogebunden() {
+        ShareLink offen = service.create(recordingId, ownerId, null, false);
+        when(settings.getBool(SettingsService.SHARING_PUBLIC_LINKS)).thenReturn(false);
+
+        assertThat(service.publicLinksAllowed()).isFalse();
+        // Der Link bleibt gueltig - er verlangt jetzt aber eine Anmeldung
+        assertThat(service.resolve(offen.getToken())).contains(offen);
+        assertThat(service.requiresLogin(offen)).isTrue();
     }
 
     @Test

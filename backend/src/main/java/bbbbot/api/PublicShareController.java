@@ -64,7 +64,7 @@ public class PublicShareController {
 
     @GetMapping
     public Dtos.PublicShareView view(@PathVariable String token) {
-        ShareLink link = requireLink(token);
+        ShareLink link = requireOpenLink(token);
         Recording recording = requireRecording(link);
         shareLinks.recordView(link);
 
@@ -77,15 +77,13 @@ public class PublicShareController {
                 .filter(s -> s.getStatus() == Summary.Status.DONE && s.getMarkdown() != null)
                 .findFirst()
                 .orElse(null);
-        String sharedBy = userRepo.findById(recording.getOwnerId())
-                .map(AppUser::getDisplayName)
-                .orElse(null);
+        AppUser owner = userRepo.findById(recording.getOwnerId()).orElse(null);
 
         return new Dtos.PublicShareView(
                 recording.getTitle(), recording.getStartedAt(), recording.getEndedAt(),
                 recording.getDurationMs(),
                 (recording.getSource() == null ? Recording.Source.BOT : recording.getSource()).name(),
-                sharedBy, media.hasVideo(recording),
+                owner == null ? null : owner.getDisplayName(), media.hasVideo(recording),
                 segments.stream()
                         .filter(s -> s.getMp3Path() != null)
                         .map(Dtos.PublicSegmentView::of)
@@ -99,35 +97,50 @@ public class PublicShareController {
                 participantService.list(recording.getId()).stream()
                         .map(Dtos.ParticipantView::of)
                         .toList(),
-                link.getExpiresAt());
+                link.getExpiresAt(),
+                owner == null ? null : owner.getLanguage());
     }
 
     @GetMapping("/segments/{segmentId}/audio")
     public ResponseEntity<FileSystemResource> audio(@PathVariable String token,
                                                     @PathVariable UUID segmentId) {
-        Recording recording = requireRecording(requireLink(token));
+        Recording recording = requireRecording(requireOpenLink(token));
         return media.audio(recording.getId(), segmentId);
     }
 
     @GetMapping("/video")
     public ResponseEntity<FileSystemResource> video(@PathVariable String token) {
-        return media.video(requireRecording(requireLink(token)));
+        return media.video(requireRecording(requireOpenLink(token)));
     }
 
     @GetMapping("/video/download")
     public ResponseEntity<FileSystemResource> videoDownload(@PathVariable String token) {
-        return media.videoDownload(requireRecording(requireLink(token)));
+        return media.videoDownload(requireRecording(requireOpenLink(token)));
     }
 
     @GetMapping("/summary/download")
     public ResponseEntity<byte[]> summaryDownload(@PathVariable String token) {
-        return media.summaryDownload(requireRecording(requireLink(token)));
+        return media.summaryDownload(requireRecording(requireOpenLink(token)));
     }
 
-    private ShareLink requireLink(String token) {
-        return shareLinks.resolve(token)
+    /**
+     * Link zum Token, der ohne Anmeldung genutzt werden darf.
+     *
+     * <p>403 bedeutet hier: Der Link existiert, verlangt aber eine Anmeldung -
+     * entweder weil der Besitzer ihn so erzeugt hat oder weil der Admin den
+     * Zugriff ohne Anmeldung abgeschaltet hat. Das Frontend fuehrt daraufhin
+     * ueber die Anmeldung und loest den Link dort ein
+     * ({@code POST /api/share-links/&#123;token&#125;/claim}).
+     */
+    private ShareLink requireOpenLink(String token) {
+        ShareLink link = shareLinks.resolve(token)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Dieser Freigabe-Link ist ungueltig oder abgelaufen"));
+        if (shareLinks.requiresLogin(link)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Diese Freigabe ist nur mit Anmeldung zugaenglich");
+        }
+        return link;
     }
 
     /** Zur Aufnahme des Links; sie kann inzwischen geloescht worden sein. */

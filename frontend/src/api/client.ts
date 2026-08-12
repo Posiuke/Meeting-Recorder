@@ -1,5 +1,10 @@
 import { translate } from '../i18n';
-import type { GlossaryImportResult, PublicShareView, RecordingView } from '../types';
+import type {
+  GlossaryImportResult,
+  PublicShareView,
+  RecordingView,
+  ShareLinkClaimView,
+} from '../types';
 
 const TOKEN_KEY = 'bbb_token';
 
@@ -300,6 +305,21 @@ export function publicVideoDownloadUrl(token: string): string {
 
 export function publicSummaryDownloadUrl(token: string): string {
   return `/api/public/shares/${encodeURIComponent(token)}/summary/download`;
+}
+
+/**
+ * Kontogebundenen Freigabe-Link einlösen (angemeldet): Die Aufnahme wird mit dem
+ * eigenen Konto geteilt; zurück kommt ihre Kennung für den Sprung dorthin.
+ */
+export function claimShareLink(token: string): Promise<ShareLinkClaimView> {
+  return api<ShareLinkClaimView>(`/api/share-links/${encodeURIComponent(token)}/claim`, {
+    method: 'POST',
+  });
+}
+
+/** Darf auf diesem Server überhaupt ohne Anmeldung geteilt werden? (Admin-Einstellung) */
+export function fetchShareLinkConfig(): Promise<{ publicLinksAllowed: boolean }> {
+  return api<{ publicLinksAllowed: boolean }>('/api/share-links/config');
 }
 
 /**

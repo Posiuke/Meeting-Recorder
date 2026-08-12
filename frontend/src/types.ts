@@ -301,6 +301,20 @@ export interface ShareLinkView {
   expired: boolean;
   views: number;
   lastViewedAt: string | null;
+  /**
+   * true = Empfänger muss sich anmelden und bekommt die Aufnahme dabei
+   * freigegeben. Kann auch von der Admin-Einstellung kommen (Zugriff ohne
+   * Anmeldung installationsweit abgeschaltet).
+   */
+  requiresLogin: boolean;
+}
+
+/** Ergebnis des Einlösens eines Freigabe-Links durch einen angemeldeten Nutzer. */
+export interface ShareLinkClaimView {
+  recordingId: string;
+  title: string | null;
+  /** true = die Aufnahme wurde dabei neu mit dem Konto geteilt */
+  shared: boolean;
 }
 
 /** Abspielbares Audio-Segment in der Freigabe-Ansicht. */
@@ -332,6 +346,8 @@ export interface PublicShareView {
   participants: ParticipantView[];
   /** null = der Link gilt bis zum Widerruf */
   expiresAt: string | null;
+  /** Oberflächensprache des Freigebenden; null = nie gewählt */
+  language: string | null;
 }
 
 export interface LoginResponse {
