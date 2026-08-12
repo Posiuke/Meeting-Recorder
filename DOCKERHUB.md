@@ -13,7 +13,7 @@ in **einem** Container; PostgreSQL läuft separat.
 
 - 🎙️ **Audio-Aufnahme** des Meetings (gemischte Teilnehmer-Streams), segmentiert nach MP3
 - 🎬 **Optionale Video-Aufnahme** der Meeting-Ansicht als MP4 (Wiedergabe & Download im UI)
-- 📤 **Datei-Upload**: vorhandene Audio-/Videodateien (MP3, WAV, M4A, MP4, MKV …) als Aufnahme übernehmen und auswerten
+- 📤 **Datei-Upload**: vorhandene Audio-/Videodateien (MP3, WAV, M4A, MP4, MKV …) als Aufnahme übernehmen und auswerten — die Auswertungs-Vorlage ist schon im Upload-Dialog wählbar
 - 🖥️ **Bildschirmaufnahme im Browser**: Bildschirm/Fenster/Tab samt Systemton und optionalem Mikrofon direkt im Tool aufnehmen — für Termine ohne Bot (Teams/Zoom/WebEx, Präsenz). **Erfordert HTTPS** und Chrome/Edge, siehe [docs/SCREEN_CAPTURE.md](docs/SCREEN_CAPTURE.md)
 - 📝 **Transkription** wahlweise über einen **eigenen Whisper-Server** (optional mit Sprechertrennung/WhisperX) oder eine **OpenAI-kompatible Cloud-API** — mit fortlaufenden Zeitstempeln über die ganze Aufnahme und strukturierter Anzeige im UI
 - ✨ **KI-Glättung des Transkripts** vor der Auswertung (Füllwörter, Satzzeichen, Erkennungsfehler) — Original bleibt erhalten, im Transkript-Tab umschaltbar; dazu ein **persönliches Glossar** für Abkürzungen und Fachbegriffe
@@ -24,6 +24,7 @@ in **einem** Container; PostgreSQL läuft separat.
 - ⏱️ **Verarbeitungs-Zeitfenster** (STT/LLM z. B. nachts) plus „Jetzt auswerten"
 - 🧪 **Verbindungstests** für Whisper und LLM direkt im Admin-Bereich
 - 👥 **Teilen & Gruppen**, Admin-Bereich für Einstellungen und Benutzer
+- 🔗 **Freigabe-Link**: Aufnahme per Adresse weitergeben — Empfänger sehen Video, Audio, Transkript und Zusammenfassung **ohne Anmeldung**, mit optionaler Laufzeit und jederzeit widerrufbar
 - 🌐 **Oberfläche auf Deutsch und Englisch** – jeder Nutzer wählt seine Sprache selbst, gespeichert am Konto (gilt auf jedem Gerät)
 - 🔐 **Anmeldung** per lokalem Konto **oder** LDAP/Active Directory — vollständig im Admin-Bereich konfigurier- und testbar
 - 🧹 **Aufräumen**: Aufbewahrungsfrist für alte Aufnahmen, Bereinigung hängengebliebener Aufnahmen
@@ -224,6 +225,18 @@ Zusammenfassung und geglättetes Transkript werden als GitHub-Markdown angezeigt
 — Tabellen und Aufgabenlisten erscheinen als solche. Codeblöcke mit der Sprache
 `mermaid` werden als Diagramm gezeichnet; anfordern lässt sich das über den
 Auswertungs-Prompt („… zusätzlich als Mermaid-Flussdiagramm").
+
+## Freigabe-Link (Zugriff ohne Anmeldung)
+
+Über **Teilen → Link zum Teilen** erzeugt der Besitzer einer Aufnahme eine
+öffentliche Adresse (`https://<host>/share/<token>`). Wer sie kennt, sieht dort
+**Video, Audio, Transkript und Zusammenfassung** — ohne Konto und ohne
+Anmeldung. Gedacht für Empfänger ohne Zugang zum System.
+
+Chat- und Sitzungsprotokoll bleiben der angemeldeten Ansicht vorbehalten. Die
+Laufzeit ist wahlweise unbegrenzt (bis zum Widerruf) oder 7/30/90 Tage; ein
+Widerruf wirkt sofort. Der Dialog zeigt zu jedem Link die Zahl der Aufrufe und
+den letzten Zugriff. Wird die Aufnahme gelöscht, verschwinden ihre Links mit ihr.
 
 ## Quellcode, Fehler und Feature-Wünsche
 

@@ -287,6 +287,53 @@ export interface ShareView {
   createdAt: string;
 }
 
+/**
+ * Öffentlicher Freigabe-Link. Die vollständige Adresse wird im Frontend aus
+ * `token` gebildet (siehe `shareLinkUrl`) – der Server kennt seine eigene
+ * öffentliche Adresse nicht.
+ */
+export interface ShareLinkView {
+  id: string;
+  token: string;
+  createdAt: string;
+  /** null = gültig bis zum Widerruf */
+  expiresAt: string | null;
+  expired: boolean;
+  views: number;
+  lastViewedAt: string | null;
+}
+
+/** Abspielbares Audio-Segment in der Freigabe-Ansicht. */
+export interface PublicSegmentView {
+  id: string;
+  seq: number;
+  durationMs: number | null;
+  sizeBytes: number | null;
+}
+
+/**
+ * Inhalt der öffentlichen Freigabe-Ansicht: Video, Audio, Transkript und
+ * Zusammenfassung. Chat- und Sitzungsprotokoll sind bewusst nicht enthalten.
+ */
+export interface PublicShareView {
+  title: string | null;
+  startedAt: string;
+  endedAt: string | null;
+  durationMs: number | null;
+  source: RecordingSource;
+  /** Anzeigename des Besitzers, der die Aufnahme freigegeben hat. */
+  sharedBy: string | null;
+  hasVideo: boolean;
+  segments: PublicSegmentView[];
+  summary: string | null;
+  summaryCreatedAt: string | null;
+  transcript: string;
+  entries: TranscriptEntry[];
+  participants: ParticipantView[];
+  /** null = der Link gilt bis zum Widerruf */
+  expiresAt: string | null;
+}
+
 export interface LoginResponse {
   token: string;
   user: UserView;

@@ -164,6 +164,26 @@ export const en: typeof de = {
     empty: 'This recording has not been shared with anyone yet.',
     groupPrefix: 'Group: {{name}}',
     remove: 'Remove',
+    linkHeading: 'Link for sharing',
+    linkIntro:
+      'Anyone who has this link can see the video, audio, transcript and summary of this recording – without signing in and without an account. Chat and session logs stay internal. Only pass the link on to people who are allowed to see the recording; it can be revoked at any time.',
+    linkExpiryLabel: 'Validity',
+    linkExpiryNever: 'Until revoked',
+    linkExpiryDays: '{{days}} days',
+    linkCreate: 'Create link',
+    linkCreating: 'Creating…',
+    linkLoading: 'Loading links…',
+    linkEmpty: 'There is no share link for this recording yet.',
+    linkCreated: 'created on {{date}}',
+    linkValidForever: 'valid until revoked',
+    linkValidUntil: 'valid until {{date}}',
+    linkExpired: 'expired on {{date}}',
+    linkNeverOpened: 'not opened yet',
+    linkViews: '{{count}} view(s), last on {{date}}',
+    linkRevoke: 'Revoke',
+    confirmRevokeTitle: 'Revoke share link',
+    confirmRevokeMessage:
+      'The link becomes invalid immediately. Anyone who saved it will no longer be able to see the recording. Continue?',
   },
 
   groups: {
@@ -316,6 +336,11 @@ export const en: typeof de = {
     titlePlaceholder: 'The file name will be used',
     submit: 'Upload',
     uploading: 'Uploading… {{percent}}%',
+    presetLabel: 'Analysis template',
+    presetHelp:
+      'Determines how the AI analyses the content – "Meeting (default)" is geared towards meetings (decisions, action items). For talks, interviews or voice notes a different template fits better. The choice already applies to the first analysis; it can be changed later under "Customise analysis".',
+    presetChosenHint:
+      'This template will be used for the analysis and is visible afterwards under "Customise analysis".',
   },
 
   analysis: {
@@ -556,6 +581,19 @@ export const en: typeof de = {
     noContent: 'No content available.',
   },
 
+  sharePage: {
+    loading: 'Loading shared recording…',
+    intro:
+      'Shared recording – you can see the video, audio, transcript and summary. No sign-in required.',
+    sharedBy: 'Shared by',
+    validUntil: 'Link valid until',
+    audioHeading: 'Audio',
+    unavailableTitle: 'Share not available',
+    unavailable: 'This share link is invalid or has expired.',
+    unavailableHint:
+      'Please ask the person who sent you the link – it may have been revoked or have expired.',
+  },
+
   admin: {
     heading: 'Administration',
     tabSettings: 'Settings',
@@ -665,6 +703,7 @@ export const en: typeof de = {
     recordingLoad: 'Recording could not be loaded.',
     transcriptLoad: 'Transcript could not be loaded.',
     sharesLoad: 'Shares could not be loaded.',
+    shareLinksLoad: 'Share links could not be loaded.',
     groupsLoad: 'Groups could not be loaded.',
     membersLoad: 'Members could not be loaded.',
     glossaryLoad: 'Glossary could not be loaded.',

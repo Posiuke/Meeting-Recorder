@@ -5,10 +5,12 @@ import bbbbot.domain.GlossaryEntry;
 import bbbbot.domain.Recording;
 import bbbbot.domain.RecordingSegment;
 import bbbbot.domain.RecordingTag;
+import bbbbot.domain.ShareLink;
 import bbbbot.repository.Repositories.GlossaryEntryRepo;
 import bbbbot.repository.Repositories.RecordingRepo;
 import bbbbot.repository.Repositories.RecordingSegmentRepo;
 import bbbbot.repository.Repositories.RecordingTagRepo;
+import bbbbot.repository.Repositories.ShareLinkRepo;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -69,6 +71,9 @@ class MigrationSchemaIT {
     private GlossaryEntryRepo glossaryRepo;
 
     @Autowired
+    private ShareLinkRepo shareLinkRepo;
+
+    @Autowired
     private EntityManager em;
 
     @Test
@@ -108,6 +113,16 @@ class MigrationSchemaIT {
         glossaryRepo.saveAndFlush(GlossaryEntry.create(
                 recording.getOwnerId(), "RZ", "Rechenzentrum"));
         assertThat(glossaryRepo.findByOwnerIdAndTermKey(recording.getOwnerId(), "rz")).isPresent();
+
+        // Oeffentlicher Freigabe-Link (V18)
+        ShareLink link = ShareLink.create(recording.getId(), "token-" + UUID.randomUUID(),
+                recording.getOwnerId(), null);
+        shareLinkRepo.saveAndFlush(link);
+        assertThat(shareLinkRepo.findByToken(link.getToken()))
+                .get()
+                .satisfies(l -> assertThat(l.getViews()).isZero());
+        assertThat(shareLinkRepo.findByRecordingIdOrderByCreatedAtDesc(recording.getId()))
+                .hasSize(1);
 
         recording.setCorrectionStatus(Recording.CorrectionStatus.READY);
         recordingRepo.saveAndFlush(recording);

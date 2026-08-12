@@ -7,7 +7,7 @@ import bbbbot.domain.ProcessingJob;
 import bbbbot.domain.PromptTemplate;
 import bbbbot.domain.Recording;
 import bbbbot.domain.RecordingSegment;
-import bbbbot.domain.ShareGrant;
+import bbbbot.domain.ShareLink;
 import bbbbot.domain.Summary;
 import bbbbot.domain.UserGroup;
 
@@ -201,6 +201,47 @@ public final class Dtos {
     public record ShareRequest(UUID userId, UUID groupId) {}
 
     public record ShareView(UUID id, UUID recordingId, UserView user, GroupView group, Instant createdAt) {}
+
+    /**
+     * Oeffentlicher Freigabe-Link. {@code token} ist das Zugriffsmerkmal; die
+     * vollstaendige Adresse setzt das Frontend daraus zusammen, damit der Server
+     * seine eigene oeffentliche Adresse nicht kennen muss.
+     *
+     * @param expiresInDays Laufzeit in Tagen oder {@code null} fuer "bis zum Widerruf"
+     */
+    public record ShareLinkRequest(Integer expiresInDays) {}
+
+    public record ShareLinkView(UUID id, String token, Instant createdAt, Instant expiresAt,
+                                boolean expired, int views, Instant lastViewedAt) {
+        public static ShareLinkView of(ShareLink link) {
+            return new ShareLinkView(link.getId(), link.getToken(), link.getCreatedAt(),
+                    link.getExpiresAt(), link.isExpired(Instant.now()),
+                    link.getViews(), link.getLastViewedAt());
+        }
+    }
+
+    /**
+     * Alles, was die oeffentliche Freigabe-Ansicht zeigt: Kopfdaten, Video,
+     * Audio-Segmente, Transkript und Zusammenfassung. Bewusst NICHT enthalten
+     * sind Chat- und Sitzungsprotokoll sowie die Verarbeitungs-Historie - die
+     * bleiben der angemeldeten Ansicht vorbehalten.
+     *
+     * @param transcript Zusammengefuehrtes Transkript (geglaettete Fassung, falls vorhanden)
+     * @param summary    Neueste fertige Zusammenfassung als Markdown; null wenn keine existiert
+     */
+    public record PublicShareView(String title, Instant startedAt, Instant endedAt, Long durationMs,
+                                  String source, String sharedBy, boolean hasVideo,
+                                  List<PublicSegmentView> segments,
+                                  String summary, Instant summaryCreatedAt,
+                                  String transcript, List<TranscriptEntry> entries,
+                                  List<ParticipantView> participants, Instant expiresAt) {}
+
+    /** Abspielbares Audio-Segment in der Freigabe-Ansicht. */
+    public record PublicSegmentView(UUID id, int seq, Long durationMs, Long sizeBytes) {
+        public static PublicSegmentView of(RecordingSegment s) {
+            return new PublicSegmentView(s.getId(), s.getSeq(), s.getDurationMs(), s.getSizeBytes());
+        }
+    }
 
     public record GroupView(UUID id, String name, UUID ownerId, boolean mine, Instant createdAt) {
         public static GroupView of(UserGroup g, UUID currentUserId) {

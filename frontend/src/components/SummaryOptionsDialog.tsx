@@ -3,6 +3,7 @@ import Modal from './Modal';
 import Alert from './Alert';
 import ConfirmDialog from './ConfirmDialog';
 import HelpTip from './HelpTip';
+import PromptPresetSelect, { findOwnTemplate, resolvePresetPrompt } from './PromptPresetSelect';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { updateSummaryOptions } from '../store/recordingsSlice';
 import {
@@ -14,17 +15,6 @@ import {
 import { errorMessage } from '../api/client';
 import { useI18n } from '../i18n';
 import type { SummaryOptionsView } from '../types';
-
-/**
- * Integrierte Prompt-Vorlagen für typische Nicht-Meeting-Inhalte. Beschriftung
- * und Prompt kommen aus den Übersetzungen – ein englischsprachiger Nutzer soll
- * keinen deutschen Prompt vorgesetzt bekommen.
- */
-const PRESET_KEYS = [
-  { key: 'talk', labelKey: 'summaryOptions.presets.talkLabel', promptKey: 'summaryOptions.presets.talkPrompt' },
-  { key: 'interview', labelKey: 'summaryOptions.presets.interviewLabel', promptKey: 'summaryOptions.presets.interviewPrompt' },
-  { key: 'note', labelKey: 'summaryOptions.presets.noteLabel', promptKey: 'summaryOptions.presets.notePrompt' },
-] as const;
 
 /** Zielsprachen der Zusammenfassung (unabhängig von der Oberflächensprache). */
 const SUMMARY_LANGUAGES = [
@@ -83,21 +73,11 @@ export default function SummaryOptionsDialog({
     maxWordsNum !== null && (!Number.isInteger(maxWordsNum) || maxWordsNum < 10 || maxWordsNum > 10000);
 
   // Auswahl "tpl:<id>" = eigene Vorlage, sonst integrierte Vorlage
-  const selectedTemplate = preset.startsWith('tpl:')
-    ? templates.find((t) => t.id === preset.slice(4))
-    : undefined;
+  const selectedTemplate = findOwnTemplate(preset, templates);
 
   const applyPreset = (key: string) => {
     setPreset(key);
-    if (key === '') {
-      setPrompt('');
-    } else if (key.startsWith('tpl:')) {
-      const found = templates.find((t) => t.id === key.slice(4));
-      if (found) setPrompt(found.prompt);
-    } else {
-      const found = PRESET_KEYS.find((p) => p.key === key);
-      if (found) setPrompt(t(found.promptKey));
-    }
+    setPrompt(resolvePresetPrompt(key, templates));
   };
 
   /**
@@ -216,25 +196,13 @@ export default function SummaryOptionsDialog({
           {t('summaryOptions.presetLabel')}
           <HelpTip text={t('summaryOptions.presetHelp')} />
         </label>
-        <select id="so-preset" value={preset} disabled={busy} onChange={(e) => applyPreset(e.target.value)}>
-          <option value="">{t('summaryOptions.presetDefault')}</option>
-          <optgroup label={t('summaryOptions.presetBuiltIn')}>
-            {PRESET_KEYS.map((p) => (
-              <option key={p.key} value={p.key}>
-                {t(p.labelKey)}
-              </option>
-            ))}
-          </optgroup>
-          {templates.length > 0 && (
-            <optgroup label={t('summaryOptions.presetMine')}>
-              {templates.map((t) => (
-                <option key={t.id} value={`tpl:${t.id}`}>
-                  {t.name}
-                </option>
-              ))}
-            </optgroup>
-          )}
-        </select>
+        <PromptPresetSelect
+          id="so-preset"
+          value={preset}
+          templates={templates}
+          disabled={busy}
+          onChange={applyPreset}
+        />
         {templatesError && (
           <span className="field-error">
             {t('summaryOptions.templatesError', { message: templatesError })}

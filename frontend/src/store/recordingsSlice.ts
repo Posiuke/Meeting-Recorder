@@ -6,6 +6,7 @@ import type {
   ParticipantView,
   RecordingDetail,
   RecordingView,
+  ShareLinkView,
   ShareView,
   SummaryOptionsView,
   SummaryView,
@@ -43,6 +44,10 @@ interface RecordingsState {
   shares: ShareView[];
   sharesLoading: boolean;
   sharesError: string | null;
+  /** Öffentliche Freigabe-Links der Aufnahme (nur für den Besitzer sichtbar). */
+  shareLinks: ShareLinkView[];
+  shareLinksLoading: boolean;
+  shareLinksError: string | null;
 }
 
 const initialState: RecordingsState = {
@@ -60,6 +65,9 @@ const initialState: RecordingsState = {
   shares: [],
   sharesLoading: false,
   sharesError: null,
+  shareLinks: [],
+  shareLinksLoading: false,
+  shareLinksError: null,
 };
 
 export const fetchRecordings = createAsyncThunk<
@@ -321,6 +329,46 @@ export const removeShare = createAsyncThunk<
   }
 });
 
+export const fetchShareLinks = createAsyncThunk<ShareLinkView[], string, { rejectValue: string }>(
+  'recordings/fetchShareLinks',
+  async (recordingId, { rejectWithValue }) => {
+    try {
+      return await api<ShareLinkView[]>(`/api/recordings/${recordingId}/share-links`);
+    } catch (e) {
+      return rejectWithValue(errorMessage(e));
+    }
+  },
+);
+
+/** Öffentlichen Freigabe-Link erzeugen (`expiresInDays` null = bis zum Widerruf). */
+export const createShareLink = createAsyncThunk<
+  ShareLinkView,
+  { recordingId: string; expiresInDays: number | null },
+  { rejectValue: string }
+>('recordings/createShareLink', async ({ recordingId, expiresInDays }, { rejectWithValue }) => {
+  try {
+    return await api<ShareLinkView>(`/api/recordings/${recordingId}/share-links`, {
+      method: 'POST',
+      body: { expiresInDays },
+    });
+  } catch (e) {
+    return rejectWithValue(errorMessage(e));
+  }
+});
+
+export const removeShareLink = createAsyncThunk<
+  string,
+  { recordingId: string; linkId: string },
+  { rejectValue: string }
+>('recordings/removeShareLink', async ({ recordingId, linkId }, { rejectWithValue }) => {
+  try {
+    await api<void>(`/api/recordings/${recordingId}/share-links/${linkId}`, { method: 'DELETE' });
+    return linkId;
+  } catch (e) {
+    return rejectWithValue(errorMessage(e));
+  }
+});
+
 /**
  * Job in der Detail-Ansicht aktualisieren oder vorn einfügen. Beim Umstufen
  * eines wartenden Jobs (z.B. "Nur transkribieren" auf den nächtlichen Job)
@@ -356,6 +404,8 @@ const recordingsSlice = createSlice({
       state.transcriptError = null;
       state.shares = [];
       state.sharesError = null;
+      state.shareLinks = [];
+      state.shareLinksError = null;
     },
   },
   extraReducers: (builder) => {
@@ -471,6 +521,25 @@ const recordingsSlice = createSlice({
       })
       .addCase(removeShare.fulfilled, (state, action) => {
         state.shares = state.shares.filter((s) => s.id !== action.payload);
+      })
+      .addCase(fetchShareLinks.pending, (state) => {
+        state.shareLinksLoading = true;
+        state.shareLinksError = null;
+      })
+      .addCase(fetchShareLinks.fulfilled, (state, action) => {
+        state.shareLinks = action.payload;
+        state.shareLinksLoading = false;
+      })
+      .addCase(fetchShareLinks.rejected, (state, action) => {
+        state.shareLinksLoading = false;
+        state.shareLinksError = action.payload ?? translate('errors.shareLinksLoad');
+      })
+      .addCase(createShareLink.fulfilled, (state, action) => {
+        // Neueste zuerst - wie die Reihenfolge des Backends
+        state.shareLinks.unshift(action.payload);
+      })
+      .addCase(removeShareLink.fulfilled, (state, action) => {
+        state.shareLinks = state.shareLinks.filter((l) => l.id !== action.payload);
       });
   },
 });

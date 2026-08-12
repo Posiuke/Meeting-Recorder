@@ -81,6 +81,11 @@ curl -s -H "X-API-Key: $KEY" -F file=@note.m4a \\
             { name: 'aiAnalysis', description: 'true (default) = transcribe and summarise' },
             { name: 'processNow', description: 'true = process immediately instead of at night' },
             { name: 'diarize', description: 'true = speaker recognition (if enabled)' },
+            {
+              name: 'summaryPrompt',
+              description:
+                'Analysis prompt for this recording (max. 8000 characters); empty = the administrator default. It already applies to the first analysis – including processNow=true.',
+            },
           ],
           example: `curl -s -H "X-API-Key: $KEY" \\
   -F file=@meeting.mp3 -F title="Jour Fixe" -F processNow=true \\
@@ -394,6 +399,44 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
           method: 'DELETE',
           path: '/api/recordings/{id}/shares/{shareId}',
           summary: 'Revoke a share.',
+        },
+        {
+          method: 'GET',
+          path: '/api/recordings/{id}/share-links',
+          summary:
+            'Public share links for this recording (owner only) – including expiry and view count.',
+        },
+        {
+          method: 'POST',
+          path: '/api/recordings/{id}/share-links',
+          summary:
+            'Create a public share link (owner only). Anyone who knows the address can see the video, audio, transcript and summary without signing in. Without expiresInDays the link is valid until revoked. The address is <base URL>/share/<token>.',
+          params: [
+            { name: 'expiresInDays', description: 'validity in days (1–3650); omit for "until revoked"' },
+          ],
+          example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
+  -d '{"expiresInDays":30}' "$BBB/api/recordings/$ID/share-links"`,
+          response: `{
+  "id": "0c9d1e2f-...",
+  "token": "brqk6JmNhZf9oO55m_98lBOZoRskgzRh7K3fBMY12Ok",
+  "createdAt": "2026-08-12T13:04:38Z",
+  "expiresAt": "2026-09-11T13:04:38Z",
+  "expired": false,
+  "views": 0,
+  "lastViewedAt": null
+}`,
+        },
+        {
+          method: 'DELETE',
+          path: '/api/recordings/{id}/share-links/{linkId}',
+          summary: 'Revoke a share link – the address becomes invalid immediately.',
+        },
+        {
+          method: 'GET',
+          path: '/api/public/shares/{token}',
+          summary:
+            'Contents of a share link: header data, audio segments, transcript and summary. Needs NO key – plus /video, /video/download, /segments/{segmentId}/audio and /summary/download. Unknown, expired and revoked tokens all answer with 404.',
+          example: `curl -s "$BBB/api/public/shares/$SHARE_TOKEN"`,
         },
         {
           method: 'GET',

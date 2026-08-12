@@ -13,6 +13,7 @@ import bbbbot.domain.Recording;
 import bbbbot.domain.RecordingSegment;
 import bbbbot.domain.RecordingTag;
 import bbbbot.domain.ShareGrant;
+import bbbbot.domain.ShareLink;
 import bbbbot.domain.Summary;
 import bbbbot.domain.UserGroup;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -129,6 +130,12 @@ public interface Repositories {
                or s.granteeGroupId in (select g.id from UserGroup g where g.ownerId = :userId))
             """)
         boolean hasAccess(@Param("recordingId") UUID recordingId, @Param("userId") UUID userId);
+    }
+
+    interface ShareLinkRepo extends JpaRepository<ShareLink, UUID> {
+        List<ShareLink> findByRecordingIdOrderByCreatedAtDesc(UUID recordingId);
+        Optional<ShareLink> findByToken(String token);
+        long countByRecordingId(UUID recordingId);
     }
 
     interface ProcessingJobRepo extends JpaRepository<ProcessingJob, UUID> {

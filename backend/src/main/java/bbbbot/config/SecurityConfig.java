@@ -37,6 +37,10 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/login", "/actuator/health").permitAll()
+                // Freigabe-Links: Die Berechtigung steckt im Token in der Adresse,
+                // geprueft wird sie im PublicShareController. Nur Lesen, nur die
+                // eine freigegebene Aufnahme.
+                .requestMatchers("/api/public/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll())

@@ -110,19 +110,24 @@ public class RecordingService {
      * @param transcribeOnly nur transkribieren, keine Zusammenfassung
      * @param keepVideo      Video zusaetzlich abspielbar bereitstellen; fuer eine
      *                       reine Transkription unnoetige Rechenzeit
+     * @param summaryPrompt  Auswertungs-Prompt dieser Aufnahme; null = Admin-Standard.
+     *                       Er wird an der Aufnahme gespeichert und wirkt damit
+     *                       schon bei der ersten (auch sofortigen) Auswertung.
      */
     public record UploadOptions(String title, boolean aiAnalysis, boolean processNow,
-                                boolean diarize, boolean transcribeOnly, boolean keepVideo) {
+                                boolean diarize, boolean transcribeOnly, boolean keepVideo,
+                                String summaryPrompt) {
 
         /** Upload aus der Weboberflaeche: vollstaendige Aufnahme inkl. Video. */
         public static UploadOptions forUpload(String title, boolean aiAnalysis, boolean processNow,
-                                              boolean diarize) {
-            return new UploadOptions(title, aiAnalysis, aiAnalysis && processNow, diarize, false, true);
+                                              boolean diarize, String summaryPrompt) {
+            return new UploadOptions(title, aiAnalysis, aiAnalysis && processNow, diarize, false, true,
+                    summaryPrompt);
         }
 
         /** API-Transkription: sofort transkribieren, keine Zusammenfassung, kein Video. */
         public static UploadOptions forTranscription(String title, boolean diarize) {
-            return new UploadOptions(title, true, true, diarize, true, false);
+            return new UploadOptions(title, true, true, diarize, true, false, null);
         }
     }
 
@@ -144,6 +149,10 @@ public class RecordingService {
         recording.setSource(Recording.Source.UPLOAD);
         recording.setStatus(Recording.Status.FINALIZING);
         recording.setTitle(title == null || title.isBlank() ? originalFilename : title.trim());
+        // Beim Hochladen gewaehlte Auswertungs-Vorlage; sie muss VOR dem
+        // Verarbeitungs-Job an der Aufnahme stehen, damit auch eine sofortige
+        // Auswertung schon mit ihr laeuft.
+        recording.setSummaryPrompt(options.summaryPrompt());
         Path dir = Path.of(props.getStorage().getRootDir()).resolve(recording.getId().toString());
         Files.createDirectories(dir);
         recording.setDirectory(dir.toAbsolutePath().toString());

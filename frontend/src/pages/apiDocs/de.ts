@@ -81,6 +81,11 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
             { name: 'aiAnalysis', description: 'true (Standard) = transkribieren und zusammenfassen' },
             { name: 'processNow', description: 'true = sofort auswerten statt im Nachtfenster' },
             { name: 'diarize', description: 'true = Sprechererkennung (falls freigeschaltet)' },
+            {
+              name: 'summaryPrompt',
+              description:
+                'Auswertungs-Prompt für diese Aufnahme (max. 8000 Zeichen); leer = Standardvorgabe des Administrators. Wirkt schon bei der ersten Auswertung – auch bei processNow=true.',
+            },
           ],
           example: `curl -s -H "X-API-Key: $KEY" \\
   -F file=@besprechung.mp3 -F title="Jour Fixe" -F processNow=true \\
@@ -395,6 +400,44 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           method: 'DELETE',
           path: '/api/recordings/{id}/shares/{shareId}',
           summary: 'Freigabe zurücknehmen.',
+        },
+        {
+          method: 'GET',
+          path: '/api/recordings/{id}/share-links',
+          summary:
+            'Öffentliche Freigabe-Links dieser Aufnahme (nur Besitzer) – mit Ablauf und Zahl der Aufrufe.',
+        },
+        {
+          method: 'POST',
+          path: '/api/recordings/{id}/share-links',
+          summary:
+            'Öffentlichen Freigabe-Link erzeugen (nur Besitzer). Wer die Adresse kennt, sieht Video, Audio, Transkript und Zusammenfassung ohne Anmeldung. Ohne expiresInDays gilt der Link bis zum Widerruf. Die Adresse lautet <Basis-URL>/share/<token>.',
+          params: [
+            { name: 'expiresInDays', description: 'Laufzeit in Tagen (1–3650); weglassen = bis zum Widerruf' },
+          ],
+          example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
+  -d '{"expiresInDays":30}' "$BBB/api/recordings/$ID/share-links"`,
+          response: `{
+  "id": "0c9d1e2f-...",
+  "token": "brqk6JmNhZf9oO55m_98lBOZoRskgzRh7K3fBMY12Ok",
+  "createdAt": "2026-08-12T13:04:38Z",
+  "expiresAt": "2026-09-11T13:04:38Z",
+  "expired": false,
+  "views": 0,
+  "lastViewedAt": null
+}`,
+        },
+        {
+          method: 'DELETE',
+          path: '/api/recordings/{id}/share-links/{linkId}',
+          summary: 'Freigabe-Link widerrufen – die Adresse ist sofort ungültig.',
+        },
+        {
+          method: 'GET',
+          path: '/api/public/shares/{token}',
+          summary:
+            'Inhalt eines Freigabe-Links: Kopfdaten, Audio-Segmente, Transkript und Zusammenfassung. Braucht KEINEN Schlüssel – dazu /video, /video/download, /segments/{segmentId}/audio und /summary/download. Unbekannte, abgelaufene und widerrufene Tokens antworten gleich mit 404.',
+          example: `curl -s "$BBB/api/public/shares/$SHARE_TOKEN"`,
         },
         {
           method: 'GET',

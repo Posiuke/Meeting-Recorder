@@ -166,6 +166,26 @@ export const de = {
     empty: 'Diese Aufnahme ist bisher mit niemandem geteilt.',
     groupPrefix: 'Gruppe: {{name}}',
     remove: 'Entfernen',
+    linkHeading: 'Link zum Teilen',
+    linkIntro:
+      'Wer diesen Link kennt, sieht Video, Audio, Transkript und Zusammenfassung dieser Aufnahme – ohne Anmeldung und ohne Konto. Chat- und Sitzungsprotokoll bleiben intern. Den Link nur an Personen weitergeben, die die Aufnahme sehen dürfen; er lässt sich jederzeit widerrufen.',
+    linkExpiryLabel: 'Gültigkeit',
+    linkExpiryNever: 'Bis zum Widerruf',
+    linkExpiryDays: '{{days}} Tage',
+    linkCreate: 'Link erzeugen',
+    linkCreating: 'Wird erzeugt…',
+    linkLoading: 'Links werden geladen…',
+    linkEmpty: 'Für diese Aufnahme gibt es noch keinen Freigabe-Link.',
+    linkCreated: 'erstellt am {{date}}',
+    linkValidForever: 'gültig bis zum Widerruf',
+    linkValidUntil: 'gültig bis {{date}}',
+    linkExpired: 'abgelaufen am {{date}}',
+    linkNeverOpened: 'noch nicht aufgerufen',
+    linkViews: '{{count}} Aufruf(e), zuletzt {{date}}',
+    linkRevoke: 'Widerrufen',
+    confirmRevokeTitle: 'Freigabe-Link widerrufen',
+    confirmRevokeMessage:
+      'Der Link wird sofort ungültig. Wer ihn gespeichert hat, sieht die Aufnahme danach nicht mehr. Fortfahren?',
   },
 
   groups: {
@@ -319,6 +339,11 @@ export const de = {
     titlePlaceholder: 'Dateiname wird verwendet',
     submit: 'Hochladen',
     uploading: 'Wird hochgeladen… {{percent}}%',
+    presetLabel: 'Auswertungs-Vorlage',
+    presetHelp:
+      'Bestimmt, wie die KI den Inhalt auswertet – „Meeting (Standard)" ist auf Besprechungen ausgelegt (Beschlüsse, Aufgaben). Für Vorträge, Interviews oder Sprachnotizen passt eine andere Vorlage besser. Die Wahl gilt schon für die erste Auswertung; sie lässt sich später unter „Auswertung anpassen" ändern.',
+    presetChosenHint:
+      'Diese Vorlage wird bei der Auswertung verwendet und ist danach unter „Auswertung anpassen" sichtbar.',
   },
 
   analysis: {
@@ -560,6 +585,19 @@ export const de = {
     noContent: 'Kein Inhalt vorhanden.',
   },
 
+  sharePage: {
+    loading: 'Freigabe wird geladen…',
+    intro:
+      'Freigegebene Aufnahme – Sie sehen Video, Audio, Transkript und Zusammenfassung. Eine Anmeldung ist nicht nötig.',
+    sharedBy: 'Freigegeben von',
+    validUntil: 'Link gültig bis',
+    audioHeading: 'Audio',
+    unavailableTitle: 'Freigabe nicht verfügbar',
+    unavailable: 'Dieser Freigabe-Link ist ungültig oder abgelaufen.',
+    unavailableHint:
+      'Bitte bei der Person nachfragen, die den Link geschickt hat – möglicherweise wurde er widerrufen oder ist abgelaufen.',
+  },
+
   admin: {
     heading: 'Administration',
     tabSettings: 'Einstellungen',
@@ -671,6 +709,7 @@ export const de = {
     recordingLoad: 'Aufnahme konnte nicht geladen werden.',
     transcriptLoad: 'Transkript konnte nicht geladen werden.',
     sharesLoad: 'Freigaben konnten nicht geladen werden.',
+    shareLinksLoad: 'Freigabe-Links konnten nicht geladen werden.',
     groupsLoad: 'Gruppen konnten nicht geladen werden.',
     membersLoad: 'Mitglieder konnten nicht geladen werden.',
     glossaryLoad: 'Glossar konnte nicht geladen werden.',

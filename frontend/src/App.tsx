@@ -10,6 +10,7 @@ import LoginPage from './pages/LoginPage';
 import BotsPage from './pages/BotsPage';
 import RecordingsPage from './pages/RecordingsPage';
 import RecordingDetailPage from './pages/RecordingDetailPage';
+import SharePage from './pages/SharePage';
 import GroupsPage from './pages/GroupsPage';
 import GlossaryPage from './pages/GlossaryPage';
 import ApiPage from './pages/ApiPage';
@@ -49,6 +50,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      {/* Freigabe-Link: bewusst ohne RequireAuth - die Berechtigung steckt im Token */}
+      <Route path="/share/:token" element={<SharePage />} />
       <Route
         element={
           <RequireAuth>

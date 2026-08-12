@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import Modal from './Modal';
 import Alert from './Alert';
+import HelpTip from './HelpTip';
+import PromptPresetSelect, { resolvePresetPrompt } from './PromptPresetSelect';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { fetchPromptTemplates } from '../store/promptTemplatesSlice';
 import { errorMessage, fetchUploadConfig, uploadRecording } from '../api/client';
 import { formatBytes } from '../utils/format';
 import { useI18n } from '../i18n';
@@ -21,10 +25,17 @@ interface UploadRecordingDialogProps {
  */
 export default function UploadRecordingDialog({ onClose, onUploaded }: UploadRecordingDialogProps) {
   const { t } = useI18n();
+  const dispatch = useAppDispatch();
+  const {
+    items: templates,
+    loaded: templatesLoaded,
+    loading: templatesLoading,
+  } = useAppSelector((s) => s.promptTemplates);
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [aiAnalysis, setAiAnalysis] = useState(true);
   const [processNow, setProcessNow] = useState(false);
+  const [preset, setPreset] = useState('');
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [maxFileSize, setMaxFileSize] = useState<number | null>(null);
@@ -40,15 +51,28 @@ export default function UploadRecordingDialog({ onClose, onUploaded }: UploadRec
       .catch(() => setMaxFileSize(null)); // ohne Limit-Info entscheidet der Server
   }, []);
 
+  // Eigene Vorlagen nur laden, wenn sie noch nicht im Store sind
+  useEffect(() => {
+    if (!templatesLoaded && !templatesLoading) {
+      dispatch(fetchPromptTemplates());
+    }
+  }, [dispatch, templatesLoaded, templatesLoading]);
+
   const uploading = progress !== null;
   const tooLarge = file !== null && maxFileSize !== null && file.size > maxFileSize;
+  // Leer = Standardvorgabe des Administrators (Meeting)
+  const summaryPrompt = resolvePresetPrompt(preset, templates);
 
   const handleUpload = async () => {
     if (!file || uploading || tooLarge) return;
     setError(null);
     setProgress(0);
     try {
-      await uploadRecording(file, { title, aiAnalysis, processNow, diarize }, setProgress);
+      await uploadRecording(
+        file,
+        { title, aiAnalysis, processNow, diarize, summaryPrompt },
+        setProgress,
+      );
       onUploaded();
     } catch (e) {
       setError(errorMessage(e));
@@ -152,6 +176,25 @@ export default function UploadRecordingDialog({ onClose, onUploaded }: UploadRec
           {t('analysis.diarize')}
         </label>
       )}
+
+      {/* Vorlage schon hier wählbar: Eine sofortige Auswertung läuft sonst mit
+          der Meeting-Vorgabe, bevor man sie nachträglich ändern könnte. */}
+      <div className="form-field">
+        <label htmlFor="upload-preset">
+          {t('upload.presetLabel')}
+          <HelpTip text={t('upload.presetHelp')} />
+        </label>
+        <PromptPresetSelect
+          id="upload-preset"
+          value={preset}
+          templates={templates}
+          disabled={uploading || !aiAnalysis}
+          onChange={setPreset}
+        />
+        {aiAnalysis && preset !== '' && (
+          <span className="muted upload-preset-hint">{t('upload.presetChosenHint')}</span>
+        )}
+      </div>
 
       {uploading && (
         <div className="upload-progress">

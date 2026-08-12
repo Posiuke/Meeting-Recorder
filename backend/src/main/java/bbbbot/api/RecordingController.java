@@ -23,11 +23,10 @@ import bbbbot.repository.Repositories.ShareGrantRepo;
 import bbbbot.repository.Repositories.SummaryRepo;
 import bbbbot.repository.Repositories.UserGroupRepo;
 import bbbbot.sharing.AccessService;
+import bbbbot.sharing.ShareLinkService;
 import bbbbot.stt.TranscriptAssembler;
 import org.springframework.core.io.FileSystemResource;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -80,6 +79,8 @@ public class RecordingController {
     private final ParticipantRepo participantRepo;
     private final SummaryService summaryService;
     private final bbbbot.settings.SettingsService settings;
+    private final ShareLinkService shareLinkService;
+    private final bbbbot.recording.RecordingMediaService media;
 
     public RecordingController(AccessService access, RecordingRepo recordingRepo,
                                RecordingSegmentRepo segmentRepo, SummaryRepo summaryRepo,
@@ -92,7 +93,9 @@ public class RecordingController {
                                bbbbot.recording.RecordingTagService tagService,
                                ParticipantService participantService,
                                ParticipantRepo participantRepo, SummaryService summaryService,
-                               bbbbot.settings.SettingsService settings) {
+                               bbbbot.settings.SettingsService settings,
+                               ShareLinkService shareLinkService,
+                               bbbbot.recording.RecordingMediaService media) {
         this.access = access;
         this.recordingRepo = recordingRepo;
         this.segmentRepo = segmentRepo;
@@ -111,6 +114,8 @@ public class RecordingController {
         this.participantRepo = participantRepo;
         this.summaryService = summaryService;
         this.settings = settings;
+        this.shareLinkService = shareLinkService;
+        this.media = media;
     }
 
     // ---------------------------------------------------------------- Upload
@@ -123,6 +128,23 @@ public class RecordingController {
     public static final Set<String> UPLOAD_EXTENSIONS = Set.of(
             "mp3", "wav", "m4a", "aac", "ogg", "opus", "flac", "wma", "amr",
             "webm", "mka", "mp4", "mkv", "mov", "avi", "3gp", "ts");
+
+    /** Laengengrenze des Auswertungs-Prompts - gleich beim Upload und pro Aufnahme. */
+    private static final int MAX_SUMMARY_PROMPT_LENGTH = 8000;
+
+    /**
+     * Normalisiert einen Auswertungs-Prompt: leer bedeutet "Admin-Standard
+     * verwenden" (null), zu lang wird abgelehnt.
+     */
+    private static String requireSummaryPrompt(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String prompt = raw.trim();
+        if (prompt.length() > MAX_SUMMARY_PROMPT_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Auswertungs-Prompt ist zu lang (max. " + MAX_SUMMARY_PROMPT_LENGTH + " Zeichen)");
+        }
+        return prompt;
+    }
 
     /**
      * Prueft die Dateiendung gegen {@link #UPLOAD_EXTENSIONS} und liefert den zu
@@ -157,13 +179,20 @@ public class RecordingController {
      * Die Datei wird asynchron zu einem MP3-Segment transkodiert; bei
      * {@code aiAnalysis} wird anschliessend ein Verarbeitungs-Job angelegt
      * ({@code processNow} stuft ihn auf Sofort-Auswertung hoch).
+     *
+     * @param summaryPrompt Auswertungs-Prompt fuer diese Aufnahme (leer =
+     *                      Admin-Standard). Damit laesst sich schon beim Hochladen
+     *                      eine andere Vorlage als "Meeting" waehlen - sonst
+     *                      liefe eine Sofort-Auswertung noch mit dem Standard,
+     *                      bevor man sie im Nachhinein anpassen koennte.
      */
     @PostMapping("/upload")
     public Dtos.RecordingView upload(@RequestParam("file") MultipartFile file,
                                      @RequestParam(value = "title", required = false) String title,
                                      @RequestParam(value = "aiAnalysis", defaultValue = "true") boolean aiAnalysis,
                                      @RequestParam(value = "processNow", defaultValue = "false") boolean processNow,
-                                     @RequestParam(value = "diarize", defaultValue = "false") boolean diarize) {
+                                     @RequestParam(value = "diarize", defaultValue = "false") boolean diarize,
+                                     @RequestParam(value = "summaryPrompt", required = false) String summaryPrompt) {
         AppUser user = CurrentUser.get();
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Keine Datei uebermittelt");
@@ -172,10 +201,11 @@ public class RecordingController {
         // Diarisierung nur, wenn der Admin sie freigeschaltet hat
         boolean diarizeEffective = diarize
                 && settings.getBool(bbbbot.settings.SettingsService.WHISPER_DIARIZE);
+        String prompt = requireSummaryPrompt(summaryPrompt);
         try (InputStream in = file.getInputStream()) {
             var recording = recordingService.createUploadedRecording(user.getId(),
                     bbbbot.recording.RecordingService.UploadOptions.forUpload(
-                            title, aiAnalysis, processNow, diarizeEffective),
+                            title, aiAnalysis, processNow, diarizeEffective, prompt),
                     original, in);
             return toView(recording, user);
         } catch (IOException e) {
@@ -297,50 +327,19 @@ public class RecordingController {
     public ResponseEntity<FileSystemResource> audio(@PathVariable UUID id, @PathVariable UUID segmentId) {
         AppUser user = CurrentUser.get();
         access.requireReadable(id, user);
-        RecordingSegment segment = segmentRepo.findById(segmentId)
-                .filter(s -> s.getRecordingId().equals(id))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Segment nicht gefunden"));
-        if (segment.getMp3Path() == null || !Files.exists(Path.of(segment.getMp3Path()))) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Audiodatei nicht vorhanden");
-        }
-        FileSystemResource resource = new FileSystemResource(segment.getMp3Path());
-        // ResponseEntity mit Resource unterstuetzt HTTP-Range-Requests automatisch
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("audio/mpeg"))
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "inline; filename=\"segment_%03d.mp3\"".formatted(segment.getSeq()))
-                .body(resource);
+        return media.audio(id, segmentId);
     }
 
     @GetMapping("/{id}/video")
     public ResponseEntity<FileSystemResource> video(@PathVariable UUID id) {
-        Recording recording = requireVideo(id);
-        FileSystemResource resource = new FileSystemResource(recording.getVideoPath());
-        // ResponseEntity mit Resource unterstuetzt HTTP-Range-Requests (Seeking) automatisch
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("video/mp4"))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"meeting.mp4\"")
-                .body(resource);
+        AppUser user = CurrentUser.get();
+        return media.video(access.requireReadable(id, user));
     }
 
     @GetMapping("/{id}/video/download")
     public ResponseEntity<FileSystemResource> videoDownload(@PathVariable UUID id) {
-        Recording recording = requireVideo(id);
-        String filename = "meeting_" + recording.getStartedAt().toString().substring(0, 10)
-                + "_" + id.toString().substring(0, 8) + ".mp4";
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("video/mp4"))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                .body(new FileSystemResource(recording.getVideoPath()));
-    }
-
-    private Recording requireVideo(UUID id) {
         AppUser user = CurrentUser.get();
-        Recording recording = access.requireReadable(id, user);
-        if (recording.getVideoPath() == null || !Files.exists(Path.of(recording.getVideoPath()))) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Video nicht vorhanden");
-        }
-        return recording;
+        return media.videoDownload(access.requireReadable(id, user));
     }
 
     /**
@@ -469,12 +468,7 @@ public class RecordingController {
         AppUser user = CurrentUser.get();
         Recording recording = access.requireOwner(id, user);
 
-        String prompt = request.prompt() == null || request.prompt().isBlank()
-                ? null : request.prompt().trim();
-        if (prompt != null && prompt.length() > 8000) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Auswertungs-Prompt ist zu lang (max. 8000 Zeichen)");
-        }
+        String prompt = requireSummaryPrompt(request.prompt());
         Integer maxWords = request.maxWords();
         if (maxWords != null && (maxWords < 10 || maxWords > 10000)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -564,6 +558,46 @@ public class RecordingController {
                 .ifPresent(shareRepo::delete);
     }
 
+    // ---------------------------------------------------- Freigabe-Links (oeffentlich)
+
+    @GetMapping("/{id}/share-links")
+    public List<Dtos.ShareLinkView> shareLinks(@PathVariable UUID id) {
+        AppUser user = CurrentUser.get();
+        access.requireOwner(id, user);
+        return shareLinkService.linksOf(id).stream().map(Dtos.ShareLinkView::of).toList();
+    }
+
+    /**
+     * Erzeugt einen oeffentlichen Freigabe-Link (nur Besitzer): Wer die Adresse
+     * kennt, sieht Video, Audio, Transkript und Zusammenfassung dieser Aufnahme
+     * ohne Anmeldung. Ohne {@code expiresInDays} gilt der Link bis zum Widerruf.
+     */
+    @PostMapping("/{id}/share-links")
+    public Dtos.ShareLinkView createShareLink(@PathVariable UUID id,
+                                             @RequestBody(required = false) Dtos.ShareLinkRequest request) {
+        AppUser user = CurrentUser.get();
+        access.requireOwner(id, user);
+        Integer days = request == null ? null : request.expiresInDays();
+        if (days != null && (days < 1 || days > ShareLinkService.MAX_EXPIRY_DAYS)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Laufzeit muss zwischen 1 und " + ShareLinkService.MAX_EXPIRY_DAYS + " Tagen liegen");
+        }
+        if (shareLinkService.countOf(id) >= ShareLinkService.MAX_LINKS_PER_RECORDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Maximal " + ShareLinkService.MAX_LINKS_PER_RECORDING
+                            + " Freigabe-Links pro Aufnahme - bitte nicht mehr benoetigte widerrufen");
+        }
+        return Dtos.ShareLinkView.of(shareLinkService.create(id, user.getId(), days));
+    }
+
+    /** Widerruft einen Freigabe-Link; die Adresse ist danach sofort ungueltig. */
+    @DeleteMapping("/{id}/share-links/{linkId}")
+    public void deleteShareLink(@PathVariable UUID id, @PathVariable UUID linkId) {
+        AppUser user = CurrentUser.get();
+        access.requireOwner(id, user);
+        shareLinkService.findOfRecording(id, linkId).ifPresent(shareLinkService::delete);
+    }
+
     // ------------------------------------------------------- Zusammenfassung
 
     @GetMapping("/{id}/summary")
@@ -579,17 +613,7 @@ public class RecordingController {
     @GetMapping("/{id}/summary/download")
     public ResponseEntity<byte[]> downloadSummary(@PathVariable UUID id) {
         AppUser user = CurrentUser.get();
-        Recording recording = access.requireReadable(id, user);
-        Summary summary = summaryRepo.findByRecordingIdOrderByCreatedAtDesc(id).stream()
-                .filter(s -> s.getStatus() == Summary.Status.DONE)
-                .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Keine Zusammenfassung vorhanden"));
-        String filename = "zusammenfassung_" + recording.getStartedAt().toString().substring(0, 10)
-                + "_" + id.toString().substring(0, 8) + ".md";
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("text/markdown; charset=utf-8"))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                .body(summary.getMarkdown().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return media.summaryDownload(access.requireReadable(id, user));
     }
 
     /**

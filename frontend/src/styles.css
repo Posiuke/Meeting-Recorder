@@ -1890,3 +1890,64 @@ tbody tr:hover {
   font-size: 0.85rem;
   margin: 0;
 }
+
+/* ===== Freigabe-Links und oeffentliche Freigabe-Ansicht ===== */
+.share-link-item {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.5rem;
+}
+
+.share-link-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.share-link-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.upload-preset-hint {
+  font-size: 0.85rem;
+}
+
+/* Die Freigabe-Ansicht laeuft ohne Layout/Navigation - Kopfzeile und
+   Innenabstaende bringt sie deshalb selbst mit. */
+.share-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+}
+
+.share-page > section {
+  margin-bottom: 1.5rem;
+}
+
+.share-page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.share-page-head .app-brand {
+  color: var(--accent);
+}
+
+/* Ohne eigene Breite zieht sich das Auswahlfeld im Flex-Kopf auf den ganzen
+   verbleibenden Platz - im dunklen App-Header steht es zwischen anderen
+   Elementen und braucht das nicht. */
+.share-page-head .language-select {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.share-page h1 {
+  margin-bottom: 0.35rem;
+}

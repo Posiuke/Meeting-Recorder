@@ -32,7 +32,8 @@ docs/       Anleitungen (u.a. Whisper-Diarisierung), Alt-Dokumentation
   umschalten. Jeder Nutzer pflegt unter **Glossar** eigene Abkürzungen und
   Fachbegriffe, die der Glättung mitgegeben werden.
 - **Verwaltung**: Aufnahmen anhören (Streaming), herunterladen, löschen,
-  mit Nutzern und selbst erstellten Gruppen teilen. Admins pflegen
+  mit Nutzern und selbst erstellten Gruppen teilen — oder per **Freigabe-Link**
+  ohne Anmeldung weitergeben (siehe unten). Admins pflegen
   Einstellungen (Whisper-/LLM-Parameter, Zeitfenster, Bot-Verhalten) und
   Admin-Rollen im Frontend.
 - **Datei-Upload**: Bestehende Audio-/Videodateien (MP3, WAV, M4A, MP4, …)
@@ -40,7 +41,10 @@ docs/       Anleitungen (u.a. Whisper-Diarisierung), Alt-Dokumentation
   (`POST /api/recordings/upload`). Die Datei wird serverseitig per ffmpeg zu
   einem MP3-Segment umgewandelt (bei Video wird die Tonspur extrahiert) und
   durchläuft danach dieselbe Auswertung wie Bot-Aufnahmen (Whisper + LLM,
-  optional sofort statt im Nacht-Zeitfenster).
+  optional sofort statt im Nacht-Zeitfenster). Die **Auswertungs-Vorlage** lässt
+  sich schon im Upload-Dialog wählen (Vortrag, Interview, Sprachnotiz oder eine
+  eigene) — sonst liefe eine Sofort-Auswertung mit der Meeting-Vorgabe, bevor man
+  sie nachträglich ändern könnte.
 - **Schlagworte & Suche**: Aufnahmen lassen sich mit Schlagworten versehen
   (der Besitzer pflegt sie, alle mit Leseberechtigung sehen und filtern danach).
   Das Suchfeld über der Liste durchsucht Titel/Raumname, Meeting-URL und
@@ -440,6 +444,36 @@ Jeder Auftrag ist eine ganz normale Aufnahme im Konto des Nutzers: sichtbar in
 der Weboberfläche und mit `DELETE /api/recordings/{id}` löschbar. Bewusst kein
 automatisches Aufräumen — ein Transkript, das ein Skript verloren hat, soll nicht
 unwiederbringlich weg sein. Video wird bei diesem Weg nicht umgewandelt.
+
+## Freigabe-Link (Zugriff ohne Anmeldung)
+
+Neben dem Teilen mit Nutzern und Gruppen kann der Besitzer einer Aufnahme unter
+**Teilen → Link zum Teilen** eine öffentliche Adresse erzeugen:
+
+```
+https://bbb.example.intern/share/<token>
+```
+
+Wer sie kennt, sieht unter dieser Adresse **Video, Audio, Transkript und
+Zusammenfassung** — ohne Konto und ohne Anmeldung. Gedacht für Teilnehmer ohne
+Zugang zum System (Externe, Gäste, Vertretungen).
+
+- Das Token sind 32 Byte Zufall (base64url) und steckt im Pfad; die Berechtigung
+  gilt **nur für diese eine Aufnahme** und nur lesend.
+- **Nicht** enthalten sind Chat-Protokoll, Sitzungsprotokoll und die
+  Verarbeitungs-Historie — die bleiben der angemeldeten Ansicht vorbehalten.
+- Laufzeit wahlweise unbegrenzt (bis zum Widerruf) oder 7/30/90 Tage. Ein
+  Widerruf wirkt sofort; unbekannte, abgelaufene und widerrufene Adressen
+  antworten gleich mit 404, damit Ausprobieren nichts verrät.
+- Der Dialog zeigt zu jedem Link, wie oft er aufgerufen wurde und wann zuletzt.
+- Mehrere Links pro Aufnahme sind möglich (z.B. einer je Empfängerkreis),
+  maximal 20.
+- Endpunkte: `GET|POST /api/recordings/{id}/share-links`,
+  `DELETE /api/recordings/{id}/share-links/{linkId}` (nur Besitzer) sowie
+  ohne jede Authentifizierung `GET /api/public/shares/{token}` samt
+  `/video`, `/segments/{segmentId}/audio` und `/summary/download`.
+
+Wird die Aufnahme gelöscht, verschwinden ihre Links mit ihr.
 
 ## Bildschirmaufnahme (optional)
 
