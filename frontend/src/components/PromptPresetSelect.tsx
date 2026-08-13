@@ -2,11 +2,17 @@ import { translate, useI18n } from '../i18n';
 import type { PromptTemplateView } from '../types';
 
 /**
- * Integrierte Prompt-Vorlagen für typische Nicht-Meeting-Inhalte. Beschriftung
- * und Prompt kommen aus den Übersetzungen – ein englischsprachiger Nutzer soll
- * keinen deutschen Prompt vorgesetzt bekommen.
+ * Integrierte Prompt-Vorlagen für typische Inhalte. Beschriftung und Prompt
+ * kommen aus den Übersetzungen – ein englischsprachiger Nutzer soll keinen
+ * deutschen Prompt vorgesetzt bekommen.
+ *
+ * „Meeting" steht hier als ausgeschriebener Prompt zur Verfügung (anpassbar,
+ * unabhängig von späteren Änderungen des Administrators); die Auswahl
+ * „Meeting (Standard)" bleibt dagegen ein leerer Prompt und folgt damit immer
+ * der aktuellen Vorgabe des Administrators.
  */
 export const PRESET_KEYS = [
+  { key: 'meeting', labelKey: 'summaryOptions.presets.meetingLabel', promptKey: 'summaryOptions.presets.meetingPrompt' },
   { key: 'talk', labelKey: 'summaryOptions.presets.talkLabel', promptKey: 'summaryOptions.presets.talkPrompt' },
   { key: 'interview', labelKey: 'summaryOptions.presets.interviewLabel', promptKey: 'summaryOptions.presets.interviewPrompt' },
   { key: 'note', labelKey: 'summaryOptions.presets.noteLabel', promptKey: 'summaryOptions.presets.notePrompt' },

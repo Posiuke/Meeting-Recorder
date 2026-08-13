@@ -48,8 +48,10 @@ const draft = (name: string, prompt: string, fromBuiltIn: string | null = null):
   name,
   prompt,
   fromBuiltIn,
-  // Ein Entwurf gilt immer als "nicht gespeichert", auch wenn er vorbelegt ist.
-  base: { name: '', prompt: '' },
+  // Der vorbelegte Stand ist die Vergleichsbasis: Wer eine integrierte Vorlage
+  // nur ansieht, hat nichts geaendert und soll beim Weiterklicken auch nicht
+  // gefragt werden. Speichern ist trotzdem moeglich (siehe canSave).
+  base: { name, prompt },
 });
 
 /**
@@ -103,9 +105,12 @@ export default function TemplatesPage() {
     editor !== null && (name !== editor.base.name || prompt !== editor.base.prompt);
   const promptTooLong = prompt.length > MAX_PROMPT_LENGTH;
   const nameTooLong = name.length > MAX_NAME_LENGTH;
+  // Ein Entwurf laesst sich immer speichern, sobald Name und Prompt stehen -
+  // auch unveraendert aus einer integrierten Vorlage uebernommen. Bei einer
+  // gespeicherten Vorlage gibt es ohne Aenderung nichts zu speichern.
   const canSave =
     editor !== null &&
-    dirty &&
+    (editor.id === null || dirty) &&
     !busy &&
     trimmedName !== '' &&
     trimmedPrompt !== '' &&

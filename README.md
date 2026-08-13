@@ -33,8 +33,8 @@ docs/       Anleitungen (u.a. Whisper-Diarisierung), Alt-Dokumentation
   Fachbegriffe, die der Glättung mitgegeben werden.
 - **Vorlagen**: Im Tab **Vorlagen** pflegt jeder Nutzer eigene
   Auswertungs-Prompts (Liste links, großer Editor rechts; integrierte Vorlagen
-  für Vortrag, Interview und Sprachnotiz lassen sich als Kopie öffnen, die
-  Admin-Vorgabe als Ausgangspunkt übernehmen). Die gespeicherten Vorlagen stehen
+  für Meeting, Vortrag, Interview und Sprachnotiz lassen sich als Kopie öffnen,
+  die Admin-Vorgabe als Ausgangspunkt übernehmen). Die gespeicherten Vorlagen stehen
   anschließend unter "Auswertung anpassen" und im Upload-Dialog zur Auswahl
   (`/api/prompt-templates`).
 - **Verwaltung**: Aufnahmen anhören (Streaming), herunterladen, löschen,
@@ -57,8 +57,8 @@ docs/       Anleitungen (u.a. Whisper-Diarisierung), Alt-Dokumentation
   einem MP3-Segment umgewandelt (bei Video wird die Tonspur extrahiert) und
   durchläuft danach dieselbe Auswertung wie Bot-Aufnahmen (Whisper + LLM,
   optional sofort statt im Nacht-Zeitfenster). Die **Auswertungs-Vorlage** lässt
-  sich schon im Upload-Dialog wählen (Vortrag, Interview, Sprachnotiz oder eine
-  eigene) — sonst liefe eine Sofort-Auswertung mit der Meeting-Vorgabe, bevor man
+  sich schon im Upload-Dialog wählen (Meeting, Vortrag, Interview, Sprachnotiz
+  oder eine eigene) — sonst liefe eine Sofort-Auswertung mit der Meeting-Vorgabe, bevor man
   sie nachträglich ändern könnte.
 - **Schlagworte & Suche**: Aufnahmen lassen sich mit Schlagworten versehen
   (der Besitzer pflegt sie, alle mit Leseberechtigung sehen und filtern danach).

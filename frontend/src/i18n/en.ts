@@ -491,7 +491,7 @@ export const en: typeof de = {
       'These settings apply to this recording only and are used for the next analysis ("Analyse now", "Analyse again" or "Recreate transcript"). Empty fields mean: use the administrator default.',
     presetLabel: 'Template',
     presetHelp:
-      'Pre-fills the analysis prompt with a template – built-in ones for typical content types (e.g. a talk or a voice note) or one of your own saved templates. The template can be edited freely afterwards.',
+      'Pre-fills the analysis prompt with a template – built-in ones for typical content types (e.g. a meeting, a talk or a voice note) or one of your own saved templates. The template can be edited freely afterwards. Difference to “Meeting (default)”: there the prompt stays empty and always follows the administrator’s current setting, whereas a template pins the text.',
     presetDefault: 'Meeting (default)',
     presetBuiltIn: 'Built-in templates',
     presetMine: 'My templates',
@@ -532,6 +532,9 @@ export const en: typeof de = {
     confirmDeleteTemplateMessage:
       'The template "{{name}}" will be deleted irrevocably. The prompt stays in the input field. Continue?',
     presets: {
+      meetingLabel: 'Meeting',
+      meetingPrompt:
+        'You are an assistant that summarises meetings precisely. Produce a structured summary with the following sections:\n1. Executive summary (max. 5 sentences)\n2. Participants & roles\n3. Decisions and action items (with owners and deadlines, where mentioned)\n4. Open questions\n5. Chronological course of the meeting (as bullet points)\nImportant: invent nothing. Mark unclear passages explicitly as unclear.',
       talkLabel: 'Talk / training',
       talkPrompt:
         'You are an assistant that summarises talks and training sessions precisely. Produce a structured summary with the following sections:\n1. Key statements (max. 5 sentences)\n2. Topics covered with the most important content per topic\n3. Examples, recommendations and practical notes\n4. Questions from the audience and the answers given\nImportant: invent nothing. Mark unclear passages explicitly as unclear.',

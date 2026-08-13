@@ -496,7 +496,7 @@ export const de = {
       'Diese Einstellungen gelten nur für diese Aufnahme und werden bei der nächsten Auswertung verwendet („Jetzt auswerten", „Erneut auswerten" oder „Transkription neu erstellen"). Leere Felder bedeuten: Standardvorgabe des Administrators.',
     presetLabel: 'Vorlage',
     presetHelp:
-      'Füllt den Auswertungs-Prompt mit einer Vorlage vor – integriert für typische Inhaltstypen (z.B. Vortrag oder Sprachnotiz) oder eine deiner eigenen gespeicherten Vorlagen. Die Vorlage kann anschließend frei angepasst werden.',
+      'Füllt den Auswertungs-Prompt mit einer Vorlage vor – integriert für typische Inhaltstypen (z.B. Meeting, Vortrag oder Sprachnotiz) oder eine deiner eigenen gespeicherten Vorlagen. Die Vorlage kann anschließend frei angepasst werden. Unterschied zu „Meeting (Standard)": Dort bleibt der Prompt leer und folgt immer der aktuellen Vorgabe des Administrators, während eine Vorlage den Text festschreibt.',
     presetDefault: 'Meeting (Standard)',
     presetBuiltIn: 'Integrierte Vorlagen',
     presetMine: 'Meine Vorlagen',
@@ -537,6 +537,9 @@ export const de = {
     confirmDeleteTemplateMessage:
       'Die Vorlage „{{name}}" wird unwiderruflich gelöscht. Der Prompt bleibt im Eingabefeld erhalten. Fortfahren?',
     presets: {
+      meetingLabel: 'Meeting / Besprechung',
+      meetingPrompt:
+        'Du bist ein Assistent, der Meetings präzise zusammenfasst. Erstelle eine strukturierte Zusammenfassung mit folgenden Abschnitten:\n1. Management-Zusammenfassung (max. 5 Sätze)\n2. Teilnehmer & Rollen\n3. Beschlüsse und Aufgaben (mit Verantwortlichen und Fristen, falls genannt)\n4. Offene Fragen\n5. Chronologischer Ablauf (stichpunktartig)\nWichtig: Erfinde nichts. Markiere unklare Stellen ausdrücklich als unklar.',
       talkLabel: 'Vortrag / Schulung',
       talkPrompt:
         'Du bist ein Assistent, der Vorträge und Schulungen präzise zusammenfasst. Erstelle eine strukturierte Zusammenfassung mit folgenden Abschnitten:\n1. Kernaussagen (max. 5 Sätze)\n2. Behandelte Themen mit den wichtigsten Inhalten je Thema\n3. Beispiele, Empfehlungen und Praxishinweise\n4. Fragen aus dem Publikum und die Antworten darauf\nWichtig: Erfinde nichts. Markiere unklare Stellen ausdrücklich als unklar.',
