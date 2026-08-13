@@ -24,11 +24,10 @@ export default function Layout() {
             {t('app.brand')}
           </div>
           <nav className="app-nav">
-            <NavLink to="/" end>
-              {t('app.nav.bots')}
-            </NavLink>
             <NavLink to="/recordings">{t('app.nav.recordings')}</NavLink>
             <NavLink to="/groups">{t('app.nav.groups')}</NavLink>
+            <NavLink to="/bots">{t('app.nav.bots')}</NavLink>
+            <NavLink to="/templates">{t('app.nav.templates')}</NavLink>
             <NavLink to="/glossary">{t('app.nav.glossary')}</NavLink>
             <NavLink to="/api">{t('app.nav.api')}</NavLink>
             {user?.admin && <NavLink to="/admin">{t('app.nav.admin')}</NavLink>}

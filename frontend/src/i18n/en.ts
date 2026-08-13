@@ -44,6 +44,7 @@ export const en: typeof de = {
       bots: 'Bots',
       recordings: 'Recordings',
       groups: 'Groups',
+      templates: 'Templates',
       glossary: 'Glossary',
       api: 'API',
       admin: 'Admin',
@@ -263,6 +264,58 @@ export const en: typeof de = {
     remove: 'Remove',
   },
 
+  templates: {
+    heading: 'Templates',
+    intro:
+      'Templates are saved instructions for the AI analysis: they define how the summary is structured and what the AI focuses on. Edit them here at your leisure – they are then available for every recording under “Adjust analysis” and already in the upload dialog. Templates are yours alone.',
+    new: 'New template',
+    newTitle: 'New template',
+    mine: 'My templates',
+    count: '{{count}} of {{max}}',
+    limitReached: 'No more than {{max}} templates are possible – delete one first.',
+    filterPlaceholder: 'Filter templates…',
+    filterEmpty: 'No template matches the filter.',
+    loading: 'Loading templates…',
+    empty: 'No template of your own yet – create one or start from a built-in template.',
+    builtIn: 'Built-in templates',
+    builtInHelp:
+      'Ready-made templates for typical content. They cannot be overwritten: a click opens a copy that you can adjust and save as your own template.',
+    builtInAction: 'Open as copy',
+    editorEmptyTitle: 'No template open',
+    editorEmpty: 'Pick a template on the left – or create a new one.',
+    nameLabel: 'Name',
+    namePlaceholder: 'e.g. Decisions and tasks only',
+    nameTooLong: 'The name is too long (max. {{max}} characters).',
+    promptLabel: 'Analysis prompt',
+    promptHelp:
+      'The instruction for the AI: it determines how the content is interpreted and what structure and focus the summary gets (e.g. decisions and tasks for meetings, key points for talks). The summary is rendered as Markdown – you can explicitly ask for tables and Mermaid diagrams (```mermaid block) here.',
+    promptPlaceholder:
+      'Describe how the AI should analyse the content – e.g. the sections you want, the focus and the tone.',
+    charCount: '{{count}} of {{max}} characters',
+    saveShortcutHint: 'Ctrl+S or ⌘+S saves as well',
+    unsaved: 'Unsaved',
+    savedFlash: 'Saved',
+    updatedAt: 'Changed: {{date}}',
+    fromBuiltIn:
+      'Copy of the built-in template “{{name}}” – saving turns it into a template of your own.',
+    discardChanges: 'Discard changes',
+    discardDraft: 'Discard draft',
+    duplicate: 'Duplicate',
+    duplicateHint: 'Saves the current text as a new template – the original stays unchanged',
+    loadDefault: 'Load default',
+    loadDefaultHint:
+      'Writes the administrator’s default into the field – so you can adjust it as a starting point',
+    loadDefaultUnavailable: 'The administrator has not set a default.',
+    copySuffix: '{{name}} (copy)',
+    confirmDeleteTitle: 'Delete template',
+    confirmDeleteMessage:
+      'The template “{{name}}” will be deleted permanently. Summaries that were already created are not affected. Continue?',
+    unsavedTitle: 'Discard changes?',
+    unsavedMessage: 'There are unsaved changes to the template “{{name}}”. Switching will lose them.',
+    unsavedMessageDraft: 'There are unsaved changes to the new template. Switching will lose them.',
+    unsavedConfirm: 'Discard',
+  },
+
   glossary: {
     heading: 'Glossary',
     intro:
@@ -443,6 +496,8 @@ export const en: typeof de = {
     presetBuiltIn: 'Built-in templates',
     presetMine: 'My templates',
     templatesError: 'Your own templates could not be loaded: {{message}}',
+    manageTemplates: 'Edit templates',
+    manageTemplatesHint: '– opens the “Templates” tab in a new browser tab.',
     promptLabel: 'Analysis prompt',
     promptHelp:
       'The instruction given to the AI: it determines how the content is interpreted and which structure and focus the summary gets (e.g. decisions and tasks for meetings, key statements for talks). Empty = the administrator default. The summary is rendered as Markdown – you can explicitly ask for tables and Mermaid diagrams (```mermaid block) here.',

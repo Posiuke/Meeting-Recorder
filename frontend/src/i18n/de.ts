@@ -46,6 +46,7 @@ export const de = {
       bots: 'Bots',
       recordings: 'Aufnahmen',
       groups: 'Gruppen',
+      templates: 'Vorlagen',
       glossary: 'Glossar',
       api: 'API',
       admin: 'Admin',
@@ -266,6 +267,60 @@ export const de = {
     remove: 'Entfernen',
   },
 
+  templates: {
+    heading: 'Vorlagen',
+    intro:
+      'Vorlagen sind gespeicherte Arbeitsanweisungen für die KI-Auswertung: Sie legen fest, wie die Zusammenfassung aufgebaut ist und worauf die KI achtet. Hier bearbeitest du sie in Ruhe – zur Auswahl stehen sie anschließend bei jeder Aufnahme unter „Auswertung anpassen" und schon im Upload-Dialog. Die Vorlagen gehören nur dir.',
+    new: 'Neue Vorlage',
+    newTitle: 'Neue Vorlage',
+    mine: 'Meine Vorlagen',
+    count: '{{count}} von {{max}}',
+    limitReached: 'Mehr als {{max}} Vorlagen sind nicht möglich – lösche zuerst eine.',
+    filterPlaceholder: 'Vorlagen filtern…',
+    filterEmpty: 'Keine Vorlage passt zum Filter.',
+    loading: 'Vorlagen werden geladen…',
+    empty: 'Noch keine eigene Vorlage – lege eine neue an oder starte mit einer integrierten Vorlage.',
+    builtIn: 'Integrierte Vorlagen',
+    builtInHelp:
+      'Fertige Vorlagen für typische Inhalte. Sie lassen sich nicht überschreiben: Ein Klick öffnet eine Kopie, die du anpassen und als eigene Vorlage speichern kannst.',
+    builtInAction: 'Als Kopie öffnen',
+    editorEmptyTitle: 'Keine Vorlage geöffnet',
+    editorEmpty: 'Links eine Vorlage auswählen – oder eine neue anlegen.',
+    nameLabel: 'Name',
+    namePlaceholder: 'z. B. Nur Beschlüsse und Aufgaben',
+    nameTooLong: 'Der Name ist zu lang (max. {{max}} Zeichen).',
+    promptLabel: 'Auswertungs-Prompt',
+    promptHelp:
+      'Die Arbeitsanweisung an die KI: Sie bestimmt, wie der Inhalt interpretiert wird und welche Struktur und Schwerpunkte die Zusammenfassung bekommt (z.B. Beschlüsse und Aufgaben bei Meetings, Kernaussagen bei Vorträgen). Die Zusammenfassung wird als Markdown dargestellt – Tabellen und Mermaid-Diagramme (```mermaid-Block) kannst du hier ausdrücklich anfordern.',
+    promptPlaceholder:
+      'Beschreibe, wie die KI den Inhalt auswerten soll – z. B. gewünschte Abschnitte, Schwerpunkte und Tonfall.',
+    charCount: '{{count}} von {{max}} Zeichen',
+    saveShortcutHint: 'Speichern auch mit Strg+S bzw. ⌘+S',
+    unsaved: 'Nicht gespeichert',
+    savedFlash: 'Gespeichert',
+    updatedAt: 'Geändert: {{date}}',
+    fromBuiltIn:
+      'Kopie der integrierten Vorlage „{{name}}" – beim Speichern entsteht daraus eine eigene Vorlage.',
+    discardChanges: 'Änderungen verwerfen',
+    discardDraft: 'Entwurf verwerfen',
+    duplicate: 'Duplizieren',
+    duplicateHint: 'Legt den aktuellen Text als neue Vorlage an – das Original bleibt unverändert',
+    loadDefault: 'Standard übernehmen',
+    loadDefaultHint:
+      'Schreibt die Standardvorgabe des Administrators in das Feld – so kannst du sie als Ausgangspunkt anpassen',
+    loadDefaultUnavailable: 'Der Administrator hat keine Standardvorgabe hinterlegt.',
+    copySuffix: '{{name}} (Kopie)',
+    confirmDeleteTitle: 'Vorlage löschen',
+    confirmDeleteMessage:
+      'Die Vorlage „{{name}}" wird unwiderruflich gelöscht. Bereits erstellte Zusammenfassungen bleiben davon unberührt. Fortfahren?',
+    unsavedTitle: 'Änderungen verwerfen?',
+    unsavedMessage:
+      'An der Vorlage „{{name}}" gibt es nicht gespeicherte Änderungen. Beim Wechsel gehen sie verloren.',
+    unsavedMessageDraft:
+      'An der neuen Vorlage gibt es nicht gespeicherte Änderungen. Beim Wechsel gehen sie verloren.',
+    unsavedConfirm: 'Verwerfen',
+  },
+
   glossary: {
     heading: 'Glossar',
     intro:
@@ -446,6 +501,8 @@ export const de = {
     presetBuiltIn: 'Integrierte Vorlagen',
     presetMine: 'Meine Vorlagen',
     templatesError: 'Eigene Vorlagen konnten nicht geladen werden: {{message}}',
+    manageTemplates: 'Vorlagen bearbeiten',
+    manageTemplatesHint: '– öffnet den Tab „Vorlagen" in einem neuen Browser-Tab.',
     promptLabel: 'Auswertungs-Prompt',
     promptHelp:
       'Die Arbeitsanweisung an die KI: Sie bestimmt, wie der Inhalt interpretiert wird und welche Struktur und Schwerpunkte die Zusammenfassung bekommt (z.B. Beschlüsse und Aufgaben bei Meetings, Kernaussagen bei Vorträgen). Leer = Standardvorgabe des Administrators. Die Zusammenfassung wird als Markdown dargestellt – Tabellen und Mermaid-Diagramme (```mermaid-Block) kannst du hier ausdrücklich anfordern.',

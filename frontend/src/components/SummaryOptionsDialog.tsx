@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import Modal from './Modal';
 import Alert from './Alert';
 import ConfirmDialog from './ConfirmDialog';
@@ -208,6 +209,14 @@ export default function SummaryOptionsDialog({
             {t('summaryOptions.templatesError', { message: templatesError })}
           </span>
         )}
+        {/* Ausfuehrliches Bearbeiten passiert im Tab "Vorlagen" - bewusst in
+            einem neuen Browser-Tab, damit dieser Dialog nicht verloren geht. */}
+        <span className="muted upload-preset-hint">
+          <Link to="/templates" target="_blank" rel="noreferrer">
+            {t('summaryOptions.manageTemplates')}
+          </Link>{' '}
+          {t('summaryOptions.manageTemplatesHint')}
+        </span>
       </div>
 
       <div className="form-field">

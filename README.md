@@ -31,6 +31,12 @@ docs/       Anleitungen (u.a. Whisper-Diarisierung), Alt-Dokumentation
   erhalten — im Transkript-Tab lässt sich zwischen **Korrigiert** und **Original**
   umschalten. Jeder Nutzer pflegt unter **Glossar** eigene Abkürzungen und
   Fachbegriffe, die der Glättung mitgegeben werden.
+- **Vorlagen**: Im Tab **Vorlagen** pflegt jeder Nutzer eigene
+  Auswertungs-Prompts (Liste links, großer Editor rechts; integrierte Vorlagen
+  für Vortrag, Interview und Sprachnotiz lassen sich als Kopie öffnen, die
+  Admin-Vorgabe als Ausgangspunkt übernehmen). Die gespeicherten Vorlagen stehen
+  anschließend unter "Auswertung anpassen" und im Upload-Dialog zur Auswahl
+  (`/api/prompt-templates`).
 - **Verwaltung**: Aufnahmen anhören (Streaming), herunterladen, löschen,
   mit Nutzern und selbst erstellten Gruppen teilen — oder per **Freigabe-Link**
   weitergeben, entweder kontogebunden (Empfänger meldet sich an und bekommt die

@@ -497,9 +497,16 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
     {
       id: 'templates',
       title: 'Prompt templates',
-      intro: 'Your own analysis prompts, reusable when processing a recording.',
+      intro:
+        'Your own analysis prompts, reusable when processing a recording – managed in the “Templates” tab of the frontend.',
       endpoints: [
         { method: 'GET', path: '/api/prompt-templates', summary: 'List your templates.' },
+        {
+          method: 'GET',
+          path: '/api/prompt-templates/default-prompt',
+          summary: 'The administrator’s default – a starting point for your own templates.',
+          response: `{ "prompt": "You are an assistant that …" }`,
+        },
         {
           method: 'POST',
           path: '/api/prompt-templates',

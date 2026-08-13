@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import Modal from './Modal';
 import Alert from './Alert';
 import HelpTip from './HelpTip';
@@ -194,6 +195,14 @@ export default function UploadRecordingDialog({ onClose, onUploaded }: UploadRec
         {aiAnalysis && preset !== '' && (
           <span className="muted upload-preset-hint">{t('upload.presetChosenHint')}</span>
         )}
+        {/* Zum Anlegen und Ueberarbeiten der Vorlagen: eigener Tab, in einem
+            neuen Browser-Tab, damit der Upload-Dialog erhalten bleibt. */}
+        <span className="muted upload-preset-hint">
+          <Link to="/templates" target="_blank" rel="noreferrer">
+            {t('summaryOptions.manageTemplates')}
+          </Link>{' '}
+          {t('summaryOptions.manageTemplatesHint')}
+        </span>
       </div>
 
       {uploading && (

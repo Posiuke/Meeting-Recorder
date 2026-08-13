@@ -297,6 +297,7 @@ input[type='text'],
 input[type='url'],
 input[type='password'],
 input[type='number'],
+input[type='search'],
 select,
 textarea {
   padding: 0.5rem 0.65rem;
@@ -1467,6 +1468,21 @@ tbody tr:hover {
   .meta-label {
     min-width: 90px;
   }
+
+  /* Vorlagen: Liste ueber den Editor statt daneben */
+  .template-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .template-list-card {
+    position: static;
+    max-height: none;
+    margin-bottom: 1rem;
+  }
+
+  .template-editor-delete {
+    margin-left: 0;
+  }
 }
 
 /* ===== Aufnahme-Upload ===== */
@@ -1707,6 +1723,157 @@ tbody tr:hover {
 .login-language select {
   width: auto;
   padding: 0.25rem 0.4rem;
+}
+
+/* ===== Vorlagen (eigener Tab fuer die Auswertungs-Prompts) ===== */
+.template-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+/* Die Liste bleibt beim Blaettern im langen Prompt sichtbar. */
+.template-list-card {
+  margin-bottom: 0;
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 8rem);
+  overflow-y: auto;
+}
+
+.template-list-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.template-list-title-spaced {
+  margin-top: 1.1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+}
+
+.template-count {
+  margin-left: auto;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.template-filter {
+  margin-bottom: 0.6rem;
+}
+
+.template-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.template-list-item {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.template-list-item:hover {
+  background: var(--accent-soft);
+}
+
+.template-list-item.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.template-list-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+.template-list-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.template-list-empty {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+}
+
+.template-editor {
+  margin-bottom: 0;
+}
+
+.template-editor-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.template-editor-head h2 {
+  margin: 0;
+  word-break: break-word;
+}
+
+.template-prompt textarea {
+  min-height: 24rem;
+  font-family: ui-monospace, 'SF Mono', Consolas, 'Liberation Mono', monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.template-editor-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+}
+
+.template-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border);
+  padding-top: 0.9rem;
+}
+
+/* Loeschen sitzt bewusst abseits der uebrigen Schaltflaechen. */
+.template-editor-delete {
+  margin-left: auto;
+}
+
+.template-editor-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 1.5rem 0;
+}
+
+.template-editor-empty h2 {
+  margin: 0;
 }
 
 /* ===== Glossar und Transkript-Fassungen ===== */

@@ -498,9 +498,16 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
     {
       id: 'templates',
       title: 'Promptvorlagen',
-      intro: 'Eigene Auswertungs-Prompts, die Sie beim Auswerten wiederverwenden.',
+      intro:
+        'Eigene Auswertungs-Prompts, die Sie beim Auswerten wiederverwenden – im Frontend im Tab „Vorlagen" pflegbar.',
       endpoints: [
         { method: 'GET', path: '/api/prompt-templates', summary: 'Eigene Vorlagen auflisten.' },
+        {
+          method: 'GET',
+          path: '/api/prompt-templates/default-prompt',
+          summary: 'Standardvorgabe des Administrators – Ausgangspunkt für eigene Vorlagen.',
+          response: `{ "prompt": "Du bist ein Assistent, der …" }`,
+        },
         {
           method: 'POST',
           path: '/api/prompt-templates',

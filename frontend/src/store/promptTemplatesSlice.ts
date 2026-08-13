@@ -13,6 +13,8 @@ interface PromptTemplatesState {
   loading: boolean;
   loaded: boolean;
   error: string | null;
+  /** Standardvorgabe des Administrators; null = noch nicht geladen. */
+  defaultPrompt: string | null;
 }
 
 const initialState: PromptTemplatesState = {
@@ -20,6 +22,7 @@ const initialState: PromptTemplatesState = {
   loading: false,
   loaded: false,
   error: null,
+  defaultPrompt: null,
 };
 
 export const fetchPromptTemplates = createAsyncThunk<
@@ -33,6 +36,23 @@ export const fetchPromptTemplates = createAsyncThunk<
     return rejectWithValue(errorMessage(e));
   }
 });
+
+/**
+ * Standardvorgabe des Administrators. Sie dient auf der Vorlagen-Seite als
+ * Ausgangspunkt ("Standard übernehmen") – ein Fehler hier ist unkritisch, dann
+ * fehlt lediglich die Schaltfläche.
+ */
+export const fetchDefaultPrompt = createAsyncThunk<string, void, { rejectValue: string }>(
+  'promptTemplates/fetchDefaultPrompt',
+  async (_, { rejectWithValue }) => {
+    try {
+      const view = await api<{ prompt: string }>('/api/prompt-templates/default-prompt');
+      return view.prompt ?? '';
+    } catch (e) {
+      return rejectWithValue(errorMessage(e));
+    }
+  },
+);
 
 export const createPromptTemplate = createAsyncThunk<
   PromptTemplateView,
@@ -94,6 +114,9 @@ const promptTemplatesSlice = createSlice({
       .addCase(fetchPromptTemplates.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload ?? translate('errors.templatesLoad');
+      })
+      .addCase(fetchDefaultPrompt.fulfilled, (state, action) => {
+        state.defaultPrompt = action.payload;
       })
       .addCase(createPromptTemplate.fulfilled, (state, action) => {
         state.items = sortByName([...state.items, action.payload]);

@@ -4,6 +4,7 @@ import bbbbot.auth.CurrentUser;
 import bbbbot.domain.AppUser;
 import bbbbot.domain.PromptTemplate;
 import bbbbot.repository.Repositories.PromptTemplateRepo;
+import bbbbot.settings.SettingsService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,9 +34,11 @@ public class PromptTemplateController {
     private static final int MAX_PROMPT_LENGTH = 8000;
 
     private final PromptTemplateRepo templateRepo;
+    private final SettingsService settings;
 
-    public PromptTemplateController(PromptTemplateRepo templateRepo) {
+    public PromptTemplateController(PromptTemplateRepo templateRepo, SettingsService settings) {
         this.templateRepo = templateRepo;
+        this.settings = settings;
     }
 
     @GetMapping
@@ -44,6 +47,15 @@ public class PromptTemplateController {
         return templateRepo.findByOwnerIdOrderByNameAsc(user.getId()).stream()
                 .map(Dtos.PromptTemplateView::of)
                 .toList();
+    }
+
+    /**
+     * Standardvorgabe des Administrators, damit sich eine eigene Vorlage aus ihr
+     * heraus entwickeln laesst statt bei einem leeren Feld zu beginnen.
+     */
+    @GetMapping("/default-prompt")
+    public Dtos.DefaultPromptView defaultPrompt() {
+        return new Dtos.DefaultPromptView(settings.get(SettingsService.SUMMARY_SYSTEM_PROMPT));
     }
 
     @PostMapping

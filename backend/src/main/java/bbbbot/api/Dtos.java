@@ -145,6 +145,13 @@ public final class Dtos {
 
     public record PromptTemplateRequest(String name, String prompt) {}
 
+    /**
+     * Standardvorgabe des Administrators fuer die Auswertung. Sie dient auf der
+     * Vorlagen-Seite als Ausgangspunkt fuer eigene Vorlagen (dieselbe Angabe
+     * steckt bereits in {@link SummaryOptionsView#defaultPrompt()}).
+     */
+    public record DefaultPromptView(String prompt) {}
+
     /** Eintrag im persoenlichen Glossar (Abkuerzung/Fachbegriff mit Bedeutung). */
     public record GlossaryEntryView(UUID id, String term, String meaning,
                                     Instant createdAt, Instant updatedAt) {

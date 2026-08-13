@@ -12,6 +12,7 @@ import RecordingsPage from './pages/RecordingsPage';
 import RecordingDetailPage from './pages/RecordingDetailPage';
 import SharePage from './pages/SharePage';
 import GroupsPage from './pages/GroupsPage';
+import TemplatesPage from './pages/TemplatesPage';
 import GlossaryPage from './pages/GlossaryPage';
 import ApiPage from './pages/ApiPage';
 import AdminPage from './pages/AdminPage';
@@ -61,10 +62,13 @@ export default function App() {
           </RequireAuth>
         }
       >
-        <Route path="/" element={<BotsPage />} />
+        {/* Startseite nach dem Anmelden: die Aufnahmen */}
+        <Route path="/" element={<Navigate to="/recordings" replace />} />
         <Route path="/recordings" element={<RecordingsPage />} />
         <Route path="/recordings/:id" element={<RecordingDetailPage />} />
+        <Route path="/bots" element={<BotsPage />} />
         <Route path="/groups" element={<GroupsPage />} />
+        <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/glossary" element={<GlossaryPage />} />
         <Route path="/api" element={<ApiPage />} />
         <Route path="/admin" element={<AdminPage />} />
