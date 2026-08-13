@@ -21,10 +21,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final AppUserRepo userRepo;
+    private final UserActivityService activity;
 
-    public JwtAuthFilter(JwtService jwtService, AppUserRepo userRepo) {
+    public JwtAuthFilter(JwtService jwtService, AppUserRepo userRepo, UserActivityService activity) {
         this.jwtService = jwtService;
         this.userRepo = userRepo;
+        this.activity = activity;
     }
 
     @Override
@@ -50,6 +52,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     }
                     var auth = new UsernamePasswordAuthenticationToken(user, null, authorities);
                     SecurityContextHolder.getContext().setAuthentication(auth);
+                    // Nur die Token-Anmeldung zaehlt als "im Frontend aktiv" -
+                    // API-Schluessel sind Maschinenzugriffe.
+                    activity.touch(user);
                 }
             }
         }

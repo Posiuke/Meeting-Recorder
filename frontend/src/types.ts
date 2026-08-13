@@ -13,6 +13,28 @@ export interface UserView {
   language: string | null;
 }
 
+/** Laufende Aufnahme eines Nutzers in der Admin-Übersicht. */
+export interface ActiveRecordingView {
+  id: string;
+  title: string | null;
+  status: 'RECORDING' | 'FINALIZING';
+  source: RecordingSource;
+  startedAt: string;
+}
+
+/**
+ * Nutzer in der Admin-Verwaltung: zusätzlich zum {@link UserView} der
+ * Aktivitätszustand und die gerade laufenden Aufnahmen.
+ */
+export interface AdminUserView extends UserView {
+  lastLoginAt: string | null;
+  /** Letzte Anfrage aus dem Frontend; null = seit Einführung nicht gesehen. */
+  lastSeenAt: string | null;
+  /** Serverseitig bewertet: Aktivität innerhalb des Online-Fensters. */
+  online: boolean;
+  activeRecordings: ActiveRecordingView[];
+}
+
 export interface AuthConfig {
   'auth.ldapEnabled': string;
   'auth.ldapDomain': string;

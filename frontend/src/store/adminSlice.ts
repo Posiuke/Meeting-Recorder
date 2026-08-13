@@ -1,7 +1,7 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { api, errorMessage } from '../api/client';
 import { translate } from '../i18n';
-import type { LdapTestResult, UserView } from '../types';
+import type { AdminUserView, LdapTestResult } from '../types';
 
 type SettingsMap = Record<string, string>;
 
@@ -13,7 +13,7 @@ interface AdminState {
   authConfig: SettingsMap | null;
   authLoading: boolean;
   authError: string | null;
-  users: UserView[];
+  users: AdminUserView[];
   usersLoading: boolean;
   usersError: string | null;
 }
@@ -92,11 +92,11 @@ export const saveSettings = createAsyncThunk<SettingsMap, SettingsMap, { rejectV
   },
 );
 
-export const fetchAdminUsers = createAsyncThunk<UserView[], void, { rejectValue: string }>(
+export const fetchAdminUsers = createAsyncThunk<AdminUserView[], void, { rejectValue: string }>(
   'admin/fetchUsers',
   async (_, { rejectWithValue }) => {
     try {
-      return await api<UserView[]>('/api/admin/users');
+      return await api<AdminUserView[]>('/api/admin/users');
     } catch (e) {
       return rejectWithValue(errorMessage(e));
     }
@@ -104,12 +104,12 @@ export const fetchAdminUsers = createAsyncThunk<UserView[], void, { rejectValue:
 );
 
 export const setUserAdmin = createAsyncThunk<
-  UserView,
+  AdminUserView,
   { userId: string; admin: boolean },
   { rejectValue: string }
 >('admin/setUserAdmin', async ({ userId, admin }, { rejectWithValue }) => {
   try {
-    return await api<UserView>(`/api/admin/users/${userId}/admin`, {
+    return await api<AdminUserView>(`/api/admin/users/${userId}/admin`, {
       method: 'PUT',
       body: { admin },
     });

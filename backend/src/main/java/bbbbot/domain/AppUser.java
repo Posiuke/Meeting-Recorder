@@ -30,6 +30,14 @@ public class AppUser {
 
     private Instant lastLoginAt;
 
+    /**
+     * Letzte Aktivitaet im Frontend (angefragter Endpunkt mit gueltigem Token).
+     * Grundlage fuer "wer ist gerade angemeldet" im Admin-Bereich - die
+     * Anmeldung selbst ist zustandslos (JWT), es gibt also keine Sitzung, die
+     * man zaehlen koennte. Wird gedrosselt geschrieben, siehe UserActivityService.
+     */
+    private Instant lastSeenAt;
+
     /** bcrypt-Hash fuer lokale Anmeldung; NULL bei reinen LDAP-Konten. */
     private String passwordHash;
 
@@ -65,6 +73,8 @@ public class AppUser {
     public Instant getCreatedAt() { return createdAt; }
     public Instant getLastLoginAt() { return lastLoginAt; }
     public void setLastLoginAt(Instant lastLoginAt) { this.lastLoginAt = lastLoginAt; }
+    public Instant getLastSeenAt() { return lastSeenAt; }
+    public void setLastSeenAt(Instant lastSeenAt) { this.lastSeenAt = lastSeenAt; }
     public String getPasswordHash() { return passwordHash; }
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
     public boolean isMustChangePassword() { return mustChangePassword; }

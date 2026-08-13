@@ -43,6 +43,14 @@ docs/       Anleitungen (u.a. Whisper-Diarisierung), Alt-Dokumentation
   Freigabe automatisch) oder ohne Anmeldung (siehe unten). Admins pflegen
   Einstellungen (Whisper-/LLM-Parameter, Zeitfenster, Bot-Verhalten) und
   Admin-Rollen im Frontend.
+- **Wer ist aktiv?**: Der Admin-Tab **Benutzer** zeigt je Konto, ob es gerade
+  angemeldet ist und ob dafür eine **Aufnahme läuft** (mit Quelle und Laufzeit);
+  laufende Aufnahmen stehen zusätzlich als Warnung über der Liste. So lässt sich
+  vor einem Neustart oder einer Wartung sehen, wen das mitten in einer Aufnahme
+  träfe. Die Anmeldung ist zustandslos (JWT), deshalb zählt die letzte Anfrage
+  aus dem Frontend (`app_user.last_seen_at`, gedrosselt fortgeschrieben);
+  „angemeldet" heißt Aktivität in den letzten 5 Minuten, API-Schlüssel-Zugriffe
+  bleiben unberücksichtigt.
 - **Datei-Upload**: Bestehende Audio-/Videodateien (MP3, WAV, M4A, MP4, …)
   lassen sich über "Aufnahme hochladen" als Aufnahme importieren
   (`POST /api/recordings/upload`). Die Datei wird serverseitig per ffmpeg zu

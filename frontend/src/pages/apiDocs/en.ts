@@ -571,7 +571,12 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
         {
           method: 'GET',
           path: '/api/admin/users',
-          summary: 'All known users – admin only.',
+          summary:
+            'All known users – admin only. Each user also carries lastSeenAt/online (frontend activity, 5 minute window) and activeRecordings (recordings running right now).',
+          response: `[{ "username": "m.mustermann", "online": true,
+   "lastSeenAt": "2026-08-13T09:12:44Z",
+   "activeRecordings": [{ "id": "5d34…", "status": "RECORDING",
+                          "source": "CAPTURE", "startedAt": "2026-08-13T09:03:00Z" }] }]`,
         },
       ],
     },

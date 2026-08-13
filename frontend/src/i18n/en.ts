@@ -728,6 +728,27 @@ export const en: typeof de = {
     usersEmail: 'Email',
     usersAdmin: 'Administrator',
     usersYourself: '(yourself)',
+    usersStatus: 'Status',
+    usersStatusHelp:
+      'Sign-in is stateless (token based), so what counts here is the last request from the frontend: “Signed in” means activity within the last 5 minutes. Access via API keys is not counted.',
+    usersOnline: 'Signed in',
+    usersOffline: 'Signed out',
+    usersLastSeen: 'Last activity: {{date}}',
+    usersLastSeenNever: 'Not active since the restart',
+    usersLastLogin: 'Last sign-in: {{date}}',
+    usersRecordingColumn: 'Recording',
+    usersRecording: 'Recording',
+    usersFinalizing: 'Finalising',
+    usersRecordingSince: 'since {{time}} ({{minutes}} min)',
+    usersRecordingNone: '–',
+    usersRefresh: 'Refresh',
+    usersRefreshed: 'As of {{time}} – refreshes automatically',
+    usersRunningTitle: 'Recordings are running right now',
+    usersRunningWarning:
+      'A restart or maintenance would cut these recordings short. Please wait until they have finished.',
+    usersRunningEntry: '{{user}}: {{title}} ({{source}}, {{since}})',
+    usersRunningNone: 'No recording is running – maintenance is safe.',
+    usersUntitled: 'untitled',
     keyHelp: {
       whisperProvider:
         'Where speech recognition runs: "local" sends the audio segments to your own Whisper server on the intranet, "openai" to a cloud API in OpenAI format (e.g. OpenAI, Groq).',

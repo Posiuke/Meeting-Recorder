@@ -2,10 +2,13 @@ package bbbbot.api;
 
 import bbbbot.auth.CurrentUser;
 import bbbbot.auth.LdapAuthenticator;
+import bbbbot.auth.UserActivityService;
 import bbbbot.domain.AppUser;
+import bbbbot.domain.Recording;
 import bbbbot.llm.LlmClient;
 import bbbbot.media.FfmpegService;
 import bbbbot.repository.Repositories.AppUserRepo;
+import bbbbot.repository.Repositories.RecordingRepo;
 import bbbbot.settings.AuthSettingsService;
 import bbbbot.settings.SettingsService;
 import bbbbot.stt.WhisperClient;
@@ -20,9 +23,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /** Admin-Funktionen: Einstellungen (STT/LLM/Zeitfenster/Bot), Authentifizierung und Admin-Rollen. */
 @RestController
@@ -33,17 +38,20 @@ public class AdminController {
     private final AuthSettingsService authSettings;
     private final LdapAuthenticator ldap;
     private final AppUserRepo userRepo;
+    private final RecordingRepo recordingRepo;
     private final LlmClient llm;
     private final WhisperClient whisper;
     private final FfmpegService ffmpeg;
 
     public AdminController(SettingsService settings, AuthSettingsService authSettings,
                            LdapAuthenticator ldap, AppUserRepo userRepo,
+                           RecordingRepo recordingRepo,
                            LlmClient llm, WhisperClient whisper, FfmpegService ffmpeg) {
         this.settings = settings;
         this.authSettings = authSettings;
         this.ldap = ldap;
         this.userRepo = userRepo;
+        this.recordingRepo = recordingRepo;
         this.llm = llm;
         this.whisper = whisper;
         this.ffmpeg = ffmpeg;
@@ -162,13 +170,23 @@ public class AdminController {
         }
     }
 
+    /**
+     * Nutzerliste mit Aktivitaetszustand: wer ist gerade angemeldet und wer
+     * nimmt gerade auf. Nach Benutzername sortiert, damit die Zeilen beim
+     * Aktualisieren nicht springen.
+     */
     @GetMapping("/users")
-    public List<Dtos.UserView> listUsers() {
-        return userRepo.findAll().stream().map(Dtos.UserView::of).toList();
+    public List<Dtos.AdminUserView> listUsers() {
+        Map<UUID, List<Dtos.ActiveRecordingView>> running = runningRecordingsByOwner();
+        return userRepo.findAll().stream()
+                .sorted(Comparator.comparing(AppUser::getUsername, String.CASE_INSENSITIVE_ORDER))
+                .map(u -> adminView(u, running))
+                .toList();
     }
 
     @PutMapping("/users/{userId}/admin")
-    public Dtos.UserView setAdmin(@PathVariable UUID userId, @RequestBody Dtos.SetAdminRequest request) {
+    public Dtos.AdminUserView setAdmin(@PathVariable UUID userId,
+                                       @RequestBody Dtos.SetAdminRequest request) {
         AppUser actor = CurrentUser.get();
         AppUser target = userRepo.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Nutzer nicht gefunden"));
@@ -177,6 +195,25 @@ public class AdminController {
         }
         target.setAdmin(request.admin());
         userRepo.save(target);
-        return Dtos.UserView.of(target);
+        return adminView(target, runningRecordingsByOwner());
+    }
+
+    private Dtos.AdminUserView adminView(AppUser user,
+                                         Map<UUID, List<Dtos.ActiveRecordingView>> running) {
+        return Dtos.AdminUserView.of(user, UserActivityService.isOnline(user.getLastSeenAt()),
+                running.getOrDefault(user.getId(), List.of()));
+    }
+
+    /**
+     * Aufnahmen, die gerade laufen oder eben abgeschlossen und noch nicht
+     * gesichert sind - genau die, die ein Neustart zerreissen wuerde.
+     */
+    private Map<UUID, List<Dtos.ActiveRecordingView>> runningRecordingsByOwner() {
+        return recordingRepo
+                .findByStatusIn(List.of(Recording.Status.RECORDING, Recording.Status.FINALIZING))
+                .stream()
+                .sorted(Comparator.comparing(Recording::getStartedAt))
+                .collect(Collectors.groupingBy(Recording::getOwnerId,
+                        Collectors.mapping(Dtos.ActiveRecordingView::of, Collectors.toList())));
     }
 }

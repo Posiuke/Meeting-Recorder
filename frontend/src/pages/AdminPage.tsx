@@ -14,9 +14,10 @@ import Spinner from '../components/Spinner';
 import Alert from '../components/Alert';
 import HelpTip from '../components/HelpTip';
 import { api, errorMessage } from '../api/client';
+import { formatDateTime, formatTime } from '../utils/format';
 import { useI18n } from '../i18n';
 import type { TranslationKey } from '../i18n';
-import type { ConnectionTestResult, LdapTestResult } from '../types';
+import type { ActiveRecordingView, ConnectionTestResult, LdapTestResult } from '../types';
 
 interface SettingsGroupDef {
   /** Übersetzungsschlüssel der Überschrift. */
@@ -533,6 +534,14 @@ function SettingsTab() {
   );
 }
 
+/** Abstand der automatischen Aktualisierung der Nutzerliste. */
+const USERS_REFRESH_MS = 20000;
+
+/** Volle Minuten seit dem Zeitpunkt – für "nimmt seit 23 Min auf". */
+function minutesSince(iso: string): number {
+  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
+}
+
 function UsersTab() {
   const { t } = useI18n();
   const dispatch = useAppDispatch();
@@ -540,10 +549,33 @@ function UsersTab() {
   const { users, usersLoading, usersError } = useAppSelector((s) => s.admin);
   const [error, setError] = useState<string | null>(null);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const [refreshedAt, setRefreshedAt] = useState<string>(() => new Date().toISOString());
 
+  // Der Zustand ist nur brauchbar, wenn er aktuell ist: Die Liste lädt sich
+  // nach, solange der Tab offen ist.
   useEffect(() => {
-    dispatch(fetchAdminUsers());
+    const load = () => {
+      void dispatch(fetchAdminUsers());
+      setRefreshedAt(new Date().toISOString());
+    };
+    load();
+    const timer = window.setInterval(load, USERS_REFRESH_MS);
+    return () => window.clearInterval(timer);
   }, [dispatch]);
+
+  const sourceLabel = (source: ActiveRecordingView['source']) => {
+    if (source === 'CAPTURE') return t('recordingDetail.sourceCapture');
+    if (source === 'UPLOAD') return t('recordingDetail.sourceUpload');
+    return t('recordingDetail.sourceBot');
+  };
+
+  const since = (recording: ActiveRecordingView) =>
+    t('admin.usersRecordingSince', {
+      time: formatTime(recording.startedAt),
+      minutes: minutesSince(recording.startedAt),
+    });
+
+  const recordingUsers = users.filter((u) => u.activeRecordings.length > 0);
 
   const handleToggle = async (userId: string, admin: boolean) => {
     setError(null);
@@ -562,41 +594,133 @@ function UsersTab() {
   }
 
   return (
-    <div className="card">
-      {usersError && <Alert kind="error">{usersError}</Alert>}
-      {error && <Alert kind="error">{error}</Alert>}
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>{t('admin.usersUsername')}</th>
-              <th>{t('admin.usersDisplayName')}</th>
-              <th>{t('admin.usersEmail')}</th>
-              <th>{t('admin.usersAdmin')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr key={user.id}>
-                <td>{user.username}</td>
-                <td>{user.displayName}</td>
-                <td>{user.email ?? '–'}</td>
-                <td>
-                  <label className="checkbox-field">
-                    <input
-                      type="checkbox"
-                      checked={user.admin}
-                      disabled={user.id === me?.id || busyUserId === user.id}
-                      onChange={(e) => handleToggle(user.id, e.target.checked)}
-                    />
-                    {user.id === me?.id && <span className="muted">{t('admin.usersYourself')}</span>}
-                  </label>
-                </td>
+    <>
+      {/* Erst die Warnung, dann die Liste: Vor Wartungsarbeiten ist genau das
+          die Frage, die ein Admin beantwortet haben will. */}
+      {recordingUsers.length > 0 ? (
+        <Alert kind="info">
+          <strong>{t('admin.usersRunningTitle')}</strong>
+          <ul className="admin-running-list">
+            {recordingUsers.flatMap((user) =>
+              user.activeRecordings.map((recording) => (
+                <li key={recording.id}>
+                  <span className="badge badge-red badge-pulse">
+                    {recording.status === 'FINALIZING'
+                      ? t('admin.usersFinalizing')
+                      : t('admin.usersRecording')}
+                  </span>{' '}
+                  {t('admin.usersRunningEntry', {
+                    user: user.displayName || user.username,
+                    title: recording.title ?? t('admin.usersUntitled'),
+                    source: sourceLabel(recording.source),
+                    since: since(recording),
+                  })}
+                </li>
+              )),
+            )}
+          </ul>
+          {t('admin.usersRunningWarning')}
+        </Alert>
+      ) : (
+        <p className="muted">{t('admin.usersRunningNone')}</p>
+      )}
+
+      <div className="card">
+        {usersError && <Alert kind="error">{usersError}</Alert>}
+        {error && <Alert kind="error">{error}</Alert>}
+
+        <div className="admin-users-head">
+          <span className="muted">
+            {t('admin.usersRefreshed', { time: formatTime(refreshedAt) })}
+          </span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={usersLoading}
+            onClick={() => {
+              void dispatch(fetchAdminUsers());
+              setRefreshedAt(new Date().toISOString());
+            }}
+          >
+            {t('admin.usersRefresh')}
+          </button>
+        </div>
+
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>{t('admin.usersUsername')}</th>
+                <th>{t('admin.usersDisplayName')}</th>
+                <th>{t('admin.usersEmail')}</th>
+                <th>
+                  {t('admin.usersStatus')}
+                  <HelpTip text={t('admin.usersStatusHelp')} />
+                </th>
+                <th>{t('admin.usersRecordingColumn')}</th>
+                <th>{t('admin.usersAdmin')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {users.map((user) => (
+                <tr key={user.id}>
+                  <td>{user.username}</td>
+                  <td>{user.displayName}</td>
+                  <td>{user.email ?? '–'}</td>
+                  <td>
+                    {user.online ? (
+                      <span className="badge badge-green badge-pulse">
+                        {t('admin.usersOnline')}
+                      </span>
+                    ) : (
+                      <span className="badge badge-gray">{t('admin.usersOffline')}</span>
+                    )}
+                    <div className="muted admin-user-seen">
+                      {user.lastSeenAt
+                        ? t('admin.usersLastSeen', { date: formatDateTime(user.lastSeenAt) })
+                        : user.lastLoginAt
+                          ? t('admin.usersLastLogin', { date: formatDateTime(user.lastLoginAt) })
+                          : t('admin.usersLastSeenNever')}
+                    </div>
+                  </td>
+                  <td>
+                    {user.activeRecordings.length === 0 ? (
+                      <span className="muted">{t('admin.usersRecordingNone')}</span>
+                    ) : (
+                      user.activeRecordings.map((recording) => (
+                        <div key={recording.id} className="admin-user-recording">
+                          <span className="badge badge-red badge-pulse">
+                            {recording.status === 'FINALIZING'
+                              ? t('admin.usersFinalizing')
+                              : t('admin.usersRecording')}
+                          </span>
+                          <span className="muted">
+                            {recording.title ?? t('admin.usersUntitled')} ·{' '}
+                            {sourceLabel(recording.source)} · {since(recording)}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </td>
+                  <td>
+                    <label className="checkbox-field">
+                      <input
+                        type="checkbox"
+                        checked={user.admin}
+                        disabled={user.id === me?.id || busyUserId === user.id}
+                        onChange={(e) => handleToggle(user.id, e.target.checked)}
+                      />
+                      {user.id === me?.id && (
+                        <span className="muted">{t('admin.usersYourself')}</span>
+                      )}
+                    </label>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

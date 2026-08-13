@@ -29,6 +29,38 @@ public final class Dtos {
         }
     }
 
+    /**
+     * Laufende Aufnahme eines Nutzers in der Admin-Uebersicht - genug, um sie
+     * zuzuordnen, ohne Inhalte offenzulegen (kein Transkript, keine URL).
+     */
+    public record ActiveRecordingView(UUID id, String title, String status, String source,
+                                      Instant startedAt) {
+        public static ActiveRecordingView of(Recording r) {
+            Recording.Source src = r.getSource() == null ? Recording.Source.BOT : r.getSource();
+            return new ActiveRecordingView(r.getId(), r.getTitle(), r.getStatus().name(),
+                    src.name(), r.getStartedAt());
+        }
+    }
+
+    /**
+     * Nutzer in der Admin-Verwaltung: zusaetzlich zu {@link UserView} der
+     * Aktivitaetszustand und die gerade laufenden Aufnahmen. Damit sieht ein
+     * Admin vor Wartungsarbeiten, wen ein Neustart mitten in einer Aufnahme
+     * treffen wuerde.
+     */
+    public record AdminUserView(UUID id, String username, String displayName, String email,
+                                boolean admin, boolean local, boolean mustChangePassword,
+                                String language, Instant lastLoginAt, Instant lastSeenAt,
+                                boolean online, List<ActiveRecordingView> activeRecordings) {
+        public static AdminUserView of(AppUser u, boolean online, List<ActiveRecordingView> active) {
+            boolean local = u.getPasswordHash() != null && !u.getPasswordHash().isBlank();
+            return new AdminUserView(u.getId(), u.getUsername(), u.getDisplayName(), u.getEmail(),
+                    u.isAdmin(), local, u.isMustChangePassword(), u.getLanguage(),
+                    u.getLastLoginAt(), u.getLastSeenAt(), online,
+                    active == null ? List.of() : active);
+        }
+    }
+
     /** Oberflaechensprache des angemeldeten Nutzers setzen. */
     public record LanguageRequest(String language) {}
 

@@ -735,6 +735,27 @@ export const de = {
     usersEmail: 'E-Mail',
     usersAdmin: 'Administrator',
     usersYourself: '(Sie selbst)',
+    usersStatus: 'Status',
+    usersStatusHelp:
+      'Die Anmeldung ist zustandslos (Token), deshalb zählt hier die letzte Anfrage aus dem Frontend: „Angemeldet" heißt Aktivität in den letzten 5 Minuten. Zugriffe über API-Schlüssel bleiben unberücksichtigt.',
+    usersOnline: 'Angemeldet',
+    usersOffline: 'Abgemeldet',
+    usersLastSeen: 'Letzte Aktivität: {{date}}',
+    usersLastSeenNever: 'Seit dem Neustart nicht aktiv',
+    usersLastLogin: 'Letzte Anmeldung: {{date}}',
+    usersRecordingColumn: 'Aufnahme',
+    usersRecording: 'Nimmt auf',
+    usersFinalizing: 'Wird abgeschlossen',
+    usersRecordingSince: 'seit {{time}} ({{minutes}} Min)',
+    usersRecordingNone: '–',
+    usersRefresh: 'Aktualisieren',
+    usersRefreshed: 'Stand: {{time}} – aktualisiert sich automatisch',
+    usersRunningTitle: 'Aufnahmen laufen gerade',
+    usersRunningWarning:
+      'Ein Neustart oder eine Wartung würde diese Aufnahmen abbrechen. Bitte warten, bis sie beendet sind.',
+    usersRunningEntry: '{{user}}: {{title}} ({{source}}, {{since}})',
+    usersRunningNone: 'Derzeit läuft keine Aufnahme – Wartungsarbeiten sind unkritisch.',
+    usersUntitled: 'ohne Titel',
     keyHelp: {
       whisperProvider:
         'Wo die Spracherkennung läuft: „local" schickt die Audio-Segmente an den eigenen Whisper-Server im Intranet, „openai" an eine Cloud-API im OpenAI-Format (z. B. OpenAI, Groq).',

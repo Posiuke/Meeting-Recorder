@@ -573,7 +573,12 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
         {
           method: 'GET',
           path: '/api/admin/users',
-          summary: 'Alle bekannten Nutzer – nur mit Admin-Recht.',
+          summary:
+            'Alle bekannten Nutzer – nur mit Admin-Recht. Je Nutzer zusätzlich lastSeenAt/online (Aktivität im Frontend, Fenster 5 Minuten) und activeRecordings (gerade laufende Aufnahmen).',
+          response: `[{ "username": "m.mustermann", "online": true,
+   "lastSeenAt": "2026-08-13T09:12:44Z",
+   "activeRecordings": [{ "id": "5d34…", "status": "RECORDING",
+                          "source": "CAPTURE", "startedAt": "2026-08-13T09:03:00Z" }] }]`,
         },
       ],
     },
