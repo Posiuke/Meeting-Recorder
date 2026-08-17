@@ -576,6 +576,7 @@ export const en: typeof de = {
     summaryOptions: 'Customise analysis',
     customized: 'customised',
     downloadSummary: 'Download summary',
+    downloadSummaryWord: 'Summary as Word',
     share: 'Share',
     videoHeading: 'Video',
     videoDownload: 'Download video',
@@ -596,6 +597,11 @@ export const en: typeof de = {
     correctionFailed:
       'The AI smoothing was not possible for this recording – the unaltered transcript is shown and analysed.',
     transcriptEmpty: 'No transcript available.',
+    downloadTranscript: 'Download transcript',
+    downloadTranscriptWord: 'Transcript as Word',
+    downloadWordHint:
+      'Word file (.doc) with headings, lists and tables – opens in Word or LibreOffice and can be saved from there as DOCX or PDF.',
+    downloadVariantHint: 'The version currently selected ({{variant}}) is downloaded.',
     chatEmpty: 'No chat log available.',
     jobsEmpty: 'No processing jobs available.',
     jobsCreated: 'Created',

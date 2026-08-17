@@ -261,9 +261,28 @@ export function audioUrl(recordingId: string, segmentId: string): string {
   return `/api/recordings/${recordingId}/segments/${segmentId}/audio?token=${encodeURIComponent(token)}`;
 }
 
-export function summaryDownloadUrl(recordingId: string): string {
+/** Download-Format der Text-Ausgaben: Markdown-Rohfassung oder Word-Datei (.doc). */
+export type DownloadFormat = 'md' | 'doc';
+
+export function summaryDownloadUrl(recordingId: string, format: DownloadFormat = 'md'): string {
   const token = getToken() ?? '';
-  return `/api/recordings/${recordingId}/summary/download?token=${encodeURIComponent(token)}`;
+  return `/api/recordings/${recordingId}/summary/download?format=${format}&token=${encodeURIComponent(token)}`;
+}
+
+/**
+ * Transkript als Datei. `original` wählt die Whisper-Rohfassung statt der
+ * geglätteten – der Aufrufer gibt weiter, was im Transkript-Tab gerade
+ * angezeigt wird.
+ */
+export function transcriptDownloadUrl(
+  recordingId: string,
+  original: boolean,
+  format: DownloadFormat = 'md',
+): string {
+  const token = getToken() ?? '';
+  const variant = original ? 'original' : 'corrected';
+  return `/api/recordings/${recordingId}/transcript/download?variant=${variant}&format=${format}`
+    + `&token=${encodeURIComponent(token)}`;
 }
 
 /** Video-URL (MP4) mit Token als Query-Parameter, da <video> keine Header setzen kann. */

@@ -139,6 +139,18 @@ curl -s -H "X-API-Key: $KEY" -F file=@note.m4a \\
 }`,
         },
         {
+          method: 'GET',
+          path: '/api/recordings/{id}/transcript/download',
+          summary:
+            'Transcript as a file – either the smoothed or the original version, as Markdown or as a Word file (.doc). The filename carries the version, the recording date and a short id.',
+          params: [
+            { name: 'variant', description: 'corrected (default) = smoothed, original = raw Whisper output' },
+            { name: 'format', description: 'md (default) or doc for the Word version' },
+          ],
+          example: `curl -s -H "X-API-Key: $KEY" -OJ \\
+  "$BBB/api/recordings/$ID/transcript/download?variant=original&format=doc"`,
+        },
+        {
           method: 'POST',
           path: '/api/recordings/{id}/transcribe',
           summary: 'Transcribe only (step 1), no summary. Runs immediately. Returns the job.',
@@ -183,9 +195,11 @@ curl -s -H "X-API-Key: $KEY" -F file=@note.m4a \\
         {
           method: 'GET',
           path: '/api/recordings/{id}/summary/download',
-          summary: 'The same summary as an .md file.',
+          summary:
+            'The same summary as a file – as Markdown or as a Word file (.doc) that Word and LibreOffice open directly.',
+          params: [{ name: 'format', description: 'md (default) or doc for the Word version' }],
           example: `curl -s -H "X-API-Key: $KEY" -OJ \\
-  "$BBB/api/recordings/$ID/summary/download"`,
+  "$BBB/api/recordings/$ID/summary/download?format=doc"`,
         },
         {
           method: 'POST',

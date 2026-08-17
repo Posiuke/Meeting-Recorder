@@ -139,6 +139,18 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
 }`,
         },
         {
+          method: 'GET',
+          path: '/api/recordings/{id}/transcript/download',
+          summary:
+            'Transkript als Datei zum Speichern – wahlweise die geglättete oder die Original-Fassung, als Markdown oder als Word-Datei (.doc). Der Dateiname enthält Fassung, Aufnahmedatum und Kurz-Kennung.',
+          params: [
+            { name: 'variant', description: 'corrected (Standard) = geglättet, original = Whisper-Rohfassung' },
+            { name: 'format', description: 'md (Standard) oder doc für die Word-Fassung' },
+          ],
+          example: `curl -s -H "X-API-Key: $KEY" -OJ \\
+  "$BBB/api/recordings/$ID/transcript/download?variant=original&format=doc"`,
+        },
+        {
           method: 'POST',
           path: '/api/recordings/{id}/transcribe',
           summary:
@@ -184,9 +196,13 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
         {
           method: 'GET',
           path: '/api/recordings/{id}/summary/download',
-          summary: 'Dieselbe Zusammenfassung als .md-Datei zum Speichern.',
+          summary:
+            'Dieselbe Zusammenfassung als Datei zum Speichern – als Markdown oder als Word-Datei (.doc), die Word und LibreOffice direkt öffnen.',
+          params: [
+            { name: 'format', description: 'md (Standard) oder doc für die Word-Fassung' },
+          ],
           example: `curl -s -H "X-API-Key: $KEY" -OJ \\
-  "$BBB/api/recordings/$ID/summary/download"`,
+  "$BBB/api/recordings/$ID/summary/download?format=doc"`,
         },
         {
           method: 'POST',

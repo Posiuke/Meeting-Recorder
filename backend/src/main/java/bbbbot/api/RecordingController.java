@@ -368,6 +368,41 @@ public class RecordingController {
                 recording.getCorrectionStatus() == null ? null : recording.getCorrectionStatus().name());
     }
 
+    /**
+     * Transkript als Datei. Die Fassung waehlt {@code variant}
+     * ({@code corrected} = geglaettet, {@code original} = Whisper-Rohfassung),
+     * das Format {@code format} ({@code md} oder {@code doc} fuer Word).
+     */
+    @GetMapping("/{id}/transcript/download")
+    public ResponseEntity<byte[]> transcriptDownload(
+            @PathVariable UUID id,
+            @RequestParam(value = "variant", defaultValue = "corrected") String variant,
+            @RequestParam(value = "format", defaultValue = "md") String format) {
+        AppUser user = CurrentUser.get();
+        Recording recording = access.requireReadable(id, user);
+        return media.transcriptDownload(recording, requireOriginalVariant(variant),
+                requireFormat(format));
+    }
+
+    /** {@code corrected} (Standard) oder {@code original}; alles andere ist ein Tippfehler. */
+    private static boolean requireOriginalVariant(String variant) {
+        String value = variant == null || variant.isBlank() ? "corrected" : variant.trim().toLowerCase(Locale.ROOT);
+        return switch (value) {
+            case "corrected" -> false;
+            case "original" -> true;
+            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Unbekannte Fassung: " + variant + " (erlaubt: corrected, original)");
+        };
+    }
+
+    private static bbbbot.export.ExportFormat requireFormat(String format) {
+        try {
+            return bbbbot.export.ExportFormat.parse(format);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+    }
+
     private static List<Dtos.TranscriptEntry> toEntryViews(List<TranscriptAssembler.Entry> entries) {
         return entries.stream()
                 .map(e -> new Dtos.TranscriptEntry(e.startSeconds(), e.speaker(), e.text()))
@@ -625,10 +660,13 @@ public class RecordingController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Keine Zusammenfassung vorhanden"));
     }
 
+    /** @param format {@code md} (Standard) oder {@code doc} fuer die Word-Fassung */
     @GetMapping("/{id}/summary/download")
-    public ResponseEntity<byte[]> downloadSummary(@PathVariable UUID id) {
+    public ResponseEntity<byte[]> downloadSummary(
+            @PathVariable UUID id,
+            @RequestParam(value = "format", defaultValue = "md") String format) {
         AppUser user = CurrentUser.get();
-        return media.summaryDownload(access.requireReadable(id, user));
+        return media.summaryDownload(access.requireReadable(id, user), requireFormat(format));
     }
 
     /**
