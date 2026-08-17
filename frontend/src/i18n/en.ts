@@ -598,6 +598,8 @@ export const en: typeof de = {
       'The AI smoothing was not possible for this recording – the unaltered transcript is shown and analysed.',
     transcriptEmpty: 'No transcript available.',
     seekHint: 'Click a line to jump to that point in the recording.',
+    audioUnavailable:
+      'This recording has no playable audio (any more) – the transcript can only be read.',
     chatEmpty: 'No chat log available.',
     jobsEmpty: 'No processing jobs available.',
     jobsCreated: 'Created',

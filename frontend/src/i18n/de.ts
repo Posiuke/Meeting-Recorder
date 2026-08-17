@@ -603,6 +603,8 @@ export const de = {
       'Die KI-Glättung war für diese Aufnahme nicht möglich – angezeigt und ausgewertet wird das unveränderte Transkript.',
     transcriptEmpty: 'Kein Transkript vorhanden.',
     seekHint: 'Klick auf eine Zeile springt an diese Stelle der Aufnahme.',
+    audioUnavailable:
+      'Zu dieser Aufnahme ist keine abspielbare Tonspur (mehr) vorhanden – das Transkript lässt sich deshalb nur lesen.',
     chatEmpty: 'Kein Chat-Protokoll vorhanden.',
     jobsEmpty: 'Keine Verarbeitungs-Jobs vorhanden.',
     jobsCreated: 'Erstellt',

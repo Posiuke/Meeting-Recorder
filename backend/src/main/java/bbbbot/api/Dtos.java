@@ -85,12 +85,24 @@ public final class Dtos {
                           UUID recordingId, int participants, int audioTracks,
                           String lastError, Instant createdAt, boolean mine) {}
 
+    /**
+     * @param hasAudio wirklich abspielbar: Der Pfad steht nicht nur in der
+     *                 Datenbank, die Datei liegt auch da. Bei alten Aufnahmen
+     *                 koennen beide auseinanderlaufen (verschobener oder
+     *                 aufgeraeumter Speicher) - das Frontend bietet die
+     *                 Wiedergabe sonst an und laeuft in einen Fehler.
+     */
     public record SegmentView(UUID id, int seq, String status, Long durationMs, Long sizeBytes,
                               boolean hasAudio, boolean hasTranscript) {
         public static SegmentView of(RecordingSegment s) {
             return new SegmentView(s.getId(), s.getSeq(), s.getStatus().name(), s.getDurationMs(),
-                    s.getSizeBytes(), s.getMp3Path() != null,
+                    s.getSizeBytes(), audioExists(s),
                     s.getTranscriptText() != null && !s.getTranscriptText().isBlank());
+        }
+
+        private static boolean audioExists(RecordingSegment s) {
+            return s.getMp3Path() != null && !s.getMp3Path().isBlank()
+                    && java.nio.file.Files.exists(java.nio.file.Path.of(s.getMp3Path()));
         }
     }
 

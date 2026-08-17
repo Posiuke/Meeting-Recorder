@@ -106,9 +106,16 @@ export default function RecordingDetailPage() {
   // Wiedergabe der Gesamt-Tonspur: Element für den Sprung, Zeile für die Anzeige
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [activeIndex, setActiveIndex] = useState(-1);
+  // Tonspur nicht abspielbar (z.B. alte Aufnahme, deren Audiodateien nicht mehr
+  // liegen, wo die Datenbank sie vermutet): Dann verspricht die Oberfläche den
+  // Sprung gar nicht erst.
+  const [audioBroken, setAudioBroken] = useState(false);
 
   useEffect(() => {
     if (!id) return;
+    // Zustand der Wiedergabe gehört zur Aufnahme, nicht zur Seite
+    setAudioBroken(false);
+    setActiveIndex(-1);
     dispatch(fetchRecordingDetail({ id }));
     return () => {
       dispatch(clearDetail());
@@ -173,13 +180,20 @@ export default function RecordingDetailPage() {
     : transcript?.transcript ?? '';
 
   // Durchgehende Tonspur: Sie entsteht serverseitig aus den Segmenten und
-  // trägt den Sprung aus dem Transkript.
-  const hasAudio = (detail?.segments ?? []).some((s) => s.hasAudio);
+  // trägt den Sprung aus dem Transkript. Fehlt sie, bleibt das Transkript Text.
+  const hasAudio = (detail?.segments ?? []).some((s) => s.hasAudio) && !audioBroken;
 
   const handleSeek = (seconds: number) => {
     const audio = audioRef.current;
-    if (!audio) return;
-    audio.currentTime = seconds;
+    // Ohne geladene Quelle wirft das Setzen von currentTime (InvalidStateError) –
+    // z.B. wenn der Server die Tonspur nicht ausliefern konnte.
+    if (!audio || audio.networkState === audio.NETWORK_NO_SOURCE) return;
+    try {
+      audio.currentTime = seconds;
+    } catch {
+      setAudioBroken(true);
+      return;
+    }
     setActiveIndex(findActiveIndex(activeEntries, seconds));
     // Nach einem Klick soll man hören, was dort steht. Lehnt der Browser das
     // Abspielen ab (kein Nutzergesten-Kontext), bleibt es beim Springen.
@@ -533,6 +547,9 @@ export default function RecordingDetailPage() {
                   controls
                   preload="metadata"
                   src={fullAudioUrl(id)}
+                  // Alte Aufnahmen ohne (noch) vorhandene Audiodateien: Der
+                  // Player verschwindet, statt einen toten Knopf zu zeigen.
+                  onError={() => setAudioBroken(true)}
                   onTimeUpdate={(e) =>
                     setActiveIndex((prev) => {
                       const next = findActiveIndex(activeEntries, e.currentTarget.currentTime);
@@ -542,6 +559,9 @@ export default function RecordingDetailPage() {
                 />
                 <span className="muted">{t('recordingDetail.seekHint')}</span>
               </div>
+            )}
+            {audioBroken && !transcriptLoading && !transcriptError && (
+              <p className="muted">{t('recordingDetail.audioUnavailable')}</p>
             )}
             {!transcriptLoading && !transcriptError && transcript?.hasCorrected && (
               <div className="transcript-variant">
