@@ -27,6 +27,7 @@ import {
   audioUrl,
   errorMessage,
   summaryDownloadUrl,
+  transcriptDownloadUrl,
   videoDownloadUrl,
   videoUrl,
 } from '../api/client';
@@ -372,9 +373,18 @@ export default function RecordingDetailPage() {
             </button>
           )}
           {hasDownloadableSummary && (
-            <a className="btn" href={summaryDownloadUrl(id)}>
-              {t('recordingDetail.downloadSummary')}
-            </a>
+            <>
+              <a className="btn" href={summaryDownloadUrl(id)}>
+                {t('recordingDetail.downloadSummary')}
+              </a>
+              <a
+                className="btn"
+                href={summaryDownloadUrl(id, 'doc')}
+                title={t('recordingDetail.downloadWordHint')}
+              >
+                {t('recordingDetail.downloadSummaryWord')}
+              </a>
+            </>
           )}
           {rec.mine && (
             <button type="button" className="btn" onClick={() => setShareOpen(true)}>
@@ -502,6 +512,32 @@ export default function RecordingDetailPage() {
             {!transcriptLoading && !transcriptError && transcript
               && !transcript.hasCorrected && transcript.correctionStatus === 'FAILED' && (
               <Alert kind="info">{t('recordingDetail.correctionFailed')}</Alert>
+            )}
+            {/* Der Download folgt der angezeigten Fassung – wer Original liest,
+                bekommt auch Original in die Datei. */}
+            {!transcriptLoading && !transcriptError
+              && (activeEntries.length > 0 || activeTranscriptText !== '') && (
+              <div className="transcript-downloads">
+                <a className="btn btn-sm" href={transcriptDownloadUrl(id, !useCorrected)}>
+                  {t('recordingDetail.downloadTranscript')}
+                </a>
+                <a
+                  className="btn btn-sm"
+                  href={transcriptDownloadUrl(id, !useCorrected, 'doc')}
+                  title={t('recordingDetail.downloadWordHint')}
+                >
+                  {t('recordingDetail.downloadTranscriptWord')}
+                </a>
+                {transcript?.hasCorrected && (
+                  <span className="muted">
+                    {t('recordingDetail.downloadVariantHint', {
+                      variant: useCorrected
+                        ? t('recordingDetail.variantCorrected')
+                        : t('recordingDetail.variantOriginal'),
+                    })}
+                  </span>
+                )}
+              </div>
             )}
             {!transcriptLoading && !transcriptError && (
               activeEntries.length > 0 ? (

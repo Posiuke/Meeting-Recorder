@@ -393,6 +393,33 @@ lässt er sich über **Bearbeiten** an der Zusammenfassung.
 Mermaid läuft im Strict-Modus: Beschriftungen werden als Text behandelt, HTML in
 Labels ist abgeschaltet.
 
+## Herunterladen: Transkript und Protokoll
+
+**Transkript**: Im Transkript-Tab stehen zwei Knöpfe — *Transkript herunterladen*
+(Markdown) und *Transkript als Word*. Heruntergeladen wird immer die Fassung, die
+gerade angezeigt wird (**Korrigiert** oder **Original**); der Dateiname trägt
+Fassung, Aufnahmedatum und Kurz-Kennung
+(`transkript_2026-07-21_8f14e45f.md`). Der Endpunkt dahinter ist
+`GET /api/recordings/{id}/transcript/download?variant=corrected|original&format=md|doc`.
+Das Transkript wird dabei **aus den Segmenten neu zusammengesetzt**, nicht aus
+`transcript.md` gelesen: So stimmen die gepflegten Teilnehmernamen immer mit der
+Anzeige überein.
+
+**Word statt Markdown**: Protokolle wandern in der Praxis nach Word, Confluence
+oder Nextcloud — dort ist Markdown eine Hürde. Zusammenfassung und Transkript
+gibt es deshalb zusätzlich als **Word-Datei** (`format=doc`): HTML mit
+`application/msword` und der Endung `.doc`, das Word und LibreOffice direkt
+öffnen. Überschriften, Listen, Tabellen und Zitate bleiben echte
+Dokumentelemente; von dort lässt sich ohne Umweg als DOCX oder PDF speichern.
+
+Bewusst **kein** echtes DOCX: Das bräuchte eine Bibliothek (POI & Co.), die in
+den abgeschotteten Zielnetzen erst durch den internen Repository-Manager müsste.
+Der Markdown→HTML-Schritt ist deshalb selbst geschrieben
+(`backend/src/main/java/bbbbot/export/`) und deckt genau den Satz ab, den die
+Oberfläche anzeigt (Markdown-Kern plus GFM-Tabellen, -Aufgabenlisten und
+-Durchstreichungen). Rohes HTML aus dem Modelltext wird dabei maskiert — dieselbe
+Entscheidung wie in der Anzeige.
+
 ## Schlagworte und Suche
 
 Auf der Detailseite einer eigenen Aufnahme lassen sich unter **Schlagworte**

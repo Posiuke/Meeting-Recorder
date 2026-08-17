@@ -3,8 +3,13 @@ package bbbbot.recording;
 import bbbbot.domain.Recording;
 import bbbbot.domain.RecordingSegment;
 import bbbbot.domain.Summary;
+import bbbbot.export.ExportFormat;
+import bbbbot.export.MarkdownHtml;
+import bbbbot.export.TranscriptHtml;
+import bbbbot.export.WordDocument;
 import bbbbot.repository.Repositories.RecordingSegmentRepo;
 import bbbbot.repository.Repositories.SummaryRepo;
+import bbbbot.stt.TranscriptAssembler;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -16,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -31,10 +37,13 @@ public class RecordingMediaService {
 
     private final RecordingSegmentRepo segmentRepo;
     private final SummaryRepo summaryRepo;
+    private final ParticipantService participantService;
 
-    public RecordingMediaService(RecordingSegmentRepo segmentRepo, SummaryRepo summaryRepo) {
+    public RecordingMediaService(RecordingSegmentRepo segmentRepo, SummaryRepo summaryRepo,
+                                 ParticipantService participantService) {
         this.segmentRepo = segmentRepo;
         this.summaryRepo = summaryRepo;
+        this.participantService = participantService;
     }
 
     /**
@@ -76,17 +85,80 @@ public class RecordingMediaService {
 
     /** Neueste fertige Zusammenfassung als Markdown-Datei. */
     public ResponseEntity<byte[]> summaryDownload(Recording recording) {
+        return summaryDownload(recording, ExportFormat.MARKDOWN);
+    }
+
+    /**
+     * Neueste fertige Zusammenfassung als Datei - als Markdown (Rohfassung) oder
+     * in der Word-Fassung, die sich ohne Umweg weiterreichen laesst.
+     */
+    public ResponseEntity<byte[]> summaryDownload(Recording recording, ExportFormat format) {
         Summary summary = summaryRepo.findByRecordingIdOrderByCreatedAtDesc(recording.getId()).stream()
                 .filter(s -> s.getStatus() == Summary.Status.DONE && s.getMarkdown() != null)
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Keine Zusammenfassung vorhanden"));
-        String filename = "zusammenfassung_" + recording.getStartedAt().toString().substring(0, 10)
-                + "_" + recording.getId().toString().substring(0, 8) + ".md";
+        byte[] body = format == ExportFormat.WORD
+                ? WordDocument.render(displayTitle(recording), subtitle(recording, null),
+                        MarkdownHtml.toHtml(summary.getMarkdown()))
+                : summary.getMarkdown().getBytes(StandardCharsets.UTF_8);
+        return fileResponse(body, format, "zusammenfassung", recording);
+    }
+
+    /**
+     * Zusammengefuehrtes Transkript als Datei. Es wird aus den Segmenten neu
+     * aufgebaut statt aus {@code transcript.md} gelesen: So stimmen die
+     * Teilnehmernamen immer mit der Anzeige ueberein, und auch Aufnahmen ohne
+     * geschriebene Datei (z.B. nach einem Fehlschlag beim Schreiben) lassen sich
+     * herunterladen.
+     *
+     * @param original true = unveraendertes Whisper-Ergebnis, false = geglaettete
+     *                 Fassung, sofern vorhanden
+     */
+    public ResponseEntity<byte[]> transcriptDownload(Recording recording, boolean original,
+                                                     ExportFormat format) {
+        List<RecordingSegment> segments = segmentRepo.findByRecordingIdOrderBySeq(recording.getId());
+        List<TranscriptAssembler.Entry> entries = TranscriptAssembler.applyNames(
+                TranscriptAssembler.assemble(segments, !original),
+                participantService.nameMap(recording.getId()));
+        if (entries.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Kein Transkript vorhanden");
+        }
+        String variant = original ? "original" : "korrigiert";
+        byte[] body = format == ExportFormat.WORD
+                ? WordDocument.render(displayTitle(recording), subtitle(recording, variant),
+                        TranscriptHtml.toHtml(entries))
+                : (TranscriptAssembler.toText(entries) + "\n").getBytes(StandardCharsets.UTF_8);
+        String base = original ? "transkript_original" : "transkript";
+        return fileResponse(body, format, base, recording);
+    }
+
+    /**
+     * Antwort mit Dateinamen aus Zweck, Aufnahmedatum und Kurz-Kennung - so
+     * bleiben mehrere heruntergeladene Aufnahmen im Download-Ordner
+     * auseinanderzuhalten.
+     */
+    private ResponseEntity<byte[]> fileResponse(byte[] body, ExportFormat format, String baseName,
+                                                Recording recording) {
+        String filename = baseName + "_" + recording.getStartedAt().toString().substring(0, 10)
+                + "_" + recording.getId().toString().substring(0, 8) + "." + format.extension();
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("text/markdown; charset=utf-8"))
+                .contentType(MediaType.parseMediaType(format.contentType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                .body(summary.getMarkdown().getBytes(StandardCharsets.UTF_8));
+                .body(body);
+    }
+
+    /** Ueberschrift im Word-Dokument: Titel der Aufnahme, sonst ihr Datum. */
+    private static String displayTitle(Recording recording) {
+        String title = recording.getTitle();
+        return title == null || title.isBlank()
+                ? "Aufnahme vom " + recording.getStartedAt().toString().substring(0, 10)
+                : title;
+    }
+
+    private static String subtitle(Recording recording, String variant) {
+        String date = recording.getStartedAt().toString().substring(0, 10);
+        return variant == null ? date : date + " · Fassung: " + variant;
     }
 
     /** Ist ein abspielbares Video vorhanden? (Datei existiert wirklich) */

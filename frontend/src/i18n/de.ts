@@ -610,6 +610,7 @@ export const de = {
     summaryOptions: 'Auswertung anpassen',
     customized: 'angepasst',
     downloadSummary: 'Zusammenfassung herunterladen',
+    downloadSummaryWord: 'Zusammenfassung als Word',
     share: 'Teilen',
     videoHeading: 'Video',
     videoDownload: 'Video herunterladen',
@@ -630,6 +631,12 @@ export const de = {
     correctionFailed:
       'Die KI-Glättung war für diese Aufnahme nicht möglich – angezeigt und ausgewertet wird das unveränderte Transkript.',
     transcriptEmpty: 'Kein Transkript vorhanden.',
+    downloadTranscript: 'Transkript herunterladen',
+    downloadTranscriptWord: 'Transkript als Word',
+    downloadWordHint:
+      'Word-Datei (.doc) mit Überschriften, Listen und Tabellen – lässt sich in Word oder LibreOffice öffnen und von dort als DOCX oder PDF speichern.',
+    downloadVariantHint:
+      'Heruntergeladen wird die gerade gewählte Fassung ({{variant}}).',
     chatEmpty: 'Kein Chat-Protokoll vorhanden.',
     jobsEmpty: 'Keine Verarbeitungs-Jobs vorhanden.',
     jobsCreated: 'Erstellt',

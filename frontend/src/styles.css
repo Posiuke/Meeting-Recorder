@@ -2095,6 +2095,18 @@ tbody tr:hover {
   margin: 0;
 }
 
+.transcript-downloads {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.transcript-downloads .muted {
+  font-size: 0.85rem;
+}
+
 /* ===== Freigabe-Links und oeffentliche Freigabe-Ansicht ===== */
 .share-link-item {
   padding-bottom: 0.5rem;

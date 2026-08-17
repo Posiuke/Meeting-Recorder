@@ -20,6 +20,7 @@ in **einem** Container; PostgreSQL läuft separat.
 - 🤖 **KI-Zusammenfassung** über jeden **OpenAI-kompatiblen** Chat-Endpoint — lokal (vLLM, Ollama) oder Cloud (OpenAI, Anthropic, Google Gemini, Groq, Mistral …)
 - 🏷️ **Schlagworte & Suche**: Aufnahmen verschlagworten, nach Schlagwort filtern und in Titel, Meeting-URL, Schlagworten sowie auf Wunsch in **Transkript und Zusammenfassung** suchen
 - 🎛️ **Auswertung pro Aufnahme anpassbar**: eigener Auswertungs-Prompt (mit Vorlagen für Vortrag, Interview, Sprachnotiz), maximale Länge, Sprache der Zusammenfassung — und die Sprache der Spracherkennung (auch „automatisch erkennen")
+- 📄 **Herunterladen als Markdown oder Word**: Transkript (geglättet oder Original) und Zusammenfassung als `.md` oder als `.doc`, das Word und LibreOffice direkt öffnen — von dort als DOCX oder PDF speicherbar
 - 🔁 **Erneut auswerten** (nur Zusammenfassung) und **Transkription neu erstellen** (Spracherkennung + Zusammenfassung) per Klick
 - ⏱️ **Verarbeitungs-Zeitfenster** (STT/LLM z. B. nachts) plus „Jetzt auswerten"
 - 🧪 **Verbindungstests** für Whisper und LLM direkt im Admin-Bereich
@@ -229,6 +230,12 @@ Zusammenfassung und geglättetes Transkript werden als GitHub-Markdown angezeigt
 — Tabellen und Aufgabenlisten erscheinen als solche. Codeblöcke mit der Sprache
 `mermaid` werden als Diagramm gezeichnet; anfordern lässt sich das über den
 Auswertungs-Prompt („… zusätzlich als Mermaid-Flussdiagramm").
+
+Beides lässt sich **herunterladen**: das Transkript im Transkript-Tab (immer die
+gerade angezeigte Fassung — korrigiert oder Original), die Zusammenfassung über
+den Knopf im Kopf der Aufnahme. Neben Markdown gibt es je eine **Word-Fassung**
+(`.doc`), die Word und LibreOffice direkt öffnen und aus der sich DOCX oder PDF
+speichern lässt.
 
 ## Freigabe-Link
 
