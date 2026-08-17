@@ -1,10 +1,12 @@
 package bbbbot.recording;
 
 import bbbbot.config.AppProperties;
+import bbbbot.domain.BotSession;
 import bbbbot.domain.ProcessingJob;
 import bbbbot.domain.Recording;
 import bbbbot.domain.RecordingSegment;
 import bbbbot.media.FfmpegService;
+import bbbbot.repository.Repositories.BotSessionRepo;
 import bbbbot.repository.Repositories.ProcessingJobRepo;
 import bbbbot.repository.Repositories.RecordingRepo;
 import bbbbot.repository.Repositories.RecordingSegmentRepo;
@@ -12,6 +14,7 @@ import bbbbot.settings.SettingsService;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -19,16 +22,20 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 /**
  * Verwaltet den Lebenszyklus von Aufnahmen: Verzeichnisse, Segment-Registrierung,
@@ -47,6 +54,7 @@ public class RecordingService {
     private final RecordingRepo recordingRepo;
     private final RecordingSegmentRepo segmentRepo;
     private final ProcessingJobRepo jobRepo;
+    private final BotSessionRepo sessionRepo;
 
     private final ExecutorService transcodePool = Executors.newFixedThreadPool(2, r -> {
         Thread t = new Thread(r, "transcode");
@@ -67,15 +75,26 @@ public class RecordingService {
         return t;
     });
 
+    /** Aufnahmen, deren Video gerade gemuxt wird oder in der Warteschlange steht. */
+    private final Set<UUID> activeMuxes = ConcurrentHashMap.newKeySet();
+
+    /**
+     * Schonfrist, bevor {@link #sweepStuckVideos()} ein Video als haengend
+     * ansieht. Deckt die laengstmoegliche regulaere Mux-Dauer ab (Warten auf die
+     * Finalisierung plus ffmpeg-Laufzeit).
+     */
+    private static final long STUCK_VIDEO_GRACE_MINUTES = 90;
+
     public RecordingService(AppProperties props, FfmpegService ffmpeg, SettingsService settings,
                             RecordingRepo recordingRepo, RecordingSegmentRepo segmentRepo,
-                            ProcessingJobRepo jobRepo) {
+                            ProcessingJobRepo jobRepo, BotSessionRepo sessionRepo) {
         this.props = props;
         this.ffmpeg = ffmpeg;
         this.settings = settings;
         this.recordingRepo = recordingRepo;
         this.segmentRepo = segmentRepo;
         this.jobRepo = jobRepo;
+        this.sessionRepo = sessionRepo;
     }
 
     public Recording createRecording(UUID botSessionId, UUID ownerId, String meetingUrl,
@@ -200,7 +219,19 @@ public class RecordingService {
             finalizeSourceFile(recordingId, processNow, transcribeOnly);
         });
         if (hasVideo) {
-            videoMuxPool.execute(() -> convertSourceVideo(recordingId, source));
+            activeMuxes.add(recordingId);
+            videoMuxPool.execute(() -> {
+                try {
+                    convertSourceVideo(recordingId, source);
+                } catch (RuntimeException e) {
+                    // Ohne dieses Netz bliebe die Aufnahme fuer immer auf MUXING stehen.
+                    log.error("Video-Bereitstellung fuer Aufnahme {} unerwartet abgebrochen: {}",
+                            recordingId, e.getMessage(), e);
+                    markVideoFailed(recordingId);
+                } finally {
+                    activeMuxes.remove(recordingId);
+                }
+            });
         }
     }
 
@@ -268,16 +299,37 @@ public class RecordingService {
         Path outMp4 = Path.of(recording.getDirectory()).resolve("meeting.mp4");
         FfmpegService.MuxResult result = ffmpeg.convertToMp4(source, outMp4);
 
-        Recording fresh = recordingRepo.findById(recordingId).orElse(recording);
+        // Gezieltes Update statt save(): Die Transkodierung/Finalisierung derselben
+        // Aufnahme laeuft parallel und wuerde sonst mit ihrem alten Schnappschuss
+        // den fertigen Video-Status wieder ueberschreiben.
         if (result.success()) {
-            fresh.setVideoPath(outMp4.toAbsolutePath().toString());
-            fresh.setVideoStatus(Recording.VideoStatus.READY);
+            recordingRepo.updateVideoState(recordingId, Recording.VideoStatus.READY,
+                    outMp4.toAbsolutePath().toString());
             log.info("Video fuer Aufnahme {} bereitgestellt: {}", recordingId, outMp4.getFileName());
         } else {
-            fresh.setVideoStatus(Recording.VideoStatus.FAILED);
+            markVideoFailed(recordingId);
             log.error("Video fuer Aufnahme {} fehlgeschlagen: {}", recordingId, result.error());
         }
-        recordingRepo.save(fresh);
+    }
+
+    /**
+     * Schliesst die Aufnahme auf einer FRISCH geladenen Entity ab (Ende, Dauer
+     * und was {@code change} sonst setzt).
+     *
+     * <p>Bewusst neu geladen: Die Bereitstellung des Videos laeuft parallel auf
+     * dem Mux-Pool und schreibt in dieselbe Zeile. Da die Entity detached ist,
+     * wuerde ein save() aus einem aelteren Schnappschuss alle Spalten
+     * zurueckschreiben - ein zwischenzeitlich fertiges Video landete wieder auf
+     * MUXING und kaeme im Frontend nie an.
+     */
+    private void updateFinalizedRecording(UUID recordingId, long totalDurationMs,
+                                          Consumer<Recording> change) {
+        recordingRepo.findById(recordingId).ifPresent(fresh -> {
+            fresh.setEndedAt(Instant.now());
+            fresh.setDurationMs(totalDurationMs);
+            change.accept(fresh);
+            recordingRepo.save(fresh);
+        });
     }
 
     /**
@@ -287,14 +339,12 @@ public class RecordingService {
     private void finalizeSourceFile(UUID recordingId, boolean processNow, boolean transcribeOnly) {
         Recording recording = recordingRepo.findById(recordingId).orElse(null);
         if (recording == null) return;
-        recording.setEndedAt(Instant.now());
 
         List<RecordingSegment> segments = segmentRepo.findByRecordingIdOrderBySeq(recordingId);
         long totalDurationMs = segments.stream()
                 .filter(s -> s.getDurationMs() != null)
                 .mapToLong(RecordingSegment::getDurationMs)
                 .sum();
-        recording.setDurationMs(totalDurationMs);
 
         boolean anyReady = segments.stream().anyMatch(s -> s.getStatus() == RecordingSegment.Status.READY);
         if (!anyReady) {
@@ -303,21 +353,23 @@ public class RecordingService {
                     .filter(e -> e != null && !e.isBlank())
                     .findFirst()
                     .orElse("Datei enthaelt kein verwertbares Audio");
-            recording.setStatus(Recording.Status.FAILED);
-            recording.setDiscardReason("Aufnahmedatei konnte nicht verarbeitet werden: " + error);
-            recordingRepo.save(recording);
+            // Auf frischem Stand speichern: Die Video-Bereitstellung derselben
+            // Aufnahme laeuft parallel und hat den Video-Status womoeglich schon
+            // fortgeschrieben - ein alter Schnappschuss wuerde ihn zurueckdrehen.
+            updateFinalizedRecording(recordingId, totalDurationMs, r -> {
+                r.setStatus(Recording.Status.FAILED);
+                r.setDiscardReason("Aufnahmedatei konnte nicht verarbeitet werden: " + error);
+            });
             log.warn("Aufnahme {} fehlgeschlagen: {}", recordingId, error);
             return;
         }
 
         if (!recording.isAiAnalysis()) {
-            recording.setStatus(Recording.Status.DONE);
-            recordingRepo.save(recording);
+            updateFinalizedRecording(recordingId, totalDurationMs, r -> r.setStatus(Recording.Status.DONE));
             log.info("Aufnahme {} fertig ohne KI-Analyse ({} ms Audio)", recordingId, totalDurationMs);
             return;
         }
-        recording.setStatus(Recording.Status.RECORDED);
-        recordingRepo.save(recording);
+        updateFinalizedRecording(recordingId, totalDurationMs, r -> r.setStatus(Recording.Status.RECORDED));
         ProcessingJob job = ProcessingJob.create(recordingId, processNow);
         job.setTranscribeOnly(transcribeOnly);
         jobRepo.save(job);
@@ -469,33 +521,76 @@ public class RecordingService {
 
     /**
      * Muxt die aufgezeichnete Browser-Ansicht (Video-Teile) mit dem Meeting-Audio
-     * zu einer MP4 und haengt sie an die Aufnahme. Wartet zuvor auf deren
+     * zu je einer MP4 pro Aufnahme und haengt sie an. Wartet zuvor auf deren
      * Finalisierung, damit die MP3-Segmente vorliegen. Laeuft asynchron.
-     */
-    /**
+     *
+     * <p>Playwright zeichnet den gesamten Browser-Kontext auf. Stoppt und startet
+     * eine Bot-Sitzung die Aufnahme zwischendurch (Chat-Befehl, Raum
+     * zwischenzeitlich leer), gehoeren also MEHRERE Aufnahmen zu derselben
+     * Videodatei. Jede bekommt ihren eigenen Ausschnitt: vorne per Offset ab
+     * ihrem Aufnahmestart, hinten durch ihre eigene Audiolaenge ({@code -shortest}).
+     * Die Temp-Datei wird erst nach der letzten Aufnahme geloescht.
+     *
      * @param videoStartEpochMs Wall-Clock-Zeitpunkt (epoch ms), zu dem die Playwright-
      *                          Video-/Kontextaufnahme begann - fuer die A/V-Synchronisierung.
      */
-    public void attachVideo(UUID recordingId, List<Path> videoParts, long videoStartEpochMs) {
-        videoMuxPool.execute(() -> muxVideo(recordingId, videoParts, videoStartEpochMs));
+    public void attachVideo(List<UUID> recordingIds, List<Path> videoParts, long videoStartEpochMs) {
+        List<UUID> ids = recordingIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty()) {
+            deleteTempVideos(videoParts);
+            return;
+        }
+        // Vormerken, bevor die Aufgabe in der Warteschlange steht: Der
+        // Reparatur-Sweep darf wartende Aufnahmen nicht auf FAILED setzen.
+        activeMuxes.addAll(ids);
+        videoMuxPool.execute(() -> {
+            try {
+                for (UUID id : ids) {
+                    try {
+                        muxVideo(id, videoParts, videoStartEpochMs);
+                    } catch (RuntimeException e) {
+                        // Ohne dieses Netz bliebe die Aufnahme fuer immer auf MUXING
+                        // stehen und das Frontend zeigte ewig "wird verarbeitet".
+                        log.error("Video-Muxen fuer Aufnahme {} unerwartet abgebrochen: {}", id, e.getMessage(), e);
+                        markVideoFailed(id);
+                    } finally {
+                        activeMuxes.remove(id);
+                    }
+                }
+            } finally {
+                activeMuxes.removeAll(ids);
+                deleteTempVideos(videoParts);
+            }
+        });
     }
 
+    /**
+     * Kennzeichnet Aufnahmen, zu denen nie ein Video kommt (der Browser-Kontext
+     * hat keine Videodatei hinterlassen). Ohne das blieben sie auf RECORDING
+     * stehen und das Frontend zeigte endlos "wird verarbeitet".
+     */
+    public void markVideoUnavailable(List<UUID> recordingIds) {
+        for (UUID id : recordingIds) {
+            if (id == null) continue;
+            Recording.VideoStatus current = recordingRepo.findById(id)
+                    .map(Recording::getVideoStatus).orElse(null);
+            if (current == Recording.VideoStatus.RECORDING || current == Recording.VideoStatus.MUXING) {
+                markVideoFailed(id);
+            }
+        }
+    }
+
+    /** Einzelne Aufnahme aus dem Kontext-Video schneiden. Loescht die Quelldateien NICHT. */
     private void muxVideo(UUID recordingId, List<Path> videoParts, long videoStartEpochMs) {
         List<Path> parts = videoParts.stream().filter(p -> p != null && Files.exists(p)).toList();
         awaitFinalize(recordingId);
         Recording recording = recordingRepo.findById(recordingId).orElse(null);
-        if (recording == null) {
-            deleteTempVideos(videoParts);
-            return;
-        }
+        if (recording == null) return;
         if (recording.getStatus() == Recording.Status.DISCARDED || parts.isEmpty()) {
-            recording.setVideoStatus(Recording.VideoStatus.FAILED);
-            recordingRepo.save(recording);
-            deleteTempVideos(videoParts);
+            markVideoFailed(recordingId);
             return;
         }
-        recording.setVideoStatus(Recording.VideoStatus.MUXING);
-        recordingRepo.save(recording);
+        recordingRepo.updateVideoState(recordingId, Recording.VideoStatus.MUXING, recording.getVideoPath());
 
         List<Path> audio = segmentRepo.findByRecordingIdOrderBySeq(recordingId).stream()
                 .filter(s -> s.getStatus() == RecordingSegment.Status.READY && s.getMp3Path() != null)
@@ -509,17 +604,76 @@ public class RecordingService {
         Path outMp4 = Path.of(recording.getDirectory()).resolve("meeting.mp4");
         FfmpegService.MuxResult result = ffmpeg.muxToMp4(parts, audio, outMp4, offsetMs);
 
-        Recording fresh = recordingRepo.findById(recordingId).orElse(recording);
         if (result.success()) {
-            fresh.setVideoPath(outMp4.toAbsolutePath().toString());
-            fresh.setVideoStatus(Recording.VideoStatus.READY);
+            recordingRepo.updateVideoState(recordingId, Recording.VideoStatus.READY,
+                    outMp4.toAbsolutePath().toString());
             log.info("Video fuer Aufnahme {} erstellt: {}", recordingId, outMp4.getFileName());
         } else {
-            fresh.setVideoStatus(Recording.VideoStatus.FAILED);
+            markVideoFailed(recordingId);
             log.error("Video-Muxen fuer Aufnahme {} fehlgeschlagen: {}", recordingId, result.error());
         }
-        recordingRepo.save(fresh);
-        deleteTempVideos(parts);
+    }
+
+    /** Video als fehlgeschlagen kennzeichnen, ohne andere Felder der Aufnahme anzufassen. */
+    private void markVideoFailed(UUID recordingId) {
+        try {
+            recordingRepo.updateVideoState(recordingId, Recording.VideoStatus.FAILED, null);
+        } catch (RuntimeException e) {
+            log.warn("Video-Status von {} konnte nicht auf FAILED gesetzt werden: {}", recordingId, e.getMessage());
+        }
+    }
+
+    /**
+     * Sicherheitsnetz gegen dauerhaft haengende Video-Anzeigen: Aufnahmen, die
+     * lange nach ihrem Ende immer noch auf RECORDING/MUXING stehen, ohne dass
+     * eine Mux-Aufgabe zu ihnen laeuft. Das passiert, wenn der Prozess mit
+     * gefuellter Mux-Warteschlange endet oder eine Bot-Sitzung ohne Video-Handle
+     * schliesst. Liegt die MP4 bereits auf der Platte, wird sie nachtraeglich
+     * eingehaengt - sonst wird ehrlich FAILED angezeigt statt endlos
+     * "wird verarbeitet".
+     */
+    @Scheduled(fixedDelay = 15 * 60_000L, initialDelay = 120_000L)
+    public void sweepStuckVideos() {
+        Instant cutoff = Instant.now().minus(STUCK_VIDEO_GRACE_MINUTES, ChronoUnit.MINUTES);
+        List<Recording> candidates = recordingRepo.findByVideoStatusIn(
+                List.of(Recording.VideoStatus.RECORDING, Recording.VideoStatus.MUXING));
+        for (Recording r : candidates) {
+            if (activeMuxes.contains(r.getId())) continue;
+            if (r.getEndedAt() == null || r.getEndedAt().isAfter(cutoff)) continue;
+            // Laeuft die Bot-Sitzung noch, kommt das Video erst beim Schliessen
+            // des Browser-Kontextes - auch fuer laengst gestoppte Aufnahmen.
+            if (isSessionRunning(r.getBotSessionId())) continue;
+
+            Path mp4 = Path.of(r.getDirectory()).resolve("meeting.mp4");
+            boolean usable = Files.isRegularFile(mp4) && fileSizeQuietly(mp4) > 0;
+            if (usable) {
+                recordingRepo.updateVideoState(r.getId(), Recording.VideoStatus.READY,
+                        mp4.toAbsolutePath().toString());
+                log.info("Haengendes Video von Aufnahme {} repariert: MP4 lag bereits vor", r.getId());
+            } else {
+                recordingRepo.updateVideoState(r.getId(), Recording.VideoStatus.FAILED, null);
+                log.warn("Video von Aufnahme {} steht seit {} auf {} ohne laufendes Muxen - auf FAILED gesetzt",
+                        r.getId(), r.getEndedAt(), r.getVideoStatus());
+            }
+        }
+    }
+
+    private boolean isSessionRunning(UUID botSessionId) {
+        if (botSessionId == null) return false;
+        return sessionRepo.findById(botSessionId)
+                .map(s -> s.getStatus() == BotSession.Status.STARTING
+                        || s.getStatus() == BotSession.Status.JOINED
+                        || s.getStatus() == BotSession.Status.RECORDING
+                        || s.getStatus() == BotSession.Status.RECONNECTING)
+                .orElse(false);
+    }
+
+    private static long fileSizeQuietly(Path file) {
+        try {
+            return Files.size(file);
+        } catch (IOException e) {
+            return 0;
+        }
     }
 
     private void awaitFinalize(UUID recordingId) {

@@ -47,9 +47,25 @@ class StartupRecoveryTest {
         // Standard: leere Listen; einzelne Tests ueberschreiben gezielt.
         when(sessionRepo.findByStatusIn(anyList())).thenReturn(List.of());
         when(recordingRepo.findByStatusIn(anyList())).thenReturn(List.of());
+        when(recordingRepo.findByVideoStatusIn(anyList())).thenReturn(List.of());
         when(jobRepo.findByStatusOrderByCreatedAt(any())).thenReturn(List.of());
 
+        this.tmp = tmp;
         recovery = new StartupRecovery(sessionRepo, recordingRepo, segmentRepo, jobRepo, props);
+    }
+
+    private Path tmp;
+
+    /** Aufnahme mit eigenem Verzeichnis, deren Video auf {@code videoStatus} steht. */
+    private Recording aufnahmeMitVideoStatus(Recording.VideoStatus videoStatus, Recording.Status status)
+            throws java.io.IOException {
+        Path dir = java.nio.file.Files.createDirectories(tmp.resolve(UUID.randomUUID().toString()));
+        Recording r = Recording.start(UUID.randomUUID(), UUID.randomUUID(), "https://x/y",
+                dir.toString(), true, true, false);
+        r.setDirectory(dir.toString());
+        r.setStatus(status);
+        r.setVideoStatus(videoStatus);
+        return r;
     }
 
     @Test
@@ -109,6 +125,46 @@ class StartupRecoveryTest {
         recovery.run(null);
 
         assertThat(capture.getStatus()).isEqualTo(Recording.Status.FAILED);
+    }
+
+    @Test
+    void fertigesVideoEinerAusgewertetenAufnahmeWirdNachtraeglichEingehaengt() throws Exception {
+        // Der Mux war fertig, der Neustart kam vor dem Statuswechsel: Die MP4 liegt
+        // da, die Anzeige haengt trotzdem auf "wird verarbeitet".
+        Recording r = aufnahmeMitVideoStatus(Recording.VideoStatus.MUXING, Recording.Status.DONE);
+        Path mp4 = java.nio.file.Path.of(r.getDirectory()).resolve("meeting.mp4");
+        java.nio.file.Files.writeString(mp4, "video");
+        when(recordingRepo.findByVideoStatusIn(anyList())).thenReturn(List.of(r));
+
+        recovery.run(null);
+
+        assertThat(r.getVideoStatus()).isEqualTo(Recording.VideoStatus.READY);
+        assertThat(r.getVideoPath()).isEqualTo(mp4.toAbsolutePath().toString());
+        assertThat(r.getStatus()).isEqualTo(Recording.Status.DONE);
+    }
+
+    @Test
+    void haengendesVideoOhneDateiWirdFehlgeschlagen() throws Exception {
+        // Die Mux-Warteschlange lebt nur im Speicher - nach dem Neustart kommt zu
+        // dieser Aufnahme nie mehr ein Video. Lieber ehrlich FAILED als endlos
+        // "wird verarbeitet".
+        Recording r = aufnahmeMitVideoStatus(Recording.VideoStatus.MUXING, Recording.Status.DONE);
+        when(recordingRepo.findByVideoStatusIn(anyList())).thenReturn(List.of(r));
+
+        recovery.run(null);
+
+        assertThat(r.getVideoStatus()).isEqualTo(Recording.VideoStatus.FAILED);
+    }
+
+    @Test
+    void videoEinerLaufendenBildschirmaufnahmeBleibtUnberuehrt() throws Exception {
+        Recording capture = aufnahmeMitVideoStatus(Recording.VideoStatus.RECORDING, Recording.Status.RECORDING);
+        capture.setSource(Recording.Source.CAPTURE);
+        when(recordingRepo.findByVideoStatusIn(anyList())).thenReturn(List.of(capture));
+
+        recovery.run(null);
+
+        assertThat(capture.getVideoStatus()).isEqualTo(Recording.VideoStatus.RECORDING);
     }
 
     @Test

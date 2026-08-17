@@ -129,6 +129,37 @@ class MigrationSchemaIT {
         recordingRepo.saveAndFlush(recording);
     }
 
+    /**
+     * Das gezielte Video-Update fasst wirklich nur die Video-Spalten an - und
+     * ueberholt dabei eine laengst veraltete Kopie derselben Zeile.
+     *
+     * <p>Genau das war die Ursache haengender Videos: Der Verarbeitungs-Job haelt
+     * die Aufnahme ueber seine ganze Laufzeit im Speicher und schrieb sie am Ende
+     * komplett zurueck - inklusive des alten Video-Status.
+     */
+    @Test
+    void videoUpdateSchreibtNurDieVideoSpalten() {
+        Recording recording = Recording.start(null, ownerId(), null, "/tmp/x", true, true, false);
+        recording.setVideoStatus(Recording.VideoStatus.MUXING);
+        recording.setStatus(Recording.Status.PROCESSING);
+        recordingRepo.saveAndFlush(recording);
+        em.clear();
+
+        recordingRepo.updateVideoState(recording.getId(), Recording.VideoStatus.READY, "/tmp/x/meeting.mp4");
+        em.clear();
+
+        assertThat(recordingRepo.findById(recording.getId()))
+                .get()
+                .satisfies(r -> assertThat(r.getVideoStatus()).isEqualTo(Recording.VideoStatus.READY))
+                .satisfies(r -> assertThat(r.getVideoPath()).isEqualTo("/tmp/x/meeting.mp4"))
+                // Der Status der Aufnahme darf dabei unangetastet bleiben.
+                .satisfies(r -> assertThat(r.getStatus()).isEqualTo(Recording.Status.PROCESSING));
+
+        assertThat(recordingRepo.findByVideoStatusIn(List.of(Recording.VideoStatus.MUXING)))
+                .extracting(Recording::getId)
+                .doesNotContain(recording.getId());
+    }
+
     /** Aufnahmen verweisen per Fremdschluessel auf app_user - Nutzer also zuerst anlegen. */
     private UUID ownerId() {
         AppUser user = AppUser.create("tester-" + UUID.randomUUID(), "Tester", null);
