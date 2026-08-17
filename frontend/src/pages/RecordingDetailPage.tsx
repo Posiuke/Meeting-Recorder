@@ -26,6 +26,8 @@ import TagEditor from '../components/TagEditor';
 import {
   audioUrl,
   errorMessage,
+  fullAudioDownloadUrl,
+  fullAudioUrl,
   summaryDownloadUrl,
   videoDownloadUrl,
   videoUrl,
@@ -33,7 +35,12 @@ import {
 import { formatBytes, formatDateTime, formatDuration } from '../utils/format';
 import { useI18n } from '../i18n';
 import type { TranslationKey } from '../i18n';
-import type { ParticipantView, RecordingSource, RecordingStatus } from '../types';
+import type {
+  ParticipantView,
+  RecordingSource,
+  RecordingStatus,
+  TranscriptEntry,
+} from '../types';
 
 /** Übersetzungsschlüssel für die Herkunft einer Aufnahme ohne Meeting-URL. */
 const SOURCE_KEYS: Record<RecordingSource, TranslationKey> = {
@@ -53,6 +60,20 @@ const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
 ];
 
 const POLL_STATUSES: RecordingStatus[] = ['RECORDING', 'FINALIZING', 'PROCESSING'];
+
+/**
+ * Zeile, die zur Abspielposition gehört: die letzte, die bereits begonnen hat.
+ * Eine Viertelsekunde Vorlauf, weil der Sprung an eine Zeitmarke im Player
+ * gerne minimal davor landet – sonst würde die eigene Zeile nicht leuchten.
+ */
+function findActiveIndex(entries: TranscriptEntry[], seconds: number): number {
+  let active = -1;
+  for (let i = 0; i < entries.length; i++) {
+    if (entries[i].startSeconds <= seconds + 0.25) active = i;
+    else break;
+  }
+  return active;
+}
 
 export default function RecordingDetailPage() {
   const { t } = useI18n();
@@ -82,6 +103,9 @@ export default function RecordingDetailPage() {
   const [summaryOptionsOpen, setSummaryOptionsOpen] = useState(false);
   /** Transkript-Tab: geglättete Fassung (Standard) oder Whisper-Original. */
   const [showOriginal, setShowOriginal] = useState(false);
+  // Wiedergabe der Gesamt-Tonspur: Element für den Sprung, Zeile für die Anzeige
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [activeIndex, setActiveIndex] = useState(-1);
 
   useEffect(() => {
     if (!id) return;
@@ -147,6 +171,28 @@ export default function RecordingDetailPage() {
   const activeTranscriptText = useCorrected
     ? transcript?.correctedTranscript ?? ''
     : transcript?.transcript ?? '';
+
+  // Durchgehende Tonspur: Sie entsteht serverseitig aus den Segmenten und
+  // trägt den Sprung aus dem Transkript.
+  const hasAudio = (detail?.segments ?? []).some((s) => s.hasAudio);
+
+  const handleSeek = (seconds: number) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = seconds;
+    setActiveIndex(findActiveIndex(activeEntries, seconds));
+    // Nach einem Klick soll man hören, was dort steht. Lehnt der Browser das
+    // Abspielen ab (kein Nutzergesten-Kontext), bleibt es beim Springen.
+    void audio.play().catch(() => {});
+  };
+
+  // Beim Wechsel der Fassung (korrigiert/original) passen die Zeilennummern
+  // nicht mehr – die Hervorhebung wird aus der Abspielposition neu bestimmt.
+  // Ohne Player gibt es keine laufende Zeile, sonst leuchtete immer die erste.
+  useEffect(() => {
+    const audio = audioRef.current;
+    setActiveIndex(audio ? findActiveIndex(activeEntries, audio.currentTime) : -1);
+  }, [activeEntries]);
 
   if (detailLoading && !detail) {
     return (
@@ -370,6 +416,11 @@ export default function RecordingDetailPage() {
               )}
             </button>
           )}
+          {hasAudio && (
+            <a className="btn" href={fullAudioDownloadUrl(id)}>
+              {t('recordingDetail.downloadAudio')}
+            </a>
+          )}
           {hasDownloadableSummary && (
             <a className="btn" href={summaryDownloadUrl(id)}>
               {t('recordingDetail.downloadSummary')}
@@ -473,6 +524,25 @@ export default function RecordingDetailPage() {
           <>
             {transcriptLoading && <Spinner label={t('recordingDetail.transcriptLoading')} />}
             {transcriptError && <Alert kind="error">{transcriptError}</Alert>}
+            {/* Ein Player für die ganze Aufnahme; er bleibt beim Scrollen oben
+                stehen, damit der Sprung aus einer Zeile hörbar bleibt. */}
+            {hasAudio && !transcriptLoading && !transcriptError && (
+              <div className="transcript-player">
+                <audio
+                  ref={audioRef}
+                  controls
+                  preload="metadata"
+                  src={fullAudioUrl(id)}
+                  onTimeUpdate={(e) =>
+                    setActiveIndex((prev) => {
+                      const next = findActiveIndex(activeEntries, e.currentTarget.currentTime);
+                      return prev === next ? prev : next;
+                    })
+                  }
+                />
+                <span className="muted">{t('recordingDetail.seekHint')}</span>
+              </div>
+            )}
             {!transcriptLoading && !transcriptError && transcript?.hasCorrected && (
               <div className="transcript-variant">
                 <div className="filter-tabs">
@@ -504,7 +574,12 @@ export default function RecordingDetailPage() {
             )}
             {!transcriptLoading && !transcriptError && (
               activeEntries.length > 0 ? (
-                <TranscriptList entries={activeEntries} participants={detail.participants} />
+                <TranscriptList
+                  entries={activeEntries}
+                  participants={detail.participants}
+                  onSeek={hasAudio ? handleSeek : undefined}
+                  activeIndex={activeIndex}
+                />
               ) : activeTranscriptText ? (
                 <Markdown>{activeTranscriptText}</Markdown>
               ) : (

@@ -261,6 +261,21 @@ export function audioUrl(recordingId: string, segmentId: string): string {
   return `/api/recordings/${recordingId}/segments/${segmentId}/audio?token=${encodeURIComponent(token)}`;
 }
 
+/**
+ * Durchgehende Tonspur der ganzen Aufnahme (Segmente zusammengefügt). Der
+ * Server fügt sie beim ersten Abruf zusammen; der Browser darf darin springen
+ * (Range-Requests), worauf der Sprung aus dem Transkript aufbaut.
+ */
+export function fullAudioUrl(recordingId: string): string {
+  const token = getToken() ?? '';
+  return `/api/recordings/${recordingId}/audio?token=${encodeURIComponent(token)}`;
+}
+
+export function fullAudioDownloadUrl(recordingId: string): string {
+  const token = getToken() ?? '';
+  return `/api/recordings/${recordingId}/audio/download?token=${encodeURIComponent(token)}`;
+}
+
 export function summaryDownloadUrl(recordingId: string): string {
   const token = getToken() ?? '';
   return `/api/recordings/${recordingId}/summary/download?token=${encodeURIComponent(token)}`;

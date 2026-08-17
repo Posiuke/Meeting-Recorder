@@ -575,6 +575,7 @@ export const en: typeof de = {
     retranscribe: 'Recreate transcript',
     summaryOptions: 'Customise analysis',
     customized: 'customised',
+    downloadAudio: 'Download recording',
     downloadSummary: 'Download summary',
     share: 'Share',
     videoHeading: 'Video',
@@ -596,6 +597,7 @@ export const en: typeof de = {
     correctionFailed:
       'The AI smoothing was not possible for this recording – the unaltered transcript is shown and analysed.',
     transcriptEmpty: 'No transcript available.',
+    seekHint: 'Click a line to jump to that point in the recording.',
     chatEmpty: 'No chat log available.',
     jobsEmpty: 'No processing jobs available.',
     jobsCreated: 'Created',

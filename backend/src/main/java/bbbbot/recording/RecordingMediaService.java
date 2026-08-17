@@ -31,10 +31,13 @@ public class RecordingMediaService {
 
     private final RecordingSegmentRepo segmentRepo;
     private final SummaryRepo summaryRepo;
+    private final FullAudioService fullAudioService;
 
-    public RecordingMediaService(RecordingSegmentRepo segmentRepo, SummaryRepo summaryRepo) {
+    public RecordingMediaService(RecordingSegmentRepo segmentRepo, SummaryRepo summaryRepo,
+                                 FullAudioService fullAudioService) {
         this.segmentRepo = segmentRepo;
         this.summaryRepo = summaryRepo;
+        this.fullAudioService = fullAudioService;
     }
 
     /**
@@ -53,6 +56,35 @@ public class RecordingMediaService {
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "inline; filename=\"segment_%03d.mp3\"".formatted(segment.getSeq()))
                 .body(new FileSystemResource(segment.getMp3Path()));
+    }
+
+    /**
+     * Durchgehende Tonspur der ganzen Aufnahme zur Wiedergabe im Browser. Range-
+     * Requests werden unterstuetzt - erst dadurch kann der Player an eine Stelle
+     * springen, ohne die ganze Datei zu laden.
+     */
+    public ResponseEntity<FileSystemResource> fullAudio(Recording recording) {
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("audio/mpeg"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"aufnahme.mp3\"")
+                .body(new FileSystemResource(requireFullAudio(recording)));
+    }
+
+    /** Dieselbe Tonspur zum Herunterladen - Dateiname mit Datum und Kurz-Kennung. */
+    public ResponseEntity<FileSystemResource> fullAudioDownload(Recording recording) {
+        Path path = requireFullAudio(recording);
+        String filename = "aufnahme_" + recording.getStartedAt().toString().substring(0, 10)
+                + "_" + recording.getId().toString().substring(0, 8) + ".mp3";
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("audio/mpeg"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .body(new FileSystemResource(path));
+    }
+
+    private Path requireFullAudio(Recording recording) {
+        return fullAudioService.fullAudio(recording)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Keine abspielbare Tonspur vorhanden"));
     }
 
     /** Video zur Wiedergabe im Browser (Range-Requests fuer das Springen). */

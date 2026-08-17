@@ -984,6 +984,51 @@ tbody tr:hover {
   background: var(--accent-soft);
 }
 
+/* Anklickbar nur mit Player – sonst verspricht der Zeiger etwas, was nicht geht. */
+.transcript-row.seekable {
+  cursor: pointer;
+}
+
+.transcript-row.seekable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.transcript-row.active {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.transcript-row.active .transcript-time {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* Player bleibt beim Scrollen im Transkript oben stehen */
+.transcript-player {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+  padding: 0.5rem 0;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.transcript-player audio {
+  flex: 1;
+  min-width: 260px;
+  height: 36px;
+}
+
+.transcript-player .muted {
+  font-size: 0.85rem;
+}
+
 .transcript-time {
   flex: 0 0 auto;
   min-width: 3.6rem;

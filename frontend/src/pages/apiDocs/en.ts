@@ -527,8 +527,21 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
       endpoints: [
         {
           method: 'GET',
+          path: '/api/recordings/{id}/audio',
+          summary:
+            'The whole recording as a single MP3 – the segments are joined on first request and reused afterwards. Supports range requests, so it works directly as a player source.',
+          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/recordings/$ID/audio" -o recording.mp3`,
+        },
+        {
+          method: 'GET',
+          path: '/api/recordings/{id}/audio/download',
+          summary: 'The same audio with a download name (recording date and short id).',
+          example: `curl -s -H "X-API-Key: $KEY" -OJ "$BBB/api/recordings/$ID/audio/download"`,
+        },
+        {
+          method: 'GET',
           path: '/api/recordings/{id}/segments/{segmentId}/audio',
-          summary: 'One audio segment as MP3.',
+          summary: 'A single audio segment as MP3.',
           example: `curl -s -H "X-API-Key: $KEY" \\
   "$BBB/api/recordings/$ID/segments/$SEGID/audio" -o segment.mp3`,
         },

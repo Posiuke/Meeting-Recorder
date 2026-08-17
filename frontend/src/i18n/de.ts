@@ -580,6 +580,7 @@ export const de = {
     retranscribe: 'Transkription neu erstellen',
     summaryOptions: 'Auswertung anpassen',
     customized: 'angepasst',
+    downloadAudio: 'Aufnahme herunterladen',
     downloadSummary: 'Zusammenfassung herunterladen',
     share: 'Teilen',
     videoHeading: 'Video',
@@ -601,6 +602,7 @@ export const de = {
     correctionFailed:
       'Die KI-Glättung war für diese Aufnahme nicht möglich – angezeigt und ausgewertet wird das unveränderte Transkript.',
     transcriptEmpty: 'Kein Transkript vorhanden.',
+    seekHint: 'Klick auf eine Zeile springt an diese Stelle der Aufnahme.',
     chatEmpty: 'Kein Chat-Protokoll vorhanden.',
     jobsEmpty: 'Keine Verarbeitungs-Jobs vorhanden.',
     jobsCreated: 'Erstellt',
