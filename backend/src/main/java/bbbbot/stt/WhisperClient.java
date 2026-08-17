@@ -24,8 +24,9 @@ import java.util.UUID;
  * STT-Client mit zwei Anbietern (Setting whisper.provider):
  *
  * "local": Whisper-ASR-Webservice im Intranet (onerahmet/openai-whisper-asr-webservice).
- * Laedt MP3-Segmente als multipart/form-data auf /asr hoch. Alle Parameter
- * (Sprache, VAD, Output-Format, initial_prompt) kommen aus den Admin-Einstellungen.
+ * Laedt MP3-Segmente als multipart/form-data auf /asr hoch. Die Parameter (VAD,
+ * Output-Format, initial_prompt) kommen aus den Admin-Einstellungen; die Sprache
+ * darf die Aufnahme vorgeben (siehe {@link SttLanguage}).
  *
  * "openai": OpenAI-kompatible Cloud-API (POST /v1/audio/transcriptions mit
  * Bearer-Token) - funktioniert mit OpenAI selbst und mit kompatiblen Anbietern
@@ -54,11 +55,23 @@ public class WhisperClient {
      *                ASR_ENGINE=whisperx auf dem Whisper-Server).
      */
     public TranscriptionResult transcribe(Path audioFile, boolean diarize) {
+        return transcribe(audioFile, diarize, null);
+    }
+
+    /**
+     * @param diarize  Sprechererkennung fuer diese Datei anfordern (benoetigt
+     *                 ASR_ENGINE=whisperx auf dem Whisper-Server).
+     * @param language Sprache dieser Aufnahme: {@code null}/leer = Admin-Standard
+     *                 ({@code whisper.language}), {@link SttLanguage#AUTO} =
+     *                 keine Vorgabe, Whisper erkennt die Sprache selbst.
+     */
+    public TranscriptionResult transcribe(Path audioFile, boolean diarize, String language) {
         int attempts = Math.max(1, settings.getInt(SettingsService.WHISPER_RETRY_ATTEMPTS));
         long baseMs = settings.getLong(SettingsService.WHISPER_RETRY_BASE_MS);
+        String effectiveLanguage = resolveLanguage(language);
         TranscriptionResult result = null;
         for (int attempt = 1; attempt <= attempts; attempt++) {
-            result = attemptTranscribe(audioFile, diarize);
+            result = attemptTranscribe(audioFile, diarize, effectiveLanguage);
             if (result.success()) return result;
             if (attempt < attempts) {
                 long wait = baseMs * (1L << (attempt - 1));
@@ -75,11 +88,24 @@ public class WhisperClient {
         return result;
     }
 
-    private TranscriptionResult attemptTranscribe(Path audioFile, boolean diarize) {
+    /**
+     * Sprachvorgabe fuer diese Anfrage: Die Wahl an der Aufnahme geht vor, ohne
+     * Wahl gilt der Admin-Standard. "Automatisch erkennen" wird zur leeren
+     * Vorgabe - der Parameter entfaellt dann in der Anfrage und Whisper
+     * entscheidet selbst.
+     */
+    private String resolveLanguage(String recordingLanguage) {
+        String language = recordingLanguage == null || recordingLanguage.isBlank()
+                ? settings.get(SettingsService.WHISPER_LANGUAGE)
+                : recordingLanguage.trim();
+        return SttLanguage.AUTO.equalsIgnoreCase(language) ? "" : language;
+    }
+
+    private TranscriptionResult attemptTranscribe(Path audioFile, boolean diarize, String language) {
         if ("openai".equalsIgnoreCase(settings.get(SettingsService.WHISPER_PROVIDER))) {
-            return attemptTranscribeOpenAi(audioFile, diarize);
+            return attemptTranscribeOpenAi(audioFile, diarize, language);
         }
-        return attemptTranscribeLocal(audioFile, diarize);
+        return attemptTranscribeLocal(audioFile, diarize, language);
     }
 
     /**
@@ -88,11 +114,10 @@ public class WhisperClient {
      * koennen (z.B. gpt-4o-transcribe), bekommen automatisch einen zweiten
      * Versuch ohne Zeitstempel.
      */
-    private TranscriptionResult attemptTranscribeOpenAi(Path audioFile, boolean diarize) {
+    private TranscriptionResult attemptTranscribeOpenAi(Path audioFile, boolean diarize, String language) {
         String url = settings.get(SettingsService.WHISPER_OPENAI_URL);
         String apiKey = settings.get(SettingsService.WHISPER_OPENAI_API_KEY);
         String model = settings.get(SettingsService.WHISPER_OPENAI_MODEL);
-        String language = settings.get(SettingsService.WHISPER_LANGUAGE);
         String initialPrompt = settings.get(SettingsService.WHISPER_INITIAL_PROMPT);
         int timeoutSec = settings.getInt(SettingsService.WHISPER_TIMEOUT_SEC);
 
@@ -119,9 +144,8 @@ public class WhisperClient {
         return result;
     }
 
-    private TranscriptionResult attemptTranscribeLocal(Path audioFile, boolean diarize) {
+    private TranscriptionResult attemptTranscribeLocal(Path audioFile, boolean diarize, String language) {
         String baseUrl = settings.get(SettingsService.WHISPER_URL);
-        String language = settings.get(SettingsService.WHISPER_LANGUAGE);
         String output = settings.get(SettingsService.WHISPER_OUTPUT);
         boolean vad = settings.getBool(SettingsService.WHISPER_VAD_FILTER);
         String initialPrompt = settings.get(SettingsService.WHISPER_INITIAL_PROMPT);
@@ -129,7 +153,11 @@ public class WhisperClient {
 
         StringBuilder query = new StringBuilder();
         appendParam(query, "task", "transcribe");
-        appendParam(query, "language", language);
+        // Ohne Sprachvorgabe (automatisch erkennen) den Parameter weglassen -
+        // ein leeres language= ist keine gueltige Sprache.
+        if (!language.isBlank()) {
+            appendParam(query, "language", language);
+        }
         appendParam(query, "output", output);
         appendParam(query, "vad_filter", String.valueOf(vad));
         if (diarize) {

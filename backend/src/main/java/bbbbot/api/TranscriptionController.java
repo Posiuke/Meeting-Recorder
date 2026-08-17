@@ -78,6 +78,10 @@ public class TranscriptionController {
     /**
      * Nimmt eine Audio-/Videodatei an und startet die Transkription.
      *
+     * @param sttLanguage Sprache der Spracherkennung (leer = Admin-Standard,
+     *                    "auto" = automatisch erkennen). Ein Skript, das eine
+     *                    fremdsprachige Datei schickt, muss das sagen koennen -
+     *                    sonst laeuft sie mit dem Sprach-Hinweis der Installation.
      * @param wait Sekunden, die die Antwort auf das Ergebnis warten darf
      *             (0 = sofort antworten, max. {@value #MAX_WAIT_SECONDS})
      * @return 200 mit Transkript, wenn es innerhalb von {@code wait} fertig wurde,
@@ -88,6 +92,7 @@ public class TranscriptionController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "title", required = false) String title,
             @RequestParam(value = "diarize", defaultValue = "false") boolean diarize,
+            @RequestParam(value = "sttLanguage", required = false) String sttLanguage,
             @RequestParam(value = "wait", defaultValue = "0") int wait) {
         AppUser user = CurrentUser.get();
         if (file == null || file.isEmpty()) {
@@ -100,10 +105,12 @@ public class TranscriptionController {
                     "Sprechererkennung ist auf diesem Server nicht freigeschaltet");
         }
 
+        String language = RecordingController.requireSttLanguage(sttLanguage);
+
         Recording recording;
         try (InputStream in = file.getInputStream()) {
             recording = recordingService.createUploadedRecording(user.getId(),
-                    RecordingService.UploadOptions.forTranscription(title, diarizeEffective),
+                    RecordingService.UploadOptions.forTranscription(title, diarizeEffective, language),
                     original, in);
         } catch (IOException e) {
             log.error("Transkriptions-Datei '{}' konnte nicht gespeichert werden", original, e);

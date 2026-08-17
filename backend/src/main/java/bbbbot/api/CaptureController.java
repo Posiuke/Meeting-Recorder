@@ -47,7 +47,8 @@ public class CaptureController {
 
     /** Start-Parameter der Aufnahme (wie beim Upload, plus Format des Browsers). */
     public record StartCaptureRequest(String title, Boolean aiAnalysis, Boolean processNow,
-                                      Boolean diarize, Boolean video, String mimeType) {}
+                                      Boolean diarize, Boolean video, String sttLanguage,
+                                      String mimeType) {}
 
     /** Rahmenbedingungen fuers Frontend. */
     @GetMapping("/config")
@@ -56,7 +57,8 @@ public class CaptureController {
         return Map.of(
                 "enabled", config.enabled(),
                 "maxBytes", config.maxBytes(),
-                "diarizeAllowed", config.diarizeAllowed());
+                "diarizeAllowed", config.diarizeAllowed(),
+                "sttLanguage", config.sttLanguage());
     }
 
     @PostMapping("/start")
@@ -67,9 +69,12 @@ public class CaptureController {
         // Diarisierung nur, wenn der Admin sie freigeschaltet hat
         boolean diarize = Boolean.TRUE.equals(request.diarize())
                 && settings.getBool(SettingsService.WHISPER_DIARIZE);
+        // Sprache der Spracherkennung: leer = Admin-Standard, "auto" = automatisch erkennen
+        String sttLanguage = RecordingController.requireSttLanguage(request.sttLanguage());
         try {
             Recording recording = captureService.start(user.getId(), request.title(), aiAnalysis,
-                    processNow, diarize, Boolean.TRUE.equals(request.video()), request.mimeType());
+                    processNow, diarize, Boolean.TRUE.equals(request.video()), sttLanguage,
+                    request.mimeType());
             return toView(recording, user);
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());

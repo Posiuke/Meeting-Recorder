@@ -10,6 +10,8 @@ export interface CaptureConfig {
   maxBytes: number;
   /** Hat der Admin die Sprechererkennung freigeschaltet? */
   diarizeAllowed: boolean;
+  /** Admin-Standard der Spracherkennung (`whisper.language`); leer = automatisch erkennen. */
+  sttLanguage: string;
 }
 
 export interface StartCaptureOptions {
@@ -19,6 +21,8 @@ export interface StartCaptureOptions {
   diarize: boolean;
   /** false = nur Ton (der Bildschirm wird verworfen, sobald die Quelle steht). */
   video: boolean;
+  /** Sprache der Spracherkennung; leer = Admin-Standard, `auto` = automatisch erkennen. */
+  sttLanguage?: string | null;
   /** Aufnahmeformat des Browsers, bestimmt die Dateiendung auf dem Server. */
   mimeType: string;
 }

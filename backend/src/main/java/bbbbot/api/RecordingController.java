@@ -148,6 +148,20 @@ public class RecordingController {
     }
 
     /**
+     * Normalisiert eine Sprachangabe fuer die Spracherkennung: leer bedeutet
+     * "Admin-Standard verwenden" (null), {@code auto} laesst Whisper selbst
+     * erkennen. Oeffentlich, weil auch der Bot-Start ({@link BotController}) sie
+     * annimmt.
+     */
+    public static String requireSttLanguage(String raw) {
+        try {
+            return bbbbot.stt.SttLanguage.normalize(raw);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+    }
+
+    /**
      * Prueft die Dateiendung gegen {@link #UPLOAD_EXTENSIONS} und liefert den zu
      * verwendenden Dateinamen zurueck.
      */
@@ -166,13 +180,16 @@ public class RecordingController {
 
     /**
      * Upload-Rahmenbedingungen fuers Frontend: Groessenlimit (Pruefung vor dem
-     * Hochladen) und ob der Admin die Sprechererkennung freigeschaltet hat.
+     * Hochladen), ob der Admin die Sprechererkennung freigeschaltet hat und
+     * welche Sprache er fuer die Spracherkennung vorgibt (fuer die Beschriftung
+     * der Auswahl "Standard (…)").
      */
     @GetMapping("/upload-config")
     public Map<String, Object> uploadConfig() {
         return Map.of(
                 "maxFileSizeBytes", maxUploadSize.toBytes(),
-                "diarizeAllowed", settings.getBool(bbbbot.settings.SettingsService.WHISPER_DIARIZE));
+                "diarizeAllowed", settings.getBool(bbbbot.settings.SettingsService.WHISPER_DIARIZE),
+                "sttLanguage", settings.get(bbbbot.settings.SettingsService.WHISPER_LANGUAGE));
     }
 
     /**
@@ -186,6 +203,10 @@ public class RecordingController {
      *                      eine andere Vorlage als "Meeting" waehlen - sonst
      *                      liefe eine Sofort-Auswertung noch mit dem Standard,
      *                      bevor man sie im Nachhinein anpassen koennte.
+     * @param sttLanguage   Sprache der Spracherkennung (leer = Admin-Standard,
+     *                      "auto" = automatisch erkennen). Aus demselben Grund
+     *                      schon hier waehlbar - ein mit falscher Sprache
+     *                      erzeugtes Transkript ist nachtraeglich nicht zu retten.
      */
     @PostMapping("/upload")
     public Dtos.RecordingView upload(@RequestParam("file") MultipartFile file,
@@ -193,7 +214,8 @@ public class RecordingController {
                                      @RequestParam(value = "aiAnalysis", defaultValue = "true") boolean aiAnalysis,
                                      @RequestParam(value = "processNow", defaultValue = "false") boolean processNow,
                                      @RequestParam(value = "diarize", defaultValue = "false") boolean diarize,
-                                     @RequestParam(value = "summaryPrompt", required = false) String summaryPrompt) {
+                                     @RequestParam(value = "summaryPrompt", required = false) String summaryPrompt,
+                                     @RequestParam(value = "sttLanguage", required = false) String sttLanguage) {
         AppUser user = CurrentUser.get();
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Keine Datei uebermittelt");
@@ -203,10 +225,11 @@ public class RecordingController {
         boolean diarizeEffective = diarize
                 && settings.getBool(bbbbot.settings.SettingsService.WHISPER_DIARIZE);
         String prompt = requireSummaryPrompt(summaryPrompt);
+        String language = requireSttLanguage(sttLanguage);
         try (InputStream in = file.getInputStream()) {
             var recording = recordingService.createUploadedRecording(user.getId(),
                     bbbbot.recording.RecordingService.UploadOptions.forUpload(
-                            title, aiAnalysis, processNow, diarizeEffective, prompt),
+                            title, aiAnalysis, processNow, diarizeEffective, prompt, language),
                     original, in);
             return toView(recording, user);
         } catch (IOException e) {
@@ -459,9 +482,12 @@ public class RecordingController {
     }
 
     /**
-     * Pro-Aufnahme-Einstellungen fuer die Zusammenfassung setzen (nur Besitzer).
-     * Leere Werte bedeuten "Admin-Standard verwenden". Die Einstellungen wirken
-     * bei der naechsten Auswertung ("Jetzt/Erneut auswerten", Transkription).
+     * Pro-Aufnahme-Einstellungen fuer Spracherkennung und Zusammenfassung setzen
+     * (nur Besitzer). Leere Werte bedeuten "Admin-Standard verwenden". Die
+     * Einstellungen wirken bei der naechsten Auswertung ("Jetzt/Erneut
+     * auswerten", Transkription) - die Sprache der Spracherkennung greift dabei
+     * nur, solange noch transkribiert wird (also vor der ersten Transkription
+     * oder bei "Transkription neu erstellen").
      */
     @PostMapping("/{id}/summary-options")
     public Dtos.SummaryOptionsView updateSummaryOptions(@PathVariable UUID id,
@@ -484,6 +510,7 @@ public class RecordingController {
         recording.setSummaryPrompt(prompt);
         recording.setSummaryMaxWords(maxWords);
         recording.setSummaryLanguage(language);
+        recording.setSttLanguage(requireSttLanguage(request.sttLanguage()));
         recordingRepo.save(recording);
         return summaryOptionsView(recording);
     }
@@ -491,8 +518,10 @@ public class RecordingController {
     private Dtos.SummaryOptionsView summaryOptionsView(Recording recording) {
         return new Dtos.SummaryOptionsView(
                 recording.getSummaryPrompt(), recording.getSummaryMaxWords(), recording.getSummaryLanguage(),
+                recording.getSttLanguage(),
                 settings.get(bbbbot.settings.SettingsService.SUMMARY_SYSTEM_PROMPT),
-                settings.get(bbbbot.settings.SettingsService.SUMMARY_LANGUAGE));
+                settings.get(bbbbot.settings.SettingsService.SUMMARY_LANGUAGE),
+                settings.get(bbbbot.settings.SettingsService.WHISPER_LANGUAGE));
     }
 
     /**

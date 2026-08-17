@@ -73,6 +73,8 @@ public class BotInstance {
     private final boolean recordVideo;
     private final boolean aiAnalysis;
     private final boolean diarize;
+    /** Sprache der Spracherkennung; null = Admin-Standard, "auto" = automatisch erkennen. */
+    private final String sttLanguage;
     private final BotConfig config;
     private final AppProperties.Bots botProps;
     private final RecordingService recordingService;
@@ -153,6 +155,7 @@ public class BotInstance {
         this.recordVideo = session.isRecordVideo();
         this.aiAnalysis = session.isAiAnalysis();
         this.diarize = session.isDiarize();
+        this.sttLanguage = session.getSttLanguage();
         this.config = config;
         this.botProps = botProps;
         this.recordingService = recordingService;
@@ -623,7 +626,7 @@ public class BotInstance {
             // Erkannter Raumname wird Titel der Aufnahme (Uebersicht zeigt dann
             // den Namen statt der Meeting-URL).
             Recording recording = recordingService.createRecording(sessionId, ownerId, meetingUrl,
-                    recordVideo, aiAnalysis, diarize, roomName);
+                    recordVideo, aiAnalysis, diarize, sttLanguage, roomName);
             currentRecordingId = recording.getId();
             if (recordVideo) {
                 // Video des laufenden Kontextes auch dieser Aufnahme zuordnen.

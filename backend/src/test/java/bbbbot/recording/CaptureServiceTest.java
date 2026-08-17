@@ -84,7 +84,8 @@ class CaptureServiceTest {
     }
 
     private Recording start() throws Exception {
-        return service.start(owner, "Test", true, false, false, true, "video/webm;codecs=vp9,opus");
+        return service.start(owner, "Test", true, false, false, true, null,
+                "video/webm;codecs=vp9,opus");
     }
 
     private void append(UUID id, int seq, String data) throws Exception {
@@ -93,6 +94,19 @@ class CaptureServiceTest {
 
     private Path captureFile(Recording recording) {
         return Path.of(recording.getDirectory()).resolve("capture.webm");
+    }
+
+    @Test
+    void merktSichDieSpracheDerSpracherkennung() throws Exception {
+        Recording recording = service.start(owner, "Test", true, false, false, true, "en",
+                "video/webm;codecs=vp9,opus");
+
+        assertThat(recording.getSttLanguage()).isEqualTo("en");
+    }
+
+    @Test
+    void ohneSprachwahlGiltDerAdminStandard() throws Exception {
+        assertThat(start().getSttLanguage()).isNull();
     }
 
     @Test

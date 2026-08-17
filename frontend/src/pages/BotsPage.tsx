@@ -14,6 +14,8 @@ import StatusBadge from '../components/StatusBadge';
 import Spinner from '../components/Spinner';
 import Alert from '../components/Alert';
 import ConfirmDialog from '../components/ConfirmDialog';
+import HelpTip from '../components/HelpTip';
+import SttLanguageSelect from '../components/SttLanguageSelect';
 import { errorMessage, fetchUploadConfig } from '../api/client';
 import { formatDateTime } from '../utils/format';
 import { useI18n } from '../i18n';
@@ -32,14 +34,21 @@ export default function BotsPage() {
   const [aiAnalysis, setAiAnalysis] = useState(true);
   const [diarize, setDiarize] = useState(false);
   const [diarizeAllowed, setDiarizeAllowed] = useState(false);
+  // '' = Sprachvorgabe des Administrators
+  const [sttLanguage, setSttLanguage] = useState('');
+  const [defaultSttLanguage, setDefaultSttLanguage] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  // Nur anzeigen, wenn der Admin die Sprechererkennung freigeschaltet hat.
+  // Rahmenbedingungen der Auswertung: Sprechererkennung nur anzeigen, wenn der
+  // Admin sie freigeschaltet hat; seine Sprachvorgabe beschriftet die Auswahl.
   useEffect(() => {
     fetchUploadConfig()
-      .then((cfg) => setDiarizeAllowed(cfg.diarizeAllowed))
+      .then((cfg) => {
+        setDiarizeAllowed(cfg.diarizeAllowed);
+        setDefaultSttLanguage(cfg.sttLanguage);
+      })
       .catch(() => setDiarizeAllowed(false));
   }, []);
 
@@ -71,6 +80,7 @@ export default function BotsPage() {
           recordVideo,
           aiAnalysis,
           diarize,
+          sttLanguage,
         }),
       ).unwrap();
       setMeetingUrl('');
@@ -147,6 +157,19 @@ export default function BotsPage() {
               {t('bots.diarize')}
             </label>
           )}
+          <div className="form-field">
+            <label htmlFor="bot-stt-language">
+              {t('sttLanguage.label')}
+              <HelpTip text={t('sttLanguage.help')} />
+            </label>
+            <SttLanguageSelect
+              id="bot-stt-language"
+              value={sttLanguage}
+              defaultLanguage={defaultSttLanguage}
+              disabled={!aiAnalysis}
+              onChange={setSttLanguage}
+            />
+          </div>
           <button type="submit" className="btn btn-primary" disabled={creating || !meetingUrl.trim()}>
             {creating ? t('bots.submitting') : t('bots.submit')}
           </button>

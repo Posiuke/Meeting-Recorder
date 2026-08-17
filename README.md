@@ -56,10 +56,11 @@ docs/       Anleitungen (u.a. Whisper-Diarisierung), Alt-Dokumentation
   (`POST /api/recordings/upload`). Die Datei wird serverseitig per ffmpeg zu
   einem MP3-Segment umgewandelt (bei Video wird die Tonspur extrahiert) und
   durchläuft danach dieselbe Auswertung wie Bot-Aufnahmen (Whisper + LLM,
-  optional sofort statt im Nacht-Zeitfenster). Die **Auswertungs-Vorlage** lässt
-  sich schon im Upload-Dialog wählen (Meeting, Vortrag, Interview, Sprachnotiz
-  oder eine eigene) — sonst liefe eine Sofort-Auswertung mit der Meeting-Vorgabe, bevor man
-  sie nachträglich ändern könnte.
+  optional sofort statt im Nacht-Zeitfenster). Die **Auswertungs-Vorlage** und die
+  **Sprache der Aufnahme** lassen sich schon im Upload-Dialog wählen (Vorlage:
+  Meeting, Vortrag, Interview, Sprachnotiz oder eine eigene) — sonst liefe eine
+  Sofort-Auswertung mit den Vorgaben des Administrators, bevor man sie
+  nachträglich ändern könnte.
 - **Schlagworte & Suche**: Aufnahmen lassen sich mit Schlagworten versehen
   (der Besitzer pflegt sie, alle mit Leseberechtigung sehen und filtern danach).
   Das Suchfeld über der Liste durchsucht Titel/Raumname, Meeting-URL und
@@ -207,7 +208,32 @@ hinzufügen heißt: Wörterbuch anlegen, in `LANGUAGES` (i18n) und
 Hilfetexte im Admin-Bereich und die integrierten Auswertungs-Prompts. Nicht
 übersetzt sind Texte, die **vom Server** kommen (Validierungsmeldungen,
 Verwurfsgründe) sowie fachliche Inhalte wie Transkripte und Zusammenfassungen
-(die Sprache der Zusammenfassung wird pro Aufnahme separat eingestellt).
+(Sprache der Aufnahme und Sprache der Zusammenfassung werden pro Aufnahme
+separat eingestellt, siehe unten).
+
+## Sprache der Aufnahme (Spracherkennung)
+
+Welche Sprache gesprochen wird, entscheidet **pro Aufnahme** der Nutzer:
+wählbar im Upload-Dialog, im Bot-Formular, beim Start einer Bildschirmaufnahme
+und nachträglich unter „Auswertung anpassen" (`recording.stt_language`,
+`POST /api/recordings/{id}/summary-options`). Über die API nehmen
+`POST /api/recordings/upload`, `POST /api/bots`,
+`POST /api/recordings/capture/start` und `POST /api/transcriptions` denselben
+Parameter `sttLanguage` entgegen.
+Zur Wahl stehen gängige Sprachen sowie **automatisch erkennen** — dann bekommt
+Whisper gar keine Sprachvorgabe und entscheidet selbst. Ohne Wahl gilt der
+Admin-Standard `whisper.language`; ist der leer, wird ebenfalls automatisch
+erkannt.
+
+Der Grund für die Wahl an der Aufnahme: Ein falscher Sprach-Hinweis beschädigt
+das Transkript an der Wurzel — Glättung und Zusammenfassung bauen darauf auf und
+können es nicht mehr retten. Deshalb steht die Wahl schon **vor** der ersten
+Transkription zur Verfügung; für eine bereits transkribierte Aufnahme wirkt eine
+Änderung erst über „Transkription neu erstellen".
+
+Die Sprache der **Zusammenfassung** ist davon unabhängig (ebenfalls unter
+„Auswertung anpassen") — ein englischer Vortrag lässt sich also mit englischer
+Spracherkennung und deutscher Zusammenfassung auswerten.
 
 ## Transkript-Glättung und Glossar
 
@@ -445,6 +471,10 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \
 curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 "$BBB/api/transcriptions"
 # -> {"id":"a1b2...","status":"PENDING"}
 curl -s -H "X-API-Key: $KEY" "$BBB/api/transcriptions/a1b2..."
+
+# fremdsprachige Datei: Sprache mitgeben (auto = automatisch erkennen)
+curl -s -H "X-API-Key: $KEY" -F file=@interview.mp3 -F sttLanguage=en \
+  "$BBB/api/transcriptions?wait=300"
 ```
 
 Der Auftrag läuft über dieselbe Strecke wie ein Upload (Transkodierung →

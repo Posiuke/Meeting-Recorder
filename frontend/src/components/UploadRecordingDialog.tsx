@@ -4,6 +4,7 @@ import Modal from './Modal';
 import Alert from './Alert';
 import HelpTip from './HelpTip';
 import PromptPresetSelect, { resolvePresetPrompt } from './PromptPresetSelect';
+import SttLanguageSelect from './SttLanguageSelect';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchPromptTemplates } from '../store/promptTemplatesSlice';
 import { errorMessage, fetchUploadConfig, uploadRecording } from '../api/client';
@@ -42,12 +43,16 @@ export default function UploadRecordingDialog({ onClose, onUploaded }: UploadRec
   const [maxFileSize, setMaxFileSize] = useState<number | null>(null);
   const [diarizeAllowed, setDiarizeAllowed] = useState(false);
   const [diarize, setDiarize] = useState(false);
+  // '' = Sprachvorgabe des Administrators
+  const [sttLanguage, setSttLanguage] = useState('');
+  const [defaultSttLanguage, setDefaultSttLanguage] = useState('');
 
   useEffect(() => {
     fetchUploadConfig()
       .then((cfg) => {
         setMaxFileSize(cfg.maxFileSizeBytes);
         setDiarizeAllowed(cfg.diarizeAllowed);
+        setDefaultSttLanguage(cfg.sttLanguage);
       })
       .catch(() => setMaxFileSize(null)); // ohne Limit-Info entscheidet der Server
   }, []);
@@ -71,7 +76,7 @@ export default function UploadRecordingDialog({ onClose, onUploaded }: UploadRec
     try {
       await uploadRecording(
         file,
-        { title, aiAnalysis, processNow, diarize, summaryPrompt },
+        { title, aiAnalysis, processNow, diarize, summaryPrompt, sttLanguage },
         setProgress,
       );
       onUploaded();
@@ -177,6 +182,22 @@ export default function UploadRecordingDialog({ onClose, onUploaded }: UploadRec
           {t('analysis.diarize')}
         </label>
       )}
+
+      {/* Sprache der Spracherkennung: Ein falscher Sprach-Hinweis beschädigt das
+          Transkript an der Wurzel – Glättung und Zusammenfassung retten das nicht. */}
+      <div className="form-field">
+        <label htmlFor="upload-stt-language">
+          {t('sttLanguage.label')}
+          <HelpTip text={t('sttLanguage.help')} />
+        </label>
+        <SttLanguageSelect
+          id="upload-stt-language"
+          value={sttLanguage}
+          defaultLanguage={defaultSttLanguage}
+          disabled={uploading || !aiAnalysis}
+          onChange={setSttLanguage}
+        />
+      </div>
 
       {/* Vorlage schon hier wählbar: Eine sofortige Auswertung läuft sonst mit
           der Meeting-Vorgabe, bevor man sie nachträglich ändern könnte. */}

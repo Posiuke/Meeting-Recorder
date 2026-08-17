@@ -490,6 +490,35 @@ export const de = {
     },
   },
 
+  /**
+   * Sprache der Spracherkennung – gemeinsam genutzt von Upload-Dialog,
+   * Bot-Formular und „Auswertung anpassen".
+   */
+  sttLanguage: {
+    label: 'Sprache der Aufnahme',
+    help: 'Die Sprache, die in der Aufnahme gesprochen wird. Sie wird der Spracherkennung als Hinweis mitgegeben – eine falsche Angabe (z.B. Deutsch für ein englisches Interview) beschädigt das Transkript von Anfang an, und weder Glättung noch Zusammenfassung können das später ausgleichen. „Automatisch erkennen" überlässt die Entscheidung Whisper; das ist bei sauberer Aufnahme meist zuverlässig, bei Sprachwechseln oder viel Fachvokabular ist die feste Angabe besser.',
+    default: 'Standard ({{language}})',
+    defaultAuto: 'Standard (automatisch erkennen)',
+    auto: 'Automatisch erkennen',
+    retranscribeHint:
+      'Wirkt bei der nächsten Spracherkennung – für eine bereits transkribierte Aufnahme also erst über „Transkription neu erstellen".',
+    lang: {
+      de: 'Deutsch',
+      en: 'Englisch',
+      fr: 'Französisch',
+      es: 'Spanisch',
+      it: 'Italienisch',
+      nl: 'Niederländisch',
+      pl: 'Polnisch',
+      pt: 'Portugiesisch',
+      ru: 'Russisch',
+      tr: 'Türkisch',
+      uk: 'Ukrainisch',
+      ar: 'Arabisch',
+      zh: 'Chinesisch',
+    },
+  },
+
   summaryOptions: {
     title: 'Auswertung anpassen',
     intro:

@@ -56,6 +56,14 @@ public class BotSession {
     @Column(nullable = false)
     private boolean diarize = false;
 
+    /**
+     * Sprache der Spracherkennung fuer die Aufnahmen dieser Session (null =
+     * Admin-Standard, "auto" = Whisper erkennt die Sprache selbst). Wird beim
+     * Aufnahmestart an die Aufnahme weitergegeben.
+     */
+    @Column(length = 16)
+    private String sttLanguage;
+
     public static BotSession create(String meetingUrl, String botName, UUID createdBy, boolean autoRecord,
                                     boolean recordVideo, boolean aiAnalysis, boolean diarize) {
         BotSession s = new BotSession();
@@ -93,4 +101,6 @@ public class BotSession {
     public void setAiAnalysis(boolean aiAnalysis) { this.aiAnalysis = aiAnalysis; }
     public boolean isDiarize() { return diarize; }
     public void setDiarize(boolean diarize) { this.diarize = diarize; }
+    public String getSttLanguage() { return sttLanguage; }
+    public void setSttLanguage(String sttLanguage) { this.sttLanguage = sttLanguage; }
 }

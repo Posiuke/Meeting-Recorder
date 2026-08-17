@@ -78,8 +78,11 @@ public class BotController {
         // Diarisierung nur, wenn der Admin sie freigeschaltet hat
         boolean diarize = request.diarize() != null && request.diarize()
                 && settings.getBool(SettingsService.WHISPER_DIARIZE);
+        // Sprache der Spracherkennung: leer = Admin-Standard, "auto" = automatisch erkennen
+        String sttLanguage = RecordingController.requireSttLanguage(request.sttLanguage());
         try {
-            BotSession session = botManager.startBot(url, botName, autoRecord, recordVideo, aiAnalysis, diarize, user.getId());
+            BotSession session = botManager.startBot(url, botName, autoRecord, recordVideo, aiAnalysis,
+                    diarize, sttLanguage, user.getId());
             BotInstance instance = botManager.get(session.getId()).orElseThrow();
             return toView(instance, user);
         } catch (IllegalStateException e) {

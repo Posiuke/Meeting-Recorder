@@ -77,8 +77,13 @@ public final class Dtos {
     /** Ergebnis eines Verbindungstests (Whisper/LLM) aus dem Admin-Bereich. */
     public record ConnectionTestResult(boolean success, String message, long durationMs) {}
 
+    /**
+     * @param sttLanguage Sprache der Spracherkennung fuer die Aufnahmen dieses
+     *                    Bots; leer = Admin-Standard, "auto" = automatisch erkennen
+     */
     public record StartBotRequest(String meetingUrl, String botName, Boolean autoRecord,
-                                  Boolean recordVideo, Boolean aiAnalysis, Boolean diarize) {}
+                                  Boolean recordVideo, Boolean aiAnalysis, Boolean diarize,
+                                  String sttLanguage) {}
 
     public record BotView(UUID sessionId, String status, String meetingUrl, String roomName,
                           String botName, boolean autoRecord, boolean recordVideo, boolean aiAnalysis,
@@ -157,14 +162,21 @@ public final class Dtos {
     public record TagRequest(String name) {}
 
     /**
-     * Pro-Aufnahme-Einstellungen fuer die Zusammenfassung (null = Admin-Standard).
-     * Die Defaults werden mitgeliefert, damit das Frontend anzeigen kann, was
-     * "Standard" konkret bedeutet.
+     * Pro-Aufnahme-Einstellungen fuer Spracherkennung und Zusammenfassung
+     * (null = Admin-Standard). Die Defaults werden mitgeliefert, damit das
+     * Frontend anzeigen kann, was "Standard" konkret bedeutet.
+     *
+     * @param language           Sprache der Zusammenfassung
+     * @param sttLanguage        Sprache der Spracherkennung ("auto" = automatisch erkennen)
+     * @param defaultSttLanguage Admin-Standard der Spracherkennung (whisper.language);
+     *                           leer bedeutet dort ebenfalls "automatisch erkennen"
      */
     public record SummaryOptionsView(String prompt, Integer maxWords, String language,
-                                     String defaultPrompt, String defaultLanguage) {}
+                                     String sttLanguage, String defaultPrompt,
+                                     String defaultLanguage, String defaultSttLanguage) {}
 
-    public record SummaryOptionsRequest(String prompt, Integer maxWords, String language) {}
+    public record SummaryOptionsRequest(String prompt, Integer maxWords, String language,
+                                        String sttLanguage) {}
 
     /** Persoenliche Promptvorlage des angemeldeten Nutzers. */
     public record PromptTemplateView(UUID id, String name, String prompt,

@@ -86,6 +86,11 @@ curl -s -H "X-API-Key: $KEY" -F file=@note.m4a \\
               description:
                 'Analysis prompt for this recording (max. 8000 characters); empty = the administrator default. It already applies to the first analysis – including processNow=true.',
             },
+            {
+              name: 'sttLanguage',
+              description:
+                'Language for speech recognition, e.g. de or en; auto = detect automatically, empty = the administrator default (whisper.language).',
+            },
           ],
           example: `curl -s -H "X-API-Key: $KEY" \\
   -F file=@meeting.mp3 -F title="Jour Fixe" -F processNow=true \\
@@ -240,6 +245,11 @@ curl -s -H "X-API-Key: $KEY" -F file=@note.m4a \\
             { name: 'file', description: 'audio or video file (mp3, wav, m4a, mp4, mkv, …)' },
             { name: 'title', description: 'title of the resulting recording; empty = file name' },
             { name: 'diarize', description: 'true = speaker recognition (if enabled)' },
+            {
+              name: 'sttLanguage',
+              description:
+                'Language for speech recognition, e.g. de or en; auto = detect automatically, empty = the administrator default (whisper.language).',
+            },
             { name: 'wait', description: 'seconds to wait (0 = answer immediately, max 600)' },
           ],
           example: `# short file: one call
@@ -346,11 +356,13 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
         {
           method: 'POST',
           path: '/api/bots',
-          summary: 'Start a bot.',
+          summary:
+            'Start a bot. sttLanguage sets the speech recognition language for this bot’s recordings (auto = detect automatically, omitted = the administrator default).',
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
   -d '{"meetingUrl":"https://bbb.example.intern/b/abc-def-ghi",
        "botName":"Minutes bot","autoRecord":true,
-       "recordVideo":false,"aiAnalysis":true,"diarize":false}' \\
+       "recordVideo":false,"aiAnalysis":true,"diarize":false,
+       "sttLanguage":"en"}' \\
   "$BBB/api/bots"`,
           response: `{ "sessionId": "9a7c...", "status": "STARTING", "roomName": "Technikrunde" }`,
         },

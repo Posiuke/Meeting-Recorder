@@ -40,8 +40,13 @@ public class BotManager {
         this.sessionRepo = sessionRepo;
     }
 
+    /**
+     * @param sttLanguage Sprache der Spracherkennung fuer die Aufnahmen dieser
+     *                    Session; null = Admin-Standard, "auto" = automatisch erkennen
+     */
     public synchronized BotSession startBot(String meetingUrl, String botName, boolean autoRecord,
-                                            boolean recordVideo, boolean aiAnalysis, boolean diarize, UUID userId) {
+                                            boolean recordVideo, boolean aiAnalysis, boolean diarize,
+                                            String sttLanguage, UUID userId) {
         if (instances.size() >= props.getBots().getMaxConcurrent()) {
             throw new IllegalStateException("Maximale Anzahl gleichzeitiger Bots erreicht ("
                     + props.getBots().getMaxConcurrent() + ")");
@@ -53,6 +58,7 @@ public class BotManager {
         }
 
         BotSession session = BotSession.create(meetingUrl.trim(), botName, userId, autoRecord, recordVideo, aiAnalysis, diarize);
+        session.setSttLanguage(sttLanguage);
         sessionRepo.save(session);
 
         BotConfig config = BotConfig.fromSettings(settings);

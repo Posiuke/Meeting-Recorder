@@ -83,7 +83,7 @@ class TranscriptionControllerTest {
         when(recordingService.createUploadedRecording(eq(user.getId()), any(), anyString(), any()))
                 .thenReturn(recording);
 
-        var response = controller.create(file("besprechung.mp3"), "Mein Titel", false, 0);
+        var response = controller.create(file("besprechung.mp3"), "Mein Titel", false, null, 0);
 
         assertThat(response.getStatusCode().value()).isEqualTo(202);
         assertThat(response.getBody()).isNotNull();
@@ -101,8 +101,28 @@ class TranscriptionControllerTest {
     }
 
     @Test
+    void reichtDieSpracheDerSpracherkennungWeiter() throws Exception {
+        when(recordingService.createUploadedRecording(eq(user.getId()), any(), anyString(), any()))
+                .thenReturn(recording);
+
+        controller.create(file("interview.mp3"), null, false, "EN", 0);
+
+        var options = org.mockito.ArgumentCaptor.forClass(RecordingService.UploadOptions.class);
+        verify(recordingService).createUploadedRecording(eq(user.getId()), options.capture(),
+                anyString(), any());
+        assertThat(options.getValue().sttLanguage()).isEqualTo("en");
+    }
+
+    @Test
+    void weistUnsinnigeSprachangabeAb() {
+        assertThatThrownBy(() -> controller.create(file("a.mp3"), null, false, "englisch bitte", 0))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Sprachangabe");
+    }
+
+    @Test
     void weistNichtUnterstuetzteDateitypenAb() {
-        assertThatThrownBy(() -> controller.create(file("tabelle.xlsx"), null, false, 0))
+        assertThatThrownBy(() -> controller.create(file("tabelle.xlsx"), null, false, null, 0))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Dateityp nicht unterstuetzt");
     }
@@ -111,7 +131,7 @@ class TranscriptionControllerTest {
     void weistLeereDateiAb() {
         var empty = new MockMultipartFile("file", "leer.mp3", "audio/mpeg", new byte[0]);
 
-        assertThatThrownBy(() -> controller.create(empty, null, false, 0))
+        assertThatThrownBy(() -> controller.create(empty, null, false, null, 0))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Keine Datei");
     }
@@ -120,7 +140,7 @@ class TranscriptionControllerTest {
     void sagtDeutlichWennSprechererkennungNichtFreigeschaltetIst() {
         when(settings.getBool(SettingsService.WHISPER_DIARIZE)).thenReturn(false);
 
-        assertThatThrownBy(() -> controller.create(file("a.mp3"), null, true, 0))
+        assertThatThrownBy(() -> controller.create(file("a.mp3"), null, true, null, 0))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Sprechererkennung");
     }

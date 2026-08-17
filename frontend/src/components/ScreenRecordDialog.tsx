@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Modal from './Modal';
 import Alert from './Alert';
 import Spinner from './Spinner';
+import HelpTip from './HelpTip';
+import SttLanguageSelect from './SttLanguageSelect';
 import { errorMessage } from '../api/client';
 import { fetchCaptureConfig } from '../api/capture';
 import type { CaptureConfig } from '../api/capture';
@@ -40,6 +42,8 @@ export default function ScreenRecordDialog({ onClose, onFinished }: ScreenRecord
   const [aiAnalysis, setAiAnalysis] = useState(true);
   const [processNow, setProcessNow] = useState(false);
   const [diarize, setDiarize] = useState(false);
+  // '' = Sprachvorgabe des Administrators
+  const [sttLanguage, setSttLanguage] = useState('');
 
   const { phase, previewStream, result } = recorder;
   const busy = phase === 'recording' || phase === 'paused' || phase === 'finishing';
@@ -242,6 +246,22 @@ export default function ScreenRecordDialog({ onClose, onFinished }: ScreenRecord
             {t('analysis.diarize')}
           </label>
         )}
+
+        {/* Sprache der Aufnahme: Sie muss vor der Transkription feststehen –
+            ein falscher Sprach-Hinweis beschädigt das Transkript von Anfang an. */}
+        <div className="form-field">
+          <label htmlFor="capture-stt-language">
+            {t('sttLanguage.label')}
+            <HelpTip text={t('sttLanguage.help')} />
+          </label>
+          <SttLanguageSelect
+            id="capture-stt-language"
+            value={sttLanguage}
+            defaultLanguage={config?.sttLanguage}
+            disabled={!aiAnalysis}
+            onChange={setSttLanguage}
+          />
+        </div>
       </>
     );
   }
@@ -357,7 +377,13 @@ export default function ScreenRecordDialog({ onClose, onFinished }: ScreenRecord
             className="btn btn-primary"
             disabled={phase === 'starting'}
             onClick={() =>
-              void recorder.beginRecording({ title, aiAnalysis, processNow, diarize })
+              void recorder.beginRecording({
+                title,
+                aiAnalysis,
+                processNow,
+                diarize,
+                sttLanguage,
+              })
             }
           >
             {phase === 'starting' ? t('capture.starting') : t('capture.start')}
