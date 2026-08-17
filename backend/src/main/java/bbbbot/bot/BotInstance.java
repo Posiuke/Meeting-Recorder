@@ -105,9 +105,12 @@ public class BotInstance {
 
     // Aufnahme-Zustand (nur Bot-Thread)
     private UUID currentRecordingId;
-    // Aufnahme, der das Video des aktuellen Browser-Kontextes zugeordnet wird
-    // (wird beim Kontext-Close gemuxt). Nur im Video-Modus gesetzt.
-    private UUID videoRecordingId;
+    // ALLE Aufnahmen, die zum Video des aktuellen Browser-Kontextes gehoeren
+    // (wird beim Kontext-Close gemuxt). Nur im Video-Modus gefuellt.
+    // Playwright zeichnet den ganzen Kontext auf: Stoppt und startet die Sitzung
+    // die Aufnahme zwischendurch, gehoeren mehrere Aufnahmen zu einem Video -
+    // jede bekommt beim Muxen ihren eigenen Ausschnitt.
+    private final List<UUID> videoRecordingIds = new ArrayList<>();
     // Wall-Clock-Start (epoch ms) der Playwright-Video-/Kontextaufnahme des aktuellen
     // Kontextes - fuer die A/V-Synchronisierung beim Muxen.
     private long videoStartEpochMs;
@@ -405,14 +408,21 @@ public class BotInstance {
         page = null; context = null; browser = null; playwright = null;
 
         if (videoPath != null) {
-            if (videoRecordingId != null) {
-                recordingService.attachVideo(videoRecordingId, List.of(videoPath), videoStartEpochMs);
+            if (!videoRecordingIds.isEmpty()) {
+                recordingService.attachVideo(List.copyOf(videoRecordingIds), List.of(videoPath), videoStartEpochMs);
             } else {
                 // Kein Aufnahme-Bezug (z.B. Bot joint, niemand kommt) -> Video verwerfen
                 try { Files.deleteIfExists(videoPath); } catch (IOException ignored) {}
             }
+        } else if (!videoRecordingIds.isEmpty()) {
+            // Playwright hat kein Video geliefert (Kontext-Close fehlgeschlagen,
+            // kein Handle). Ohne diese Meldung wartete das Frontend fuer immer
+            // auf ein Video, das nie kommt.
+            log.warn("Kein Video-Pfad aus dem Browser-Kontext - {} Aufnahme(n) bleiben ohne Video.",
+                    videoRecordingIds.size());
+            recordingService.markVideoUnavailable(List.copyOf(videoRecordingIds));
         }
-        videoRecordingId = null;
+        videoRecordingIds.clear();
     }
 
     private void updateStatus(BotSession.Status newStatus, String error) {
@@ -616,8 +626,8 @@ public class BotInstance {
                     recordVideo, aiAnalysis, diarize, roomName);
             currentRecordingId = recording.getId();
             if (recordVideo) {
-                // Video des laufenden Kontextes dieser Aufnahme zuordnen.
-                videoRecordingId = recording.getId();
+                // Video des laufenden Kontextes auch dieser Aufnahme zuordnen.
+                videoRecordingIds.add(recording.getId());
             }
             segmentSeq = 0;
             stoppingRecording = false;

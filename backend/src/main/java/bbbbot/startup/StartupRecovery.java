@@ -34,6 +34,8 @@ import java.util.List;
  *   <li>Aufnahmen in RECORDING/FINALIZING -> FAILED (samt haengender Segmente)</li>
  *   <li>Verarbeitungs-Jobs in RUNNING -> PENDING (werden erneut aufgegriffen);
  *       zugehoerige Aufnahmen in PROCESSING -> RECORDED</li>
+ *   <li>Videos in RECORDING/MUXING -> READY, falls die fertige MP4 schon auf der
+ *       Platte liegt, sonst FAILED - unabhaengig vom Status der Aufnahme</li>
  *   <li>verwaiste Video-Temp-Verzeichnisse werden entfernt</li>
  * </ul>
  */
@@ -65,6 +67,7 @@ public class StartupRecovery implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         recoverBotSessions();
         recoverRecordings();
+        recoverVideos();
         recoverJobs();
         sweepVideoTmp();
     }
@@ -111,6 +114,54 @@ public class StartupRecovery implements ApplicationRunner {
             }
         }
         if (!stuck.isEmpty()) log.info("Recovery: {} haengende Aufnahme(n) auf FAILED gesetzt", stuck.size());
+    }
+
+    /**
+     * Repariert haengende Video-Zustaende. Der Mux-Pool ist rein im Speicher:
+     * Was beim Neustart lief oder in der Warteschlange stand, ist weg - die
+     * Aufnahme steht aber weiter auf RECORDING/MUXING und das Frontend zeigt
+     * dauerhaft "wird verarbeitet". {@link #recoverRecordings()} greift dafuer
+     * nicht, weil es nur Aufnahmen behandelt, die selbst noch auf RECORDING/
+     * FINALIZING stehen - eine laengst fertig ausgewertete Aufnahme mit
+     * haengendem Video bliebe ewig stehen.
+     *
+     * <p>Ist die MP4 schon fertig geschrieben, wird sie nachtraeglich eingehaengt
+     * statt verworfen; sonst wird ehrlich FAILED angezeigt.
+     */
+    private void recoverVideos() {
+        List<Recording> stuck = recordingRepo.findByVideoStatusIn(List.of(
+                Recording.VideoStatus.RECORDING, Recording.VideoStatus.MUXING));
+        int rescued = 0;
+        int failed = 0;
+        for (Recording r : stuck) {
+            // Laufende Bildschirmaufnahmen werden von CaptureService.sweepStale()
+            // regulaer abgeschlossen und bekommen ihr Video danach noch.
+            if (r.getSource() == Recording.Source.CAPTURE
+                    && r.getStatus() == Recording.Status.RECORDING) continue;
+
+            Path mp4 = Path.of(r.getDirectory()).resolve("meeting.mp4");
+            if (Files.isRegularFile(mp4) && sizeQuietly(mp4) > 0) {
+                r.setVideoPath(mp4.toAbsolutePath().toString());
+                r.setVideoStatus(Recording.VideoStatus.READY);
+                rescued++;
+            } else {
+                r.setVideoStatus(Recording.VideoStatus.FAILED);
+                failed++;
+            }
+            recordingRepo.save(r);
+        }
+        if (rescued > 0 || failed > 0) {
+            log.info("Recovery: {} fertige(s) Video(s) nachtraeglich eingehaengt, "
+                    + "{} haengende(s) Video(s) auf FAILED gesetzt", rescued, failed);
+        }
+    }
+
+    private static long sizeQuietly(Path file) {
+        try {
+            return Files.size(file);
+        } catch (IOException e) {
+            return 0;
+        }
     }
 
     private void recoverJobs() {

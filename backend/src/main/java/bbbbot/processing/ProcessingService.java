@@ -238,8 +238,7 @@ public class ProcessingService {
             finishJob(job, false, "Aufnahme existiert nicht mehr");
             return;
         }
-        recording.setStatus(Recording.Status.PROCESSING);
-        recordingRepo.save(recording);
+        saveStatus(recording.getId(), Recording.Status.PROCESSING);
         log.info("Starte Verarbeitung fuer Aufnahme {} (Job {}, Versuch {})",
                 recording.getId(), job.getId(), job.getAttempts());
 
@@ -296,8 +295,7 @@ public class ProcessingService {
             // Zwei-Schritt-Auswertung: nach der Transkription stoppen, die
             // Zusammenfassung stoesst der Nutzer separat an ("Jetzt auswerten").
             if (job.isTranscribeOnly()) {
-                recording.setStatus(Recording.Status.TRANSCRIBED);
-                recordingRepo.save(recording);
+                saveStatus(recording.getId(), Recording.Status.TRANSCRIBED);
                 finishJob(job, true, "Nur Transkription (" + transcriptChars
                         + " Zeichen) - Zusammenfassung wird separat angestossen");
                 return;
@@ -307,8 +305,7 @@ public class ProcessingService {
             int minChat = settings.getInt(SettingsService.SUMMARY_MIN_CHAT_CHARS);
             int chatChars = recording.getChatLog() == null ? 0 : recording.getChatLog().trim().length();
             if (transcriptChars < minTranscript && chatChars < minChat) {
-                recording.setStatus(Recording.Status.DONE);
-                recordingRepo.save(recording);
+                saveStatus(recording.getId(), Recording.Status.DONE);
                 finishJob(job, true, "Kein auswertbarer Inhalt (Transkript " + transcriptChars
                         + " Zeichen, Chat " + chatChars + " Zeichen) - keine Zusammenfassung erstellt");
                 return;
@@ -326,8 +323,7 @@ public class ProcessingService {
                     log.info("Alte Zusammenfassungen von Aufnahme {} durch neue Auswertung ersetzt",
                             recording.getId());
                 }
-                recording.setStatus(Recording.Status.DONE);
-                recordingRepo.save(recording);
+                saveStatus(recording.getId(), Recording.Status.DONE);
                 finishJob(job, true, null);
             } else {
                 retryOrFail(job, recording, "Zusammenfassung fehlgeschlagen: " + summary.getError());
@@ -362,8 +358,7 @@ public class ProcessingService {
                     segmentRepo.save(segment);
                 }
             }
-            recording.setCorrectionStatus(Recording.CorrectionStatus.NONE);
-            recordingRepo.save(recording);
+            saveCorrectionStatus(recording.getId(), Recording.CorrectionStatus.NONE);
             if (!enabled) return;
         }
 
@@ -415,9 +410,8 @@ public class ProcessingService {
         }
         if (corrected == 0 && failed == 0) return;
 
-        recording.setCorrectionStatus(corrected > 0
+        saveCorrectionStatus(recording.getId(), corrected > 0
                 ? Recording.CorrectionStatus.READY : Recording.CorrectionStatus.FAILED);
-        recordingRepo.save(recording);
         log.info("Glaettung fuer Aufnahme {}: {} Segment(e) geglaettet, {} fehlgeschlagen",
                 recording.getId(), corrected, failed);
     }
@@ -427,12 +421,10 @@ public class ProcessingService {
             job.setStatus(ProcessingJob.Status.PENDING);
             job.setLastError(error);
             jobRepo.save(job);
-            recording.setStatus(interimStatus(recording));
-            recordingRepo.save(recording);
+            saveStatus(recording.getId(), interimStatus(recording));
             log.warn("Job {} wird erneut versucht ({}). Fehler: {}", job.getId(), job.getAttempts(), error);
         } else {
-            recording.setStatus(Recording.Status.FAILED);
-            recordingRepo.save(recording);
+            saveStatus(recording.getId(), Recording.Status.FAILED);
             finishJob(job, false, error);
         }
     }
@@ -450,6 +442,32 @@ public class ProcessingService {
                 .filter(s -> s.getStatus() == RecordingSegment.Status.READY)
                 .allMatch(s -> s.getTranscriptText() != null && !s.getTranscriptText().isBlank());
         return allTranscribed ? Recording.Status.TRANSCRIBED : Recording.Status.RECORDED;
+    }
+
+    /**
+     * Setzt den Status einer Aufnahme auf einer FRISCH geladenen Entity.
+     *
+     * <p>Bewusst kein {@code save()} der beim Job-Start geladenen Instanz: Ein
+     * Job laeuft Minuten bis Stunden (Whisper, Glaettung, Zusammenfassung),
+     * waehrenddessen haengt das parallele Video-Muxen sein Ergebnis an dieselbe
+     * Zeile. Da die Entity detached ist ({@code open-in-view: false}, keine
+     * Transaktion), schreibt {@code save()} ALLE Spalten aus dem alten
+     * Schnappschuss zurueck - das fertige Video landete so wieder auf MUXING
+     * mit leerem Pfad und kam im Frontend nie an.
+     */
+    private void saveStatus(UUID recordingId, Recording.Status status) {
+        recordingRepo.findById(recordingId).ifPresent(fresh -> {
+            fresh.setStatus(status);
+            recordingRepo.save(fresh);
+        });
+    }
+
+    /** Wie {@link #saveStatus}, aber fuer den Glaettungs-Status. */
+    private void saveCorrectionStatus(UUID recordingId, Recording.CorrectionStatus status) {
+        recordingRepo.findById(recordingId).ifPresent(fresh -> {
+            fresh.setCorrectionStatus(status);
+            recordingRepo.save(fresh);
+        });
     }
 
     private void finishJob(ProcessingJob job, boolean success, String message) {

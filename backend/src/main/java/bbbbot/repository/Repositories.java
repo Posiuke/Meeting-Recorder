@@ -17,8 +17,10 @@ import bbbbot.domain.ShareLink;
 import bbbbot.domain.Summary;
 import bbbbot.domain.UserGroup;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -72,6 +74,25 @@ public interface Repositories {
             order by r.startedAt desc
             """)
         List<Recording> findAllAccessibleBy(@Param("userId") UUID userId);
+
+        List<Recording> findByVideoStatusIn(List<Recording.VideoStatus> statuses);
+
+        /**
+         * Schreibt ausschliesslich die beiden Video-Spalten.
+         *
+         * <p>Bewusst ein gezieltes UPDATE statt {@code save(entity)}: Das Muxen
+         * laeuft parallel zur Verarbeitung derselben Aufnahme. Ein save() der
+         * ganzen Entity wuerde alle Spalten aus einem alten Schnappschuss
+         * zurueckschreiben - und damit z.B. den inzwischen erreichten Status
+         * ueberschreiben. Umgekehrt darf die Verarbeitung die Video-Spalten
+         * nicht anfassen (siehe ProcessingService).
+         */
+        @Modifying(clearAutomatically = true, flushAutomatically = true)
+        @Transactional
+        @Query("update Recording r set r.videoStatus = :status, r.videoPath = :path where r.id = :id")
+        int updateVideoState(@Param("id") UUID id,
+                             @Param("status") Recording.VideoStatus status,
+                             @Param("path") String path);
     }
 
     interface RecordingSegmentRepo extends JpaRepository<RecordingSegment, UUID> {
