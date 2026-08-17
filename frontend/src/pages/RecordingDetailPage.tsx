@@ -550,12 +550,17 @@ export default function RecordingDetailPage() {
                   // Alte Aufnahmen ohne (noch) vorhandene Audiodateien: Der
                   // Player verschwindet, statt einen toten Knopf zu zeigen.
                   onError={() => setAudioBroken(true)}
-                  onTimeUpdate={(e) =>
-                    setActiveIndex((prev) => {
-                      const next = findActiveIndex(activeEntries, e.currentTarget.currentTime);
-                      return prev === next ? prev : next;
-                    })
-                  }
+                  // Die Zeit kommt aus dem Element, NICHT aus dem Ereignis:
+                  // React setzt currentTarget zurück, sobald der Handler
+                  // zurückkehrt – in der nachgelagerten Zustandsfunktion wäre es
+                  // null. Der Vergleich mit dem vorherigen Wert hält das Neu-
+                  // Zeichnen bei 4 Ereignissen je Sekunde auf Zeilenwechsel.
+                  onTimeUpdate={() => {
+                    const audio = audioRef.current;
+                    if (!audio) return;
+                    const next = findActiveIndex(activeEntries, audio.currentTime);
+                    setActiveIndex((prev) => (prev === next ? prev : next));
+                  }}
                 />
                 <span className="muted">{t('recordingDetail.seekHint')}</span>
               </div>
