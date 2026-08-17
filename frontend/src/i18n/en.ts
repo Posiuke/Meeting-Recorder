@@ -600,6 +600,7 @@ export const en: typeof de = {
     retranscribe: 'Recreate transcript',
     summaryOptions: 'Customise analysis',
     customized: 'customised',
+    downloadAudio: 'Download recording',
     downloadSummary: 'Download summary',
     downloadSummaryWord: 'Summary as Word',
     share: 'Share',
@@ -627,6 +628,9 @@ export const en: typeof de = {
     downloadWordHint:
       'Word file (.doc) with headings, lists and tables – opens in Word or LibreOffice and can be saved from there as DOCX or PDF.',
     downloadVariantHint: 'The version currently selected ({{variant}}) is downloaded.',
+    seekHint: 'Click a line to jump to that point in the recording.',
+    audioUnavailable:
+      'This recording has no playable audio (any more) – the transcript can only be read.',
     chatEmpty: 'No chat log available.',
     jobsEmpty: 'No processing jobs available.',
     jobsCreated: 'Created',

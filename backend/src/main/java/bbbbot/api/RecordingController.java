@@ -354,6 +354,24 @@ public class RecordingController {
         return media.audio(id, segmentId);
     }
 
+    /**
+     * Durchgehende Tonspur der ganzen Aufnahme (Segmente zusammengefuegt) -
+     * fuer den Player im Transkript, aus dem sich per Klick auf eine Zeile an
+     * die passende Stelle springen laesst.
+     */
+    @GetMapping("/{id}/audio")
+    public ResponseEntity<FileSystemResource> fullAudio(@PathVariable UUID id) {
+        AppUser user = CurrentUser.get();
+        return media.fullAudio(access.requireReadable(id, user));
+    }
+
+    /** Dieselbe Tonspur als Download der kompletten Aufnahme. */
+    @GetMapping("/{id}/audio/download")
+    public ResponseEntity<FileSystemResource> fullAudioDownload(@PathVariable UUID id) {
+        AppUser user = CurrentUser.get();
+        return media.fullAudioDownload(access.requireReadable(id, user));
+    }
+
     @GetMapping("/{id}/video")
     public ResponseEntity<FileSystemResource> video(@PathVariable UUID id) {
         AppUser user = CurrentUser.get();

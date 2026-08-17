@@ -420,6 +420,28 @@ Oberfläche anzeigt (Markdown-Kern plus GFM-Tabellen, -Aufgabenlisten und
 -Durchstreichungen). Rohes HTML aus dem Modelltext wird dabei maskiert — dieselbe
 Entscheidung wie in der Anzeige.
 
+## Vom Transkript in die Aufnahme springen
+
+Die häufigste Frage an ein Protokoll ist „hat sie das wirklich so gesagt?". Im
+Transkript-Tab steht deshalb ein Player über der Liste, und **ein Klick auf eine
+Zeile springt an genau diese Stelle** der Aufnahme (Tastatur: Tabulator und
+Enter/Leertaste). Die gerade laufende Zeile wird hervorgehoben und ins Bild
+geholt, wenn sie beim Weiterhören aus dem sichtbaren Bereich wandert.
+
+Grundlage ist eine **durchgehende Tonspur**: `GET /api/recordings/{id}/audio`
+fügt die MP3-Segmente beim ersten Abruf zu `audio.mp3` im Aufnahme-Verzeichnis
+zusammen (ffmpeg, concat-Demuxer mit `-c copy` — kein erneutes Kodieren) und
+liefert sie danach direkt aus. Kommen Segmente hinzu oder werden sie neu
+transkodiert, ist die Datei älter als das jüngste Segment und wird verworfen;
+pro Aufnahme läuft höchstens ein ffmpeg-Lauf gleichzeitig. Die Auslieferung
+unterstützt Range-Requests — ohne die könnte der Browser nicht springen, sondern
+müsste die ganze Datei laden.
+
+Dieselbe Datei ist der **Download der kompletten Aufnahme**
+(`GET /api/recordings/{id}/audio/download`, Knopf „Aufnahme herunterladen"); die
+einzelnen Segmente bleiben in der Segment-Liste weiterhin einzeln abspielbar und
+herunterladbar.
+
 ## Schlagworte und Suche
 
 Auf der Detailseite einer eigenen Aufnahme lassen sich unter **Schlagworte**

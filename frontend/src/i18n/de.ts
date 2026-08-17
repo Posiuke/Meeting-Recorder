@@ -609,6 +609,7 @@ export const de = {
     retranscribe: 'Transkription neu erstellen',
     summaryOptions: 'Auswertung anpassen',
     customized: 'angepasst',
+    downloadAudio: 'Aufnahme herunterladen',
     downloadSummary: 'Zusammenfassung herunterladen',
     downloadSummaryWord: 'Zusammenfassung als Word',
     share: 'Teilen',
@@ -637,6 +638,9 @@ export const de = {
       'Word-Datei (.doc) mit Überschriften, Listen und Tabellen – lässt sich in Word oder LibreOffice öffnen und von dort als DOCX oder PDF speichern.',
     downloadVariantHint:
       'Heruntergeladen wird die gerade gewählte Fassung ({{variant}}).',
+    seekHint: 'Klick auf eine Zeile springt an diese Stelle der Aufnahme.',
+    audioUnavailable:
+      'Zu dieser Aufnahme ist keine abspielbare Tonspur (mehr) vorhanden – das Transkript lässt sich deshalb nur lesen.',
     chatEmpty: 'Kein Chat-Protokoll vorhanden.',
     jobsEmpty: 'Keine Verarbeitungs-Jobs vorhanden.',
     jobsCreated: 'Erstellt',

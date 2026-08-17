@@ -35,7 +35,8 @@ class RecordingMediaServiceTest {
         segmentRepo = mock(RecordingSegmentRepo.class);
         SummaryRepo summaryRepo = mock(SummaryRepo.class);
         participantService = mock(ParticipantService.class);
-        media = new RecordingMediaService(segmentRepo, summaryRepo, participantService);
+        media = new RecordingMediaService(segmentRepo, summaryRepo, participantService,
+                mock(FullAudioService.class));
 
         recording = Recording.start(null, UUID.randomUUID(), null, "/tmp/x", false, true, true);
         recording.setTitle("Wochenbesprechung Technik");

@@ -287,14 +287,55 @@ public class FfmpegService {
         }
     }
 
-    private Path concatCopy(List<Path> parts, Path out, List<Path> temps)
-            throws IOException, InterruptedException {
+    /**
+     * Fuegt die MP3-Segmente einer Aufnahme zu einer durchgehenden Datei
+     * zusammen. Alle Segmente stammen aus der eigenen Transkodierung (gleicher
+     * Codec, gleiche Abtastrate), deshalb genuegt der concat-Demuxer mit
+     * {@code -c copy}: kein erneutes Kodieren, kein Qualitaetsverlust und
+     * Sekunden statt Minuten Laufzeit.
+     */
+    public TranscodeResult concatMp3(List<Path> parts, Path out) {
+        List<Path> existing = parts.stream().filter(p -> p != null && Files.exists(p)).toList();
+        if (existing.isEmpty()) {
+            return new TranscodeResult(false, null, null, "Keine Audio-Segmente vorhanden");
+        }
+        List<Path> temps = new ArrayList<>();
+        try {
+            Path listFile = writeConcatList(existing, out);
+            temps.add(listFile);
+            ProcessResult result = run(List.of(props.getMedia().getFfmpegPath(), "-y",
+                    "-f", "concat", "-safe", "0", "-i", listFile.toString(),
+                    "-c", "copy", out.toString()), 1800);
+            if (result.exitCode() == 0 && Files.exists(out) && Files.size(out) > 0) {
+                return new TranscodeResult(true, out, probeDurationMs(out), null);
+            }
+            return new TranscodeResult(false, null, null,
+                    "ffmpeg exit=" + result.exitCode() + ": " + tail(result.stderr(), 500));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return new TranscodeResult(false, null, null, "Unterbrochen");
+        } catch (IOException e) {
+            return new TranscodeResult(false, null, null, "IO-Fehler: " + e.getMessage());
+        } finally {
+            for (Path t : temps) {
+                try { Files.deleteIfExists(t); } catch (IOException ignored) {}
+            }
+        }
+    }
+
+    private Path writeConcatList(List<Path> parts, Path out) throws IOException {
         Path listFile = out.resolveSibling(out.getFileName() + ".list.txt");
         StringBuilder sb = new StringBuilder();
         for (Path p : parts) {
             sb.append("file '").append(p.toAbsolutePath().toString().replace("'", "'\\''")).append("'\n");
         }
         Files.writeString(listFile, sb.toString(), StandardCharsets.UTF_8);
+        return listFile;
+    }
+
+    private Path concatCopy(List<Path> parts, Path out, List<Path> temps)
+            throws IOException, InterruptedException {
+        Path listFile = writeConcatList(parts, out);
         temps.add(listFile);
         temps.add(out);
         run(List.of(props.getMedia().getFfmpegPath(), "-y",
