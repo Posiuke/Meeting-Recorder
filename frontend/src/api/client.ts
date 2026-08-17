@@ -178,6 +178,12 @@ export interface UploadRecordingOptions {
    * schon bei einer sofortigen Auswertung.
    */
   summaryPrompt?: string | null;
+  /**
+   * Sprache der Spracherkennung; leer/undefined = Admin-Standard, `auto` =
+   * Whisper erkennt sie selbst. Muss beim Hochladen feststehen: Ein mit
+   * falscher Sprache erzeugtes Transkript ist nachträglich nicht zu retten.
+   */
+  sttLanguage?: string | null;
 }
 
 export interface UploadConfig {
@@ -185,6 +191,8 @@ export interface UploadConfig {
   maxFileSizeBytes: number;
   /** Hat der Admin die Sprechererkennung (Diarisierung) freigeschaltet? */
   diarizeAllowed: boolean;
+  /** Admin-Standard der Spracherkennung (`whisper.language`); leer = automatisch erkennen. */
+  sttLanguage: string;
 }
 
 export function fetchUploadConfig(): Promise<UploadConfig> {
@@ -249,6 +257,7 @@ export function uploadRecording(
     form.append('processNow', String(options.processNow));
     form.append('diarize', String(options.diarize ?? false));
     if (options.summaryPrompt?.trim()) form.append('summaryPrompt', options.summaryPrompt.trim());
+    if (options.sttLanguage?.trim()) form.append('sttLanguage', options.sttLanguage.trim());
     xhr.send(form);
   });
 }

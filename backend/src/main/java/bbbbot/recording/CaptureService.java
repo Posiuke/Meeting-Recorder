@@ -101,8 +101,14 @@ public class CaptureService {
         }
     }
 
-    /** Rahmenbedingungen fuer das Frontend. */
-    public record CaptureConfig(boolean enabled, long maxBytes, boolean diarizeAllowed) {}
+    /**
+     * Rahmenbedingungen fuer das Frontend.
+     *
+     * @param sttLanguage Admin-Standard der Spracherkennung (whisper.language),
+     *                    fuer die Beschriftung der Sprachauswahl
+     */
+    public record CaptureConfig(boolean enabled, long maxBytes, boolean diarizeAllowed,
+                                String sttLanguage) {}
 
     /** Sequenzluecke - der Client muss ab {@link #expectedSeq()} erneut senden. */
     public static class SequenceMismatchException extends RuntimeException {
@@ -125,7 +131,8 @@ public class CaptureService {
         return new CaptureConfig(
                 settings.getBool(SettingsService.CAPTURE_ENABLED),
                 maxBytes(),
-                settings.getBool(SettingsService.WHISPER_DIARIZE));
+                settings.getBool(SettingsService.WHISPER_DIARIZE),
+                settings.get(SettingsService.WHISPER_LANGUAGE));
     }
 
     private long maxBytes() {
@@ -139,9 +146,12 @@ public class CaptureService {
      * @param video    ob ein Bildschirm mitlaeuft (nur Ton = false); bestimmt die
      *                 Anzeige waehrend der Aufnahme, beim Abschluss wird das
      *                 tatsaechliche Format geprueft
+     * @param sttLanguage Sprache der Spracherkennung; null = Admin-Standard,
+     *                    "auto" = Whisper erkennt sie selbst
      */
     public Recording start(UUID ownerId, String title, boolean aiAnalysis, boolean processNow,
-                           boolean diarize, boolean video, String mimeType) throws IOException {
+                           boolean diarize, boolean video, String sttLanguage, String mimeType)
+            throws IOException {
         if (!settings.getBool(SettingsService.CAPTURE_ENABLED)) {
             throw new IllegalStateException("Bildschirmaufnahme ist nicht freigeschaltet");
         }
@@ -149,6 +159,7 @@ public class CaptureService {
         recording.setSource(Recording.Source.CAPTURE);
         recording.setStatus(Recording.Status.RECORDING);
         recording.setCaptureLastChunkAt(Instant.now());
+        recording.setSttLanguage(sttLanguage);
         recording.setTitle(title == null || title.isBlank()
                 ? "Bildschirmaufnahme " + LocalDateTime.now().format(TITLE_TIME)
                 : title.trim());
@@ -163,8 +174,10 @@ public class CaptureService {
                 StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND), 1 << 16);
         sessions.put(recording.getId(), new Session(ownerId, file, out, processNow));
 
-        log.info("Bildschirmaufnahme {} gestartet (Nutzer {}, Format {}, Video={}, Analyse={}, Diarisierung={})",
-                recording.getId(), ownerId, mimeType, video, aiAnalysis, diarize);
+        log.info("Bildschirmaufnahme {} gestartet (Nutzer {}, Format {}, Video={}, Analyse={}, "
+                        + "Diarisierung={}, Sprache={})",
+                recording.getId(), ownerId, mimeType, video, aiAnalysis, diarize,
+                sttLanguage == null ? "Standard" : sttLanguage);
         return recording;
     }
 

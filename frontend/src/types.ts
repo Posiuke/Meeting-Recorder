@@ -84,6 +84,11 @@ export interface CreateBotRequest {
   aiAnalysis?: boolean;
   /** Sprechererkennung – nur wirksam, wenn der Admin sie freigeschaltet hat. */
   diarize?: boolean;
+  /**
+   * Sprache der Spracherkennung für die Aufnahmen dieses Bots; leer/undefined =
+   * Admin-Standard, `auto` = Whisper erkennt sie selbst.
+   */
+  sttLanguage?: string | null;
 }
 
 export interface BotSessionHistoryView {
@@ -248,14 +253,22 @@ export interface JobView {
   finishedAt: string | null;
 }
 
-/** Pro-Aufnahme-Einstellungen für die Zusammenfassung (null = Admin-Standard). */
+/**
+ * Pro-Aufnahme-Einstellungen für Spracherkennung und Zusammenfassung
+ * (null = Admin-Standard).
+ */
 export interface SummaryOptionsView {
   prompt: string | null;
   maxWords: number | null;
+  /** Sprache der Zusammenfassung. */
   language: string | null;
+  /** Sprache der Spracherkennung; `auto` = Whisper erkennt sie selbst. */
+  sttLanguage: string | null;
   /** Admin-Standardwerte, damit die UI zeigen kann, was "Standard" bedeutet. */
   defaultPrompt: string;
   defaultLanguage: string;
+  /** Admin-Standard der Spracherkennung; leer bedeutet "automatisch erkennen". */
+  defaultSttLanguage: string;
 }
 
 /** Teilnehmer einer Aufnahme: aus der Diarisierung erkannter Sprecher mit editierbarem Namen. */

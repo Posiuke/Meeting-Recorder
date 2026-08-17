@@ -87,6 +87,47 @@ class WhisperClientOpenAiTest {
     }
 
     @Test
+    void spracheDerAufnahmeSchlaegtDenAdminStandard() {
+        List<String> bodies = respondWithText();
+
+        var result = new WhisperClient(settings).transcribe(audioFile, false, "en");
+
+        assertThat(result.success()).isTrue();
+        assertThat(languageField(bodies.get(0))).isEqualTo("en");
+    }
+
+    @Test
+    void automatischErkennenLaesstDieSprachvorgabeWeg() {
+        List<String> bodies = respondWithText();
+
+        var result = new WhisperClient(settings).transcribe(audioFile, false, SttLanguage.AUTO);
+
+        assertThat(result.success()).isTrue();
+        assertThat(bodies.get(0)).doesNotContain("name=\"language\"");
+    }
+
+    /** Mock-Antwort ohne Segmente; liefert die empfangenen Anfrage-Koerper. */
+    private List<String> respondWithText() {
+        List<String> bodies = new ArrayList<>();
+        server.createContext("/v1/audio/transcriptions", exchange -> {
+            bodies.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] response = "{\"text\":\"Hello world.\"}".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        return bodies;
+    }
+
+    /** Wert des multipart-Feldes "language" aus dem Anfrage-Koerper. */
+    private static String languageField(String body) {
+        var matcher = java.util.regex.Pattern
+                .compile("name=\"language\"\r\n\r\n([^\r]*)\r\n")
+                .matcher(body);
+        return matcher.find() ? matcher.group(1) : null;
+    }
+
+    @Test
     void faelltBeiUnbekanntemResponseFormatAufJsonZurueck() {
         AtomicInteger calls = new AtomicInteger();
         server.createContext("/v1/audio/transcriptions", exchange -> {

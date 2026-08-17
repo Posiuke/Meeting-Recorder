@@ -108,6 +108,15 @@ public class Recording {
     @Column(length = 16)
     private String summaryLanguage;
 
+    /**
+     * Sprache der Spracherkennung fuer diese Aufnahme (null = Admin-Standard
+     * whisper.language, "auto" = Whisper erkennt die Sprache selbst). Ein
+     * falscher Sprach-Hinweis beschaedigt das Transkript an der Wurzel - deshalb
+     * gehoert die Wahl an die Aufnahme und nicht nur in die Admin-Einstellungen.
+     */
+    @Column(length = 16)
+    private String sttLanguage;
+
     public static Recording start(UUID botSessionId, UUID ownerId, String meetingUrl, String directory,
                                   boolean recordVideo, boolean aiAnalysis, boolean diarize) {
         Recording r = new Recording();
@@ -169,4 +178,6 @@ public class Recording {
     public void setSummaryMaxWords(Integer summaryMaxWords) { this.summaryMaxWords = summaryMaxWords; }
     public String getSummaryLanguage() { return summaryLanguage; }
     public void setSummaryLanguage(String summaryLanguage) { this.summaryLanguage = summaryLanguage; }
+    public String getSttLanguage() { return sttLanguage; }
+    public void setSttLanguage(String sttLanguage) { this.sttLanguage = sttLanguage; }
 }

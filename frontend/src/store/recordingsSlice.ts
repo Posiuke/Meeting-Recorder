@@ -204,16 +204,28 @@ export const reprocessRecording = createAsyncThunk<JobView, string, { rejectValu
   },
 );
 
-/** Pro-Aufnahme-Einstellungen für die Zusammenfassung speichern (wirken bei der nächsten Auswertung). */
+/**
+ * Pro-Aufnahme-Einstellungen für Spracherkennung und Zusammenfassung speichern
+ * (wirken bei der nächsten Auswertung bzw. Transkription).
+ */
 export const updateSummaryOptions = createAsyncThunk<
   SummaryOptionsView,
-  { id: string; prompt: string | null; maxWords: number | null; language: string | null },
+  {
+    id: string;
+    prompt: string | null;
+    maxWords: number | null;
+    language: string | null;
+    sttLanguage: string | null;
+  },
   { rejectValue: string }
->('recordings/updateSummaryOptions', async ({ id, prompt, maxWords, language }, { rejectWithValue }) => {
+>('recordings/updateSummaryOptions', async (
+  { id, prompt, maxWords, language, sttLanguage },
+  { rejectWithValue },
+) => {
   try {
     return await api<SummaryOptionsView>(`/api/recordings/${id}/summary-options`, {
       method: 'POST',
-      body: { prompt, maxWords, language },
+      body: { prompt, maxWords, language, sttLanguage },
     });
   } catch (e) {
     return rejectWithValue(errorMessage(e));

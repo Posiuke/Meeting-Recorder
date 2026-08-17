@@ -365,7 +365,8 @@ export default function RecordingDetailPage() {
               {t('recordingDetail.summaryOptions')}
               {(detail.summaryOptions.prompt !== null ||
                 detail.summaryOptions.maxWords !== null ||
-                detail.summaryOptions.language !== null) && (
+                detail.summaryOptions.language !== null ||
+                detail.summaryOptions.sttLanguage !== null) && (
                 <span className="tag">{t('recordingDetail.customized')}</span>
               )}
             </button>

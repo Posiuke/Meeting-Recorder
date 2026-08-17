@@ -5,6 +5,7 @@ import Alert from './Alert';
 import ConfirmDialog from './ConfirmDialog';
 import HelpTip from './HelpTip';
 import PromptPresetSelect, { findOwnTemplate, resolvePresetPrompt } from './PromptPresetSelect';
+import SttLanguageSelect from './SttLanguageSelect';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { updateSummaryOptions } from '../store/recordingsSlice';
 import {
@@ -52,6 +53,7 @@ export default function SummaryOptionsDialog({
   const [prompt, setPrompt] = useState(options.prompt ?? '');
   const [maxWords, setMaxWords] = useState(options.maxWords?.toString() ?? '');
   const [language, setLanguage] = useState(options.language ?? '');
+  const [sttLanguage, setSttLanguage] = useState(options.sttLanguage ?? '');
   const [preset, setPreset] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -157,6 +159,7 @@ export default function SummaryOptionsDialog({
           prompt: prompt.trim() === '' ? null : prompt.trim(),
           maxWords: maxWordsNum,
           language: language === '' ? null : language,
+          sttLanguage: sttLanguage === '' ? null : sttLanguage,
         }),
       ).unwrap();
       onClose();
@@ -191,6 +194,23 @@ export default function SummaryOptionsDialog({
       <p className="muted">{t('summaryOptions.intro')}</p>
 
       {error && <Alert kind="error">{error}</Alert>}
+
+      {/* Steht vor den Auswertungs-Feldern, weil die Spracherkennung vor der
+          Auswertung läuft: Sie wirkt nur, solange noch transkribiert wird. */}
+      <div className="form-field">
+        <label htmlFor="so-stt-language">
+          {t('sttLanguage.label')}
+          <HelpTip text={t('sttLanguage.help')} />
+        </label>
+        <SttLanguageSelect
+          id="so-stt-language"
+          value={sttLanguage}
+          defaultLanguage={options.defaultSttLanguage}
+          disabled={busy}
+          onChange={setSttLanguage}
+        />
+        <span className="muted upload-preset-hint">{t('sttLanguage.retranscribeHint')}</span>
+      </div>
 
       <div className="form-field">
         <label htmlFor="so-preset">

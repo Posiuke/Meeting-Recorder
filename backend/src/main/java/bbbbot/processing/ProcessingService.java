@@ -250,6 +250,8 @@ public class ProcessingService {
             boolean redoTranscripts = job.isRedoTranscripts();
             // Sprechererkennung: vom Nutzer fuer diese Aufnahme gewuenscht UND vom Admin freigeschaltet
             boolean diarize = recording.isDiarize() && settings.getBool(SettingsService.WHISPER_DIARIZE);
+            // Sprache der Aufnahme geht vor; ohne Wahl gilt der Admin-Standard.
+            String sttLanguage = recording.getSttLanguage();
             List<RecordingSegment> segments = segmentRepo.findByRecordingIdOrderBySeq(recording.getId());
             boolean sttFailed = false;
             String sttError = null;
@@ -257,7 +259,8 @@ public class ProcessingService {
                 if (segment.getStatus() != RecordingSegment.Status.READY) continue;
                 if (!redoTranscripts
                         && segment.getTranscriptText() != null && !segment.getTranscriptText().isBlank()) continue;
-                WhisperClient.TranscriptionResult result = whisper.transcribe(Path.of(segment.getMp3Path()), diarize);
+                WhisperClient.TranscriptionResult result =
+                        whisper.transcribe(Path.of(segment.getMp3Path()), diarize, sttLanguage);
                 if (result.success()) {
                     segment.setTranscriptText(result.text());
                     segmentRepo.save(segment);

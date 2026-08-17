@@ -19,7 +19,7 @@ in **einem** Container; PostgreSQL läuft separat.
 - ✨ **KI-Glättung des Transkripts** vor der Auswertung (Füllwörter, Satzzeichen, Erkennungsfehler) — Original bleibt erhalten, im Transkript-Tab umschaltbar; dazu ein **persönliches Glossar** für Abkürzungen und Fachbegriffe
 - 🤖 **KI-Zusammenfassung** über jeden **OpenAI-kompatiblen** Chat-Endpoint — lokal (vLLM, Ollama) oder Cloud (OpenAI, Anthropic, Google Gemini, Groq, Mistral …)
 - 🏷️ **Schlagworte & Suche**: Aufnahmen verschlagworten, nach Schlagwort filtern und in Titel, Meeting-URL, Schlagworten sowie auf Wunsch in **Transkript und Zusammenfassung** suchen
-- 🎛️ **Auswertung pro Aufnahme anpassbar**: eigener Auswertungs-Prompt (mit Vorlagen für Vortrag, Interview, Sprachnotiz), maximale Länge, Sprache
+- 🎛️ **Auswertung pro Aufnahme anpassbar**: eigener Auswertungs-Prompt (mit Vorlagen für Vortrag, Interview, Sprachnotiz), maximale Länge, Sprache der Zusammenfassung — und die Sprache der Spracherkennung (auch „automatisch erkennen")
 - 🔁 **Erneut auswerten** (nur Zusammenfassung) und **Transkription neu erstellen** (Spracherkennung + Zusammenfassung) per Klick
 - ⏱️ **Verarbeitungs-Zeitfenster** (STT/LLM z. B. nachts) plus „Jetzt auswerten"
 - 🧪 **Verbindungstests** für Whisper und LLM direkt im Admin-Bereich
@@ -215,9 +215,13 @@ Einrichtung, Reverse-Proxy-Konfiguration und Fehlersuche:
 Auf der Aufnahme-Detailseite kann der Besitzer über **„Auswertung anpassen"**
 eigenen Auswertungs-Prompt (mit Vorlagen für Vortrag, Interview, Sprachnotiz),
 maximale Länge und Sprache der Zusammenfassung setzen — praktisch für
-hochgeladene Dateien, die kein Meeting sind. Die Einstellungen wirken bei der
-nächsten Auswertung („Jetzt auswerten", „Erneut auswerten" oder „Transkription
-neu erstellen"). Die Standardvorgabe des Administrators lässt sich über
+hochgeladene Dateien, die kein Meeting sind. Dort steht auch die **Sprache der
+Aufnahme** für die Spracherkennung (inkl. „automatisch erkennen"); sie ist
+außerdem schon im Upload-Dialog, im Bot-Formular und beim Start einer
+Bildschirmaufnahme wählbar, weil ein falscher Sprach-Hinweis das Transkript von
+Anfang an beschädigt. Die Einstellungen wirken
+bei der nächsten Auswertung („Jetzt auswerten", „Erneut auswerten" oder
+„Transkription neu erstellen"). Die Standardvorgabe des Administrators lässt sich über
 **„Standard übernehmen"** in das Feld holen und dort anpassen, statt sie
 vollständig ersetzen zu müssen.
 

@@ -86,6 +86,8 @@ export interface BeginRecordingOptions {
   aiAnalysis: boolean;
   processNow: boolean;
   diarize: boolean;
+  /** Sprache der Spracherkennung; '' = Admin-Standard, 'auto' = automatisch erkennen. */
+  sttLanguage: string;
 }
 
 export interface AudioLevels {
@@ -467,6 +469,7 @@ export function useScreenRecorder() {
           processNow: options.processNow,
           diarize: options.diarize,
           video: withVideo,
+          sttLanguage: options.sttLanguage,
           mimeType,
         });
       } catch (e) {

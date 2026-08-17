@@ -78,9 +78,15 @@ public class RecordingService {
         this.jobRepo = jobRepo;
     }
 
+    /**
+     * @param sttLanguage Sprache der Spracherkennung dieser Aufnahme; null =
+     *                    Admin-Standard, "auto" = Whisper erkennt sie selbst
+     */
     public Recording createRecording(UUID botSessionId, UUID ownerId, String meetingUrl,
-                                     boolean recordVideo, boolean aiAnalysis, boolean diarize, String title) {
+                                     boolean recordVideo, boolean aiAnalysis, boolean diarize,
+                                     String sttLanguage, String title) {
         Recording recording = Recording.start(botSessionId, ownerId, meetingUrl, "", recordVideo, aiAnalysis, diarize);
+        recording.setSttLanguage(sttLanguage);
         if (title != null && !title.isBlank()) {
             recording.setTitle(title.trim());
         }
@@ -113,21 +119,24 @@ public class RecordingService {
      * @param summaryPrompt  Auswertungs-Prompt dieser Aufnahme; null = Admin-Standard.
      *                       Er wird an der Aufnahme gespeichert und wirkt damit
      *                       schon bei der ersten (auch sofortigen) Auswertung.
+     * @param sttLanguage    Sprache der Spracherkennung; null = Admin-Standard,
+     *                       "auto" = Whisper erkennt sie selbst. Sie muss - wie der
+     *                       Prompt - vor dem Verarbeitungs-Job feststehen.
      */
     public record UploadOptions(String title, boolean aiAnalysis, boolean processNow,
                                 boolean diarize, boolean transcribeOnly, boolean keepVideo,
-                                String summaryPrompt) {
+                                String summaryPrompt, String sttLanguage) {
 
         /** Upload aus der Weboberflaeche: vollstaendige Aufnahme inkl. Video. */
         public static UploadOptions forUpload(String title, boolean aiAnalysis, boolean processNow,
-                                              boolean diarize, String summaryPrompt) {
+                                              boolean diarize, String summaryPrompt, String sttLanguage) {
             return new UploadOptions(title, aiAnalysis, aiAnalysis && processNow, diarize, false, true,
-                    summaryPrompt);
+                    summaryPrompt, sttLanguage);
         }
 
         /** API-Transkription: sofort transkribieren, keine Zusammenfassung, kein Video. */
-        public static UploadOptions forTranscription(String title, boolean diarize) {
-            return new UploadOptions(title, true, true, diarize, true, false, null);
+        public static UploadOptions forTranscription(String title, boolean diarize, String sttLanguage) {
+            return new UploadOptions(title, true, true, diarize, true, false, null, sttLanguage);
         }
     }
 
@@ -153,6 +162,9 @@ public class RecordingService {
         // Verarbeitungs-Job an der Aufnahme stehen, damit auch eine sofortige
         // Auswertung schon mit ihr laeuft.
         recording.setSummaryPrompt(options.summaryPrompt());
+        // Dasselbe gilt fuer die Sprache der Spracherkennung: Sie wird beim
+        // Transkribieren gebraucht, das direkt im Anschluss laufen kann.
+        recording.setSttLanguage(options.sttLanguage());
         Path dir = Path.of(props.getStorage().getRootDir()).resolve(recording.getId().toString());
         Files.createDirectories(dir);
         recording.setDirectory(dir.toAbsolutePath().toString());

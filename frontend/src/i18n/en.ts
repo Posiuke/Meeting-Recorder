@@ -485,6 +485,31 @@ export const en: typeof de = {
     },
   },
 
+  sttLanguage: {
+    label: 'Language of the recording',
+    help: 'The language spoken in the recording. It is passed to speech recognition as a hint – a wrong choice (e.g. German for an English interview) damages the transcript from the start, and neither smoothing nor the summary can make up for that later. “Detect automatically” leaves the decision to Whisper; with a clean recording that is usually reliable, but with language switches or a lot of specialist vocabulary an explicit choice is better.',
+    default: 'Default ({{language}})',
+    defaultAuto: 'Default (detect automatically)',
+    auto: 'Detect automatically',
+    retranscribeHint:
+      'Applies to the next speech recognition run – for an already transcribed recording that means “Recreate transcript”.',
+    lang: {
+      de: 'German',
+      en: 'English',
+      fr: 'French',
+      es: 'Spanish',
+      it: 'Italian',
+      nl: 'Dutch',
+      pl: 'Polish',
+      pt: 'Portuguese',
+      ru: 'Russian',
+      tr: 'Turkish',
+      uk: 'Ukrainian',
+      ar: 'Arabic',
+      zh: 'Chinese',
+    },
+  },
+
   summaryOptions: {
     title: 'Customise analysis',
     intro:
