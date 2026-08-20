@@ -306,7 +306,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
       id: 'glossary',
       title: 'Glossary',
       intro:
-        'Your abbreviations and technical terms. They feed into the AI smoothing of your transcripts – including direct transcriptions.',
+        'Your abbreviations and technical terms. They feed into the AI smoothing of your transcripts – including direct transcriptions. There is also the installation-wide shared glossary under /api/glossary/shared: everyone may read and export it, only admins may change it. Smoothing uses both lists; if a term is in both, your personal entry wins.',
       endpoints: [
         {
           method: 'GET',
@@ -351,6 +351,43 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
   "$BBB/api/glossary/import"`,
           response: `{ "created": 12, "updated": 3, "unchanged": 40, "skipped": 1,
   "warnings": ["Zeile 8: kein Begriff angegeben"] }`,
+        },
+        {
+          method: 'GET',
+          path: '/api/glossary/shared',
+          summary: 'The installation-wide glossary, alphabetically. Readable by everyone.',
+          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/glossary/shared"`,
+        },
+        {
+          method: 'POST',
+          path: '/api/glossary/shared',
+          summary: 'Create a shared term. Admins only (403 otherwise).',
+          example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
+  -d '{"term":"Projekt Nord","meaning":"Replacing the legacy system"}' "$BBB/api/glossary/shared"`,
+        },
+        {
+          method: 'PUT',
+          path: '/api/glossary/shared/{id}',
+          summary: 'Change a shared entry. Admins only.',
+        },
+        {
+          method: 'DELETE',
+          path: '/api/glossary/shared/{id}',
+          summary: 'Delete a shared entry. Admins only.',
+        },
+        {
+          method: 'GET',
+          path: '/api/glossary/shared/export',
+          summary: 'The shared glossary as CSV. Readable by everyone.',
+          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/glossary/shared/export" -o shared.csv`,
+        },
+        {
+          method: 'POST',
+          path: '/api/glossary/shared/import',
+          summary:
+            'Import a CSV into the shared glossary (field file). Merges just like the personal import. Admins only.',
+          example: `curl -s -H "X-API-Key: $KEY" -F file=@shared.csv \\
+  "$BBB/api/glossary/shared/import"`,
         },
       ],
     },

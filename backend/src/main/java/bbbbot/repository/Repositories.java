@@ -175,6 +175,12 @@ public interface Repositories {
         List<GlossaryEntry> findByOwnerIdOrderByTermKeyAsc(UUID ownerId);
         long countByOwnerId(UUID ownerId);
         Optional<GlossaryEntry> findByOwnerIdAndTermKey(UUID ownerId, String termKey);
+
+        // Gemeinsames Glossar der Installation. Eigene Methoden, weil ein
+        // uebergebenes null zu "owner_id = null" wird und damit nie trifft.
+        List<GlossaryEntry> findByOwnerIdIsNullOrderByTermKeyAsc();
+        long countByOwnerIdIsNull();
+        Optional<GlossaryEntry> findByOwnerIdIsNullAndTermKey(String termKey);
     }
 
     interface AppSettingRepo extends JpaRepository<AppSetting, String> {

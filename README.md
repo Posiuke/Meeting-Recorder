@@ -29,8 +29,9 @@ docs/       Anleitungen (u.a. Whisper-Diarisierung), Alt-Dokumentation
 - **Transkript-Glättung & Glossar**: Vor der Auswertung glättet das LLM das
   Rohtranskript (Füllwörter, Satzzeichen, Erkennungsfehler). Das Original bleibt
   erhalten — im Transkript-Tab lässt sich zwischen **Korrigiert** und **Original**
-  umschalten. Jeder Nutzer pflegt unter **Glossar** eigene Abkürzungen und
-  Fachbegriffe, die der Glättung mitgegeben werden.
+  umschalten. Unter **Glossar** pflegt jeder Nutzer eigene Abkürzungen und
+  Fachbegriffe; daneben steht ein **gemeinsames Glossar der Installation**, das
+  Admins pflegen und alle lesen. Beide gehen in die Glättung ein.
 - **Vorlagen**: Im Tab **Vorlagen** pflegt jeder Nutzer eigene
   Auswertungs-Prompts (Liste links, großer Editor rechts; integrierte Vorlagen
   für Meeting, Vortrag, Interview und Sprachnotiz lassen sich als Kopie öffnen,
@@ -265,14 +266,26 @@ einem mehrzeiligen Satz alle seine Zeilen. Fällt die Glättung ganz aus (LLM ni
 erreichbar), läuft die Auswertung mit dem Original weiter; der Job schlägt
 deswegen nicht fehl.
 
-Jeder Nutzer pflegt unter **Glossar** seine eigenen Abkürzungen, Eigennamen und
-Fachbegriffe (optional mit Bedeutung). Bei einer Aufnahme wird das Glossar ihres
-**Besitzers** in den Glättungs-Prompt eingebaut, damit interne Begriffe richtig
-geschrieben und nicht durch ähnlich klingende Alltagswörter ersetzt werden.
+Unter **Glossar** stehen zwei Listen nebeneinander:
 
-Das Glossar lässt sich als **CSV-Datei** herunterladen und wieder einlesen
-(`GET /api/glossary/export`, `POST /api/glossary/import`) — so kann eine Liste
-vorab in Excel oder im Texteditor vorbereitet und gepflegt werden:
+- **Mein Glossar** — die eigenen Abkürzungen, Eigennamen und Fachbegriffe
+  (optional mit Bedeutung).
+- **Gemeinsames Glossar** — Begriffe der ganzen Installation: Abteilungskürzel,
+  Projekt- und Produktnamen. Gepflegt wird die Liste von **Admins**, lesen und
+  exportieren dürfen sie alle. So muss nicht jeder dieselbe Liste selbst pflegen,
+  und die Qualität eines Transkripts hängt nicht davon ab, wer den Bot gestartet
+  hat.
+
+Bei einer Aufnahme gehen **beide** in den Glättungs-Prompt ein: das gemeinsame
+Glossar und das persönliche ihres **Besitzers**. Steht ein Begriff in beiden,
+gewinnt der persönliche Eintrag — wer einen Begriff selbst pflegt, meint damit
+etwas Genaueres als die installationsweite Liste. Die Obergrenze
+`correction.glossaryMaxChars` gilt für das zusammengeführte Ergebnis.
+
+Beide Listen lassen sich als **CSV-Datei** herunterladen und wieder einlesen
+(`GET /api/glossary/export`, `POST /api/glossary/import`; gemeinsam unter
+`/api/glossary/shared/export` bzw. `/api/glossary/shared/import`) — so kann eine
+Liste vorab in Excel oder im Texteditor vorbereitet und gepflegt werden:
 
 ```
 Begriff;Bedeutung
@@ -298,7 +311,7 @@ Einstellungen (Admin → Einstellungen → *Transkript-Glättung*):
 | `correction.systemPrompt` | (deutscher Standardprompt) | Anweisung an das LLM; das Antwortformat `Nummer \| Satz` muss erhalten bleiben |
 | `correction.chunkChars` | `3000` | Zeichen je Glättungsschritt (ein LLM-Aufruf). Das Antwort-Token-Budget richtet sich nach der **tatsächlichen** Blockgröße (`Zeichen/2 + 512`) und nicht nach `llm.maxTokens` — die Antwort ist etwa so lang wie die Eingabe |
 | `correction.maxSentenceChars` | `500` | Notbremse für die Satzbildung: ohne Satzzeichen im Transkript wird nach so vielen Zeichen getrennt |
-| `correction.glossaryMaxChars` | `12000` | Wie viel Glossar in den Prompt geht (0 = unbegrenzt). Der Block geht in **jeden** Schritt ein und kostet dort Kontext |
+| `correction.glossaryMaxChars` | `12000` | Wie viel Glossar in den Prompt geht (0 = unbegrenzt) — gemeinsames und persönliches zusammen. Der Block geht in **jeden** Schritt ein und kostet dort Kontext |
 
 Bestehende Aufnahmen bekommen die Glättung über **„Erneut auswerten"** nachträglich.
 **„Transkription neu erstellen"** verwirft eine vorhandene Glättung (sie gehört zum

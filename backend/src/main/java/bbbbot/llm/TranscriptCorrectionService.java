@@ -97,7 +97,10 @@ public class TranscriptCorrectionService {
         return settings.getBool(SettingsService.CORRECTION_ENABLED);
     }
 
-    /** Glossar-Block des Nutzers, der allen Aufrufen fuer dessen Aufnahmen mitgegeben wird. */
+    /**
+     * Glossar-Block fuer alle Aufrufe zu den Aufnahmen dieses Nutzers: gemeinsames
+     * Glossar der Installation und persoenliches zusammengefuehrt.
+     */
     public String glossaryFor(java.util.UUID ownerId) {
         return glossaryService.promptBlock(ownerId);
     }

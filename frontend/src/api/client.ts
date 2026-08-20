@@ -1,6 +1,7 @@
 import { translate } from '../i18n';
 import type {
   GlossaryImportResult,
+  GlossaryScope,
   PublicShareView,
   RecordingView,
   ShareLinkClaimView,
@@ -366,17 +367,25 @@ export function fetchShareLinkConfig(): Promise<{ publicLinksAllowed: boolean }>
 }
 
 /**
+ * Basispfad einer der beiden Glossar-Listen: das persönliche Glossar des
+ * angemeldeten Nutzers oder das gemeinsame der Installation.
+ */
+export function glossaryPath(scope: GlossaryScope): string {
+  return scope === 'shared' ? '/api/glossary/shared' : '/api/glossary';
+}
+
+/**
  * Glossar als CSV-Datei. Token im Query-Parameter, weil der Download über einen
  * normalen Link läuft (kein Header möglich).
  */
-export function glossaryExportUrl(): string {
+export function glossaryExportUrl(scope: GlossaryScope): string {
   const token = getToken() ?? '';
-  return `/api/glossary/export?token=${encodeURIComponent(token)}`;
+  return `${glossaryPath(scope)}/export?token=${encodeURIComponent(token)}`;
 }
 
-/** Liest eine CSV-Datei ins eigene Glossar ein (zusammenführen, nichts wird gelöscht). */
-export function importGlossary(file: File): Promise<GlossaryImportResult> {
+/** Liest eine CSV-Datei in eine der Listen ein (zusammenführen, nichts wird gelöscht). */
+export function importGlossary(file: File, scope: GlossaryScope): Promise<GlossaryImportResult> {
   const form = new FormData();
   form.append('file', file);
-  return api<GlossaryImportResult>('/api/glossary/import', { method: 'POST', body: form });
+  return api<GlossaryImportResult>(`${glossaryPath(scope)}/import`, { method: 'POST', body: form });
 }

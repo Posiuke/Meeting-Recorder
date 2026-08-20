@@ -9,25 +9,31 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.UUID;
 
 /**
- * Persoenliches Glossar: Abkuerzungen und Fachbegriffe, die in den eigenen
- * Besprechungen vorkommen. Die Eintraege gehen in die Glaettung des Transkripts
- * ein - damit schreibt die KI haus- und fachinterne Begriffe richtig, statt sie
- * durch aehnlich klingende Alltagswoerter zu ersetzen.
+ * Glossar: Abkuerzungen und Fachbegriffe, die in den Besprechungen vorkommen. Die
+ * Eintraege gehen in die Glaettung des Transkripts ein - damit schreibt die KI
+ * haus- und fachinterne Begriffe richtig, statt sie durch aehnlich klingende
+ * Alltagswoerter zu ersetzen.
+ *
+ * <p>Es gibt zwei Listen: das <b>gemeinsame</b> Glossar der Installation (von
+ * Admins gepflegt) und das <b>persoenliche</b> jedes Nutzers. In den Prompt gehen
+ * beide zusammen ein - siehe {@link #promptBlock(UUID)}.
  */
 @Service
 public class GlossaryService {
 
     /**
-     * Reine Missbrauchsgrenze - fachlich soll das Glossar so lang sein duerfen,
-     * wie der Nutzer es braucht. Wie viel davon im Prompt landet, steuert der
-     * Admin ueber {@code correction.glossaryMaxChars}.
+     * Reine Missbrauchsgrenze je Liste (persoenlich wie gemeinsam) - fachlich soll
+     * ein Glossar so lang sein duerfen, wie es gebraucht wird. Wie viel davon im
+     * Prompt landet, steuert der Admin ueber {@code correction.glossaryMaxChars}.
      */
-    public static final int MAX_ENTRIES_PER_USER = 10_000;
+    public static final int MAX_ENTRIES_PER_LIST = 10_000;
 
     private final GlossaryEntryRepo repo;
     private final SettingsService settings;
@@ -37,8 +43,29 @@ public class GlossaryService {
         this.settings = settings;
     }
 
+    /**
+     * Eintraege einer Liste, alphabetisch nach Vergleichsform des Begriffs.
+     *
+     * @param ownerId Nutzer, dessen persoenliches Glossar gemeint ist -
+     *                {@code null} fuer das gemeinsame Glossar der Installation
+     */
     public List<GlossaryEntry> entriesOf(UUID ownerId) {
-        return repo.findByOwnerIdOrderByTermKeyAsc(ownerId);
+        return ownerId == null
+                ? repo.findByOwnerIdIsNullOrderByTermKeyAsc()
+                : repo.findByOwnerIdOrderByTermKeyAsc(ownerId);
+    }
+
+    /** Wie viele Eintraege die Liste schon hat (fuer {@link #MAX_ENTRIES_PER_LIST}). */
+    public long countOf(UUID ownerId) {
+        return ownerId == null ? repo.countByOwnerIdIsNull() : repo.countByOwnerId(ownerId);
+    }
+
+    /** Eintrag derselben Liste mit gleicher Vergleichsform des Begriffs. */
+    public Optional<GlossaryEntry> findByTerm(UUID ownerId, String term) {
+        String key = GlossaryEntry.normalizeKey(term);
+        return ownerId == null
+                ? repo.findByOwnerIdIsNullAndTermKey(key)
+                : repo.findByOwnerIdAndTermKey(ownerId, key);
     }
 
     /**
@@ -58,7 +85,8 @@ public class GlossaryService {
     static final int MAX_WARNINGS = 50;
 
     /**
-     * Uebernimmt eine CSV-Datei ins Glossar des Nutzers: vorhandene Begriffe
+     * Uebernimmt eine CSV-Datei in eine der Listen ({@code ownerId == null} =
+     * gemeinsames Glossar der Installation): vorhandene Begriffe
      * werden mit der Bedeutung aus der Datei aktualisiert, neue angelegt, nicht
      * genannte bleiben unberuehrt. Es wird nie etwas geloescht - ein Import darf
      * kein Glossar zerstoeren, das ueber Monate gewachsen ist.
@@ -75,7 +103,7 @@ public class GlossaryService {
         int updated = 0;
         int unchanged = 0;
         int skipped = parsed.skipped();
-        long total = repo.countByOwnerId(ownerId);
+        long total = countOf(ownerId);
         boolean limitReached = false;
 
         for (GlossaryCsv.Row row : parsed.rows()) {
@@ -92,8 +120,7 @@ public class GlossaryService {
                         + GlossaryEntry.MAX_MEANING_LENGTH + " Zeichen)");
                 continue;
             }
-            Optional<GlossaryEntry> existing =
-                    repo.findByOwnerIdAndTermKey(ownerId, GlossaryEntry.normalizeKey(row.term()));
+            Optional<GlossaryEntry> existing = findByTerm(ownerId, row.term());
             if (existing.isPresent()) {
                 GlossaryEntry entry = existing.get();
                 if (row.term().equals(entry.getTerm()) && Objects.equals(meaning, entry.getMeaning())) {
@@ -107,7 +134,7 @@ public class GlossaryService {
                 updated++;
                 continue;
             }
-            if (total >= MAX_ENTRIES_PER_USER) {
+            if (total >= MAX_ENTRIES_PER_LIST) {
                 skipped++;
                 limitReached = true;
                 continue;
@@ -117,7 +144,7 @@ public class GlossaryService {
             total++;
         }
         if (limitReached) {
-            warnings.add("Grenze von " + MAX_ENTRIES_PER_USER
+            warnings.add("Grenze von " + MAX_ENTRIES_PER_LIST
                     + " Eintraegen erreicht - weitere Begriffe wurden nicht angelegt");
         }
         return new ImportResult(created, updated, unchanged, skipped, shorten(warnings));
@@ -131,15 +158,35 @@ public class GlossaryService {
     }
 
     /**
-     * Baut den Glossar-Abschnitt fuer den Prompt. Leeres Glossar ergibt einen
-     * leeren String (dann entfaellt der Abschnitt ganz). Wie viele Zeichen
-     * hoechstens mitgehen, legt der Admin fest ({@code correction.glossaryMaxChars},
-     * 0 = unbegrenzt) - der Block geht in JEDEN Glaettungsschritt ein und kostet
-     * dort entsprechend Kontext.
+     * Baut den Glossar-Abschnitt fuer den Prompt: gemeinsames Glossar der
+     * Installation und persoenliches des Aufnahme-Besitzers zusammengefuehrt.
+     * Beide Glossare leer ergibt einen leeren String (dann entfaellt der Abschnitt
+     * ganz). Wie viele Zeichen hoechstens mitgehen, legt der Admin fest
+     * ({@code correction.glossaryMaxChars}, 0 = unbegrenzt) und gilt fuer das
+     * Ergebnis - der Block geht in JEDEN Glaettungsschritt ein und kostet dort
+     * entsprechend Kontext.
      */
     public String promptBlock(UUID ownerId) {
-        return renderPromptBlock(entriesOf(ownerId),
+        return renderPromptBlock(merge(entriesOf(null), entriesOf(ownerId)),
                 settings.getInt(SettingsService.CORRECTION_GLOSSARY_MAX_CHARS));
+    }
+
+    /**
+     * Fuehrt gemeinsames und persoenliches Glossar zu einer Liste zusammen.
+     * Bei gleichem Begriff (Vergleichsform) gewinnt der persoenliche Eintrag:
+     * Ein selbst gepflegter Begriff meint etwas Genaueres als die
+     * installationsweite Liste - sonst waere er nicht angelegt worden.
+     *
+     * <p>Sortiert wird wie in den Einzellisten nach Vergleichsform, damit die
+     * Herkunft eines Eintrags im Prompt keine Rolle spielt und eine Kuerzung
+     * ueber {@code correction.glossaryMaxChars} nicht eine der beiden Listen
+     * bevorzugt.
+     */
+    static List<GlossaryEntry> merge(List<GlossaryEntry> shared, List<GlossaryEntry> personal) {
+        Map<String, GlossaryEntry> byKey = new TreeMap<>();
+        for (GlossaryEntry entry : shared) byKey.put(entry.getTermKey(), entry);
+        for (GlossaryEntry entry : personal) byKey.put(entry.getTermKey(), entry);
+        return List.copyOf(byKey.values());
     }
 
     /**

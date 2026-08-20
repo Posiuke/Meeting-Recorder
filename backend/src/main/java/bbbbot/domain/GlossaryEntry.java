@@ -10,13 +10,19 @@ import java.util.Locale;
 import java.util.UUID;
 
 /**
- * Eintrag im persoenlichen Glossar: eine Abkuerzung oder ein Fachbegriff, der in
- * den eigenen Besprechungen vorkommt, optional mit Bedeutung. Die Eintraege
- * gehen in die KI-Glaettung des Transkripts ein, damit haus- und fachinterne
- * Begriffe richtig geschrieben und nicht "wegkorrigiert" werden.
+ * Eintrag im Glossar: eine Abkuerzung oder ein Fachbegriff aus den Besprechungen,
+ * optional mit Bedeutung. Die Eintraege gehen in die KI-Glaettung des Transkripts
+ * ein, damit haus- und fachinterne Begriffe richtig geschrieben und nicht
+ * "wegkorrigiert" werden.
  *
- * <p>Jeder Nutzer pflegt seine eigene Liste; verwendet wird bei einer Aufnahme
- * das Glossar ihres Besitzers.
+ * <p>Es gibt zwei Geltungsbereiche in derselben Tabelle:
+ * <ul>
+ *   <li><b>persoenlich</b> ({@code ownerId} gesetzt) - die eigene Liste eines Nutzers,</li>
+ *   <li><b>gemeinsam</b> ({@code ownerId == null}) - installationsweit, von Admins
+ *       gepflegt. Abteilungskuerzel und Projektnamen sind kein persoenlicher Besitz.</li>
+ * </ul>
+ * Bei einer Aufnahme gehen beide ein: das gemeinsame Glossar und das persoenliche
+ * ihres Besitzers, wobei bei gleichem Begriff der persoenliche Eintrag gewinnt.
  */
 @Entity
 @Table(name = "glossary_entry")
@@ -29,7 +35,7 @@ public class GlossaryEntry {
     @Id
     private UUID id;
 
-    @Column(nullable = false)
+    /** {@code null} = gemeinsamer Eintrag der Installation. */
     private UUID ownerId;
 
     @Column(nullable = false, length = 200)
@@ -46,6 +52,12 @@ public class GlossaryEntry {
 
     private Instant updatedAt;
 
+    /**
+     * Neuer Eintrag im angegebenen Geltungsbereich.
+     *
+     * @param ownerId Nutzer, dem der Eintrag gehoert - {@code null} fuer das
+     *                gemeinsame Glossar der Installation
+     */
     public static GlossaryEntry create(UUID ownerId, String term, String meaning) {
         GlossaryEntry entry = new GlossaryEntry();
         entry.id = UUID.randomUUID();
@@ -63,6 +75,9 @@ public class GlossaryEntry {
 
     public UUID getId() { return id; }
     public UUID getOwnerId() { return ownerId; }
+
+    /** Gehoert der Eintrag dem gemeinsamen Glossar der Installation? */
+    public boolean isShared() { return ownerId == null; }
     public String getTerm() { return term; }
 
     public void setTerm(String term) {

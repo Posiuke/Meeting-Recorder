@@ -323,21 +323,32 @@ export const de = {
 
   glossary: {
     heading: 'Glossar',
+    tabPersonal: 'Mein Glossar',
+    tabShared: 'Gemeinsames Glossar',
     intro:
-      'Abkürzungen, Eigennamen und Fachbegriffe aus Ihren Besprechungen. Die Liste wird der KI mitgegeben, wenn sie das Transkript glättet – so schreibt sie interne Begriffe richtig, statt sie durch ähnlich klingende Alltagswörter zu ersetzen. Das Glossar gilt nur für Ihre eigenen Aufnahmen; jeder pflegt seine eigene Liste.',
+      'Abkürzungen, Eigennamen und Fachbegriffe aus Ihren Besprechungen. Die Liste wird der KI mitgegeben, wenn sie das Transkript glättet – so schreibt sie interne Begriffe richtig, statt sie durch ähnlich klingende Alltagswörter zu ersetzen. Sie gilt für Ihre eigenen Aufnahmen und geht dort zusammen mit dem gemeinsamen Glossar ein; steht ein Begriff in beiden, gewinnt Ihr eigener Eintrag.',
+    introShared:
+      'Begriffe der ganzen Installation: Abteilungskürzel, Projekt- und Produktnamen, Eigennamen. Sie gehen bei jeder Aufnahme in die Glättung ein – unabhängig davon, wer den Bot gestartet hat. So muss niemand dieselbe Liste noch einmal pflegen. Steht ein Begriff auch im persönlichen Glossar des Besitzers, gewinnt dort der persönliche Eintrag.',
+    sharedReadOnly:
+      'Diese Liste pflegen Admins. Lesen und exportieren können Sie sie – eigene Begriffe gehören unter „Mein Glossar".',
     termLabel: 'Begriff oder Abkürzung',
     termPlaceholder: 'z. B. RZ',
     meaningLabel: 'Bedeutung (optional)',
     meaningPlaceholder: 'z. B. Rechenzentrum',
     loading: 'Glossar wird geladen…',
     empty: 'Noch keine Einträge – oben den ersten Begriff hinzufügen.',
+    emptyShared: 'Noch keine gemeinsamen Einträge – oben den ersten Begriff hinzufügen.',
+    emptySharedReadOnly: 'Noch keine gemeinsamen Einträge. Begriffe hier eintragen können Admins.',
     columnTerm: 'Begriff',
     columnMeaning: 'Bedeutung',
     confirmDeleteTitle: 'Eintrag löschen',
     confirmDeleteMessage: 'Soll „{{term}}" aus dem Glossar entfernt werden?',
+    confirmDeleteMessageShared:
+      'Soll „{{term}}" aus dem gemeinsamen Glossar entfernt werden? Das wirkt für alle Nutzer.',
     exportLabel: 'Exportieren',
     importLabel: 'Importieren',
     importTitle: 'Glossar importieren',
+    importTitleShared: 'Gemeinsames Glossar importieren',
     importIntro:
       'CSV-Datei mit den Spalten „Begriff" und „Bedeutung", getrennt durch Semikolon – so speichert und öffnet Excel im deutschen Sprachraum. Eine Kopfzeile ist erlaubt, Zeilen mit # werden übersprungen. Vorhandene Begriffe werden mit der Bedeutung aus der Datei aktualisiert, neue angelegt; nichts wird gelöscht.',
     importExample:

@@ -309,7 +309,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
       id: 'glossary',
       title: 'Glossar',
       intro:
-        'Ihre Abkürzungen und Fachbegriffe. Sie gehen in die KI-Glättung Ihrer Transkripte ein – auch bei der Direkt-Transkription.',
+        'Ihre Abkürzungen und Fachbegriffe. Sie gehen in die KI-Glättung Ihrer Transkripte ein – auch bei der Direkt-Transkription. Zusätzlich gibt es das gemeinsame Glossar der Installation unter /api/glossary/shared: Lesen und Exportieren darf es jeder, ändern nur Admins. Bei der Glättung gehen beide Listen ein; steht ein Begriff in beiden, gewinnt Ihr persönlicher Eintrag.',
       endpoints: [
         {
           method: 'GET',
@@ -354,6 +354,43 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
   "$BBB/api/glossary/import"`,
           response: `{ "created": 12, "updated": 3, "unchanged": 40, "skipped": 1,
   "warnings": ["Zeile 8: kein Begriff angegeben"] }`,
+        },
+        {
+          method: 'GET',
+          path: '/api/glossary/shared',
+          summary: 'Gemeinsames Glossar der Installation, alphabetisch. Für alle lesbar.',
+          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/glossary/shared"`,
+        },
+        {
+          method: 'POST',
+          path: '/api/glossary/shared',
+          summary: 'Gemeinsamen Begriff anlegen. Nur Admins (sonst 403).',
+          example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
+  -d '{"term":"Projekt Nord","meaning":"Ablösung der Altanlage"}' "$BBB/api/glossary/shared"`,
+        },
+        {
+          method: 'PUT',
+          path: '/api/glossary/shared/{id}',
+          summary: 'Gemeinsamen Eintrag ändern. Nur Admins.',
+        },
+        {
+          method: 'DELETE',
+          path: '/api/glossary/shared/{id}',
+          summary: 'Gemeinsamen Eintrag löschen. Nur Admins.',
+        },
+        {
+          method: 'GET',
+          path: '/api/glossary/shared/export',
+          summary: 'Gemeinsames Glossar als CSV. Für alle lesbar.',
+          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/glossary/shared/export" -o gemeinsam.csv`,
+        },
+        {
+          method: 'POST',
+          path: '/api/glossary/shared/import',
+          summary:
+            'CSV ins gemeinsame Glossar einlesen (Feld file). Führt zusammen wie der eigene Import. Nur Admins.',
+          example: `curl -s -H "X-API-Key: $KEY" -F file=@gemeinsam.csv \\
+  "$BBB/api/glossary/shared/import"`,
         },
       ],
     },

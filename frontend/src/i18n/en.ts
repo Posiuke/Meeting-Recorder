@@ -318,21 +318,32 @@ export const en: typeof de = {
 
   glossary: {
     heading: 'Glossary',
+    tabPersonal: 'My glossary',
+    tabShared: 'Shared glossary',
     intro:
-      'Abbreviations, proper names and technical terms from your meetings. The list is passed to the AI when it smooths the transcript, so internal terms are spelled correctly instead of being replaced by similar-sounding everyday words. The glossary applies to your own recordings only; everyone maintains their own list.',
+      'Abbreviations, proper names and technical terms from your meetings. The list is passed to the AI when it smooths the transcript, so internal terms are spelled correctly instead of being replaced by similar-sounding everyday words. It applies to your own recordings and is combined there with the shared glossary; if a term appears in both, your own entry wins.',
+    introShared:
+      'Terms for the whole installation: department abbreviations, project and product names, proper names. They go into smoothing for every recording, no matter who started the bot – so nobody has to maintain the same list twice. If a term is also in the owner\'s personal glossary, the personal entry wins there.',
+    sharedReadOnly:
+      'This list is maintained by admins. You can read and export it – your own terms belong under "My glossary".',
     termLabel: 'Term or abbreviation',
     termPlaceholder: 'e.g. RZ',
     meaningLabel: 'Meaning (optional)',
     meaningPlaceholder: 'e.g. data centre',
     loading: 'Loading glossary…',
     empty: 'No entries yet – add your first term above.',
+    emptyShared: 'No shared entries yet – add the first term above.',
+    emptySharedReadOnly: 'No shared entries yet. Admins can add terms here.',
     columnTerm: 'Term',
     columnMeaning: 'Meaning',
     confirmDeleteTitle: 'Delete entry',
     confirmDeleteMessage: 'Remove "{{term}}" from the glossary?',
+    confirmDeleteMessageShared:
+      'Remove "{{term}}" from the shared glossary? This affects all users.',
     exportLabel: 'Export',
     importLabel: 'Import',
     importTitle: 'Import glossary',
+    importTitleShared: 'Import shared glossary',
     importIntro:
       'CSV file with the columns "Begriff" (term) and "Bedeutung" (meaning), separated by semicolons – the format Excel uses in German locales. A header row is allowed, lines starting with # are skipped. Existing terms are updated with the meaning from the file and new ones are added; nothing is deleted.',
     importExample:

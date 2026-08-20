@@ -203,6 +203,116 @@ class GlossaryServiceTest {
         }
     }
 
+    /**
+     * Gemeinsames Glossar der Installation + persoenliches des Aufnahme-Besitzers:
+     * beide gehen in den Prompt ein, bei gleichem Begriff gewinnt das persoenliche.
+     */
+    @Nested
+    class Zusammenfuehrung {
+
+        private final UUID other = UUID.randomUUID();
+
+        @Test
+        void beideListenGehenEinUndBleibenAlphabetisch() {
+            List<GlossaryEntry> merged = GlossaryService.merge(
+                    List.of(GlossaryEntry.create(null, "RZ", "Rechenzentrum"),
+                            GlossaryEntry.create(null, "Alpha", "Projekt Alpha")),
+                    List.of(GlossaryEntry.create(owner, "Jour Fixe", "Wochenrunde")));
+
+            assertThat(merged).extracting(GlossaryEntry::getTerm)
+                    .containsExactly("Alpha", "Jour Fixe", "RZ");
+        }
+
+        @Test
+        void beiGleichemBegriffGewinntDerPersoenlicheEintrag() {
+            List<GlossaryEntry> merged = GlossaryService.merge(
+                    List.of(GlossaryEntry.create(null, "RZ", "Rechenzentrum")),
+                    List.of(GlossaryEntry.create(owner, "rz", "Rechtsabteilung Zentrale")));
+
+            assertThat(merged).singleElement().satisfies(e -> {
+                assertThat(e.getTerm()).isEqualTo("rz");
+                assertThat(e.getMeaning()).isEqualTo("Rechtsabteilung Zentrale");
+                assertThat(e.getOwnerId()).isEqualTo(owner);
+            });
+        }
+
+        @Test
+        void promptBlockNimmtGemeinsamesUndPersoenlichesGlossar() {
+            GlossaryEntryRepo repo = mock(GlossaryEntryRepo.class);
+            SettingsService settings = mock(SettingsService.class);
+            when(settings.getInt(SettingsService.CORRECTION_GLOSSARY_MAX_CHARS)).thenReturn(NO_CAP);
+            when(repo.findByOwnerIdIsNullOrderByTermKeyAsc()).thenReturn(
+                    List.of(GlossaryEntry.create(null, "Alpha", "Projekt Alpha"),
+                            GlossaryEntry.create(null, "RZ", "Rechenzentrum")));
+            when(repo.findByOwnerIdOrderByTermKeyAsc(owner)).thenReturn(
+                    List.of(GlossaryEntry.create(owner, "RZ", "Rechtsabteilung")));
+
+            String block = new GlossaryService(repo, settings).promptBlock(owner);
+
+            assertThat(block).isEqualTo("""
+                    - Alpha = Projekt Alpha
+                    - RZ = Rechtsabteilung
+                    """);
+        }
+
+        /** Die Obergrenze gilt fuer das Ergebnis, nicht je Liste. */
+        @Test
+        void obergrenzeGiltFuerDasZusammengefuehrteErgebnis() {
+            GlossaryEntryRepo repo = mock(GlossaryEntryRepo.class);
+            SettingsService settings = mock(SettingsService.class);
+            when(settings.getInt(SettingsService.CORRECTION_GLOSSARY_MAX_CHARS)).thenReturn(45);
+            when(repo.findByOwnerIdIsNullOrderByTermKeyAsc()).thenReturn(
+                    List.of(GlossaryEntry.create(null, "Alpha", "A".repeat(30))));
+            when(repo.findByOwnerIdOrderByTermKeyAsc(owner)).thenReturn(
+                    List.of(GlossaryEntry.create(owner, "Beta", "B".repeat(30))));
+
+            String block = new GlossaryService(repo, settings).promptBlock(owner);
+
+            assertThat(block.length()).isLessThanOrEqualTo(45);
+            assertThat(block).contains("Alpha").doesNotContain("Beta");
+        }
+
+        /** Das Glossar eines anderen Nutzers hat mit dieser Aufnahme nichts zu tun. */
+        @Test
+        void fremdeGlossareBleibenAussen() {
+            GlossaryEntryRepo repo = mock(GlossaryEntryRepo.class);
+            SettingsService settings = mock(SettingsService.class);
+            when(settings.getInt(SettingsService.CORRECTION_GLOSSARY_MAX_CHARS)).thenReturn(NO_CAP);
+            when(repo.findByOwnerIdIsNullOrderByTermKeyAsc()).thenReturn(List.of());
+            when(repo.findByOwnerIdOrderByTermKeyAsc(owner)).thenReturn(List.of());
+            when(repo.findByOwnerIdOrderByTermKeyAsc(other)).thenReturn(
+                    List.of(GlossaryEntry.create(other, "Fremd", "nicht hier")));
+
+            assertThat(new GlossaryService(repo, settings).promptBlock(owner)).isEmpty();
+        }
+    }
+
+    /** Derselbe CSV-Import fuellt auch das gemeinsame Glossar (Eintraege ohne Besitzer). */
+    @Test
+    void importInsGemeinsameGlossarLegtEintraegeOhneBesitzerAn() {
+        GlossaryEntryRepo repo = mock(GlossaryEntryRepo.class);
+        List<GlossaryEntry> stored = new ArrayList<>();
+        when(repo.save(any(GlossaryEntry.class))).thenAnswer(inv -> {
+            stored.add(inv.getArgument(0));
+            return inv.getArgument(0);
+        });
+        when(repo.countByOwnerIdIsNull()).thenAnswer(inv -> (long) stored.size());
+        when(repo.findByOwnerIdIsNullAndTermKey(anyString())).thenAnswer(inv -> {
+            String key = inv.getArgument(0);
+            return stored.stream().filter(e -> e.getTermKey().equals(key)).findFirst();
+        });
+        GlossaryService service = new GlossaryService(repo, mock(SettingsService.class));
+
+        GlossaryService.ImportResult result = service.importCsv(null,
+                "Begriff;Bedeutung\nBBB;BigBlueButton\n".getBytes(StandardCharsets.UTF_8));
+
+        assertThat(result.created()).isEqualTo(1);
+        assertThat(stored).singleElement().satisfies(e -> {
+            assertThat(e.getTerm()).isEqualTo("BBB");
+            assertThat(e.isShared()).isTrue();
+        });
+    }
+
     @Test
     void vergleichsformIgnoriertSchreibweiseUndRandLeerzeichen() {
         assertThat(GlossaryEntry.normalizeKey("  RZ ")).isEqualTo("rz");

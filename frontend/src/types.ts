@@ -181,7 +181,13 @@ export interface TranscriptView {
   correctionStatus: CorrectionStatus | null;
 }
 
-/** Eintrag im persönlichen Glossar (Abkürzung/Fachbegriff). */
+/**
+ * Geltungsbereich eines Glossars: die eigene Liste oder die gemeinsame der
+ * Installation (gepflegt von Admins, gelesen von allen).
+ */
+export type GlossaryScope = 'personal' | 'shared';
+
+/** Eintrag im Glossar (Abkürzung/Fachbegriff). */
 export interface GlossaryEntryView {
   id: string;
   term: string;

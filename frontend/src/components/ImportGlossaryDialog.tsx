@@ -3,22 +3,28 @@ import Modal from './Modal';
 import Alert from './Alert';
 import { errorMessage, importGlossary } from '../api/client';
 import { useI18n } from '../i18n';
-import type { GlossaryImportResult } from '../types';
+import type { GlossaryImportResult, GlossaryScope } from '../types';
 
 const ACCEPT = '.csv,.txt,text/csv,text/plain';
 
 interface ImportGlossaryDialogProps {
+  /** In welche Liste eingelesen wird: eigenes oder gemeinsames Glossar. */
+  scope: GlossaryScope;
   onClose: () => void;
   /** Wird nach erfolgreichem Import mit dem Ergebnis aufgerufen. */
   onImported: (result: GlossaryImportResult) => void;
 }
 
 /**
- * Dialog zum Einlesen einer CSV-Datei ins persönliche Glossar. Der Import führt
- * zusammen: vorhandene Begriffe werden aktualisiert, neue angelegt, nicht
- * genannte bleiben stehen – gelöscht wird nie.
+ * Dialog zum Einlesen einer CSV-Datei ins Glossar. Der Import führt zusammen:
+ * vorhandene Begriffe werden aktualisiert, neue angelegt, nicht genannte bleiben
+ * stehen – gelöscht wird nie.
  */
-export default function ImportGlossaryDialog({ onClose, onImported }: ImportGlossaryDialogProps) {
+export default function ImportGlossaryDialog({
+  scope,
+  onClose,
+  onImported,
+}: ImportGlossaryDialogProps) {
   const { t } = useI18n();
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -29,7 +35,7 @@ export default function ImportGlossaryDialog({ onClose, onImported }: ImportGlos
     setBusy(true);
     setError(null);
     try {
-      onImported(await importGlossary(file));
+      onImported(await importGlossary(file, scope));
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -39,7 +45,7 @@ export default function ImportGlossaryDialog({ onClose, onImported }: ImportGlos
 
   return (
     <Modal
-      title={t('glossary.importTitle')}
+      title={scope === 'shared' ? t('glossary.importTitleShared') : t('glossary.importTitle')}
       onClose={busy ? () => {} : onClose}
       footer={
         <>

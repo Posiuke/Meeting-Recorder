@@ -114,6 +114,15 @@ class MigrationSchemaIT {
                 recording.getOwnerId(), "RZ", "Rechenzentrum"));
         assertThat(glossaryRepo.findByOwnerIdAndTermKey(recording.getOwnerId(), "rz")).isPresent();
 
+        // Gemeinsames Glossar der Installation (V22): derselbe Begriff darf
+        // zusaetzlich ohne Besitzer stehen - die Teil-Indexe trennen die Listen.
+        glossaryRepo.saveAndFlush(GlossaryEntry.create(null, "RZ", "Rechenzentrum Nord"));
+        assertThat(glossaryRepo.findByOwnerIdIsNullAndTermKey("rz"))
+                .get()
+                .satisfies(e -> assertThat(e.isShared()).isTrue());
+        assertThat(glossaryRepo.findByOwnerIdIsNullOrderByTermKeyAsc()).hasSize(1);
+        assertThat(glossaryRepo.countByOwnerIdIsNull()).isEqualTo(1);
+
         // Oeffentlicher Freigabe-Link (V18)
         ShareLink link = ShareLink.create(recording.getId(), "token-" + UUID.randomUUID(),
                 recording.getOwnerId(), null, true);

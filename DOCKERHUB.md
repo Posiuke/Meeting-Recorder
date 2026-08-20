@@ -16,7 +16,7 @@ in **einem** Container; PostgreSQL läuft separat.
 - 📤 **Datei-Upload**: vorhandene Audio-/Videodateien (MP3, WAV, M4A, MP4, MKV …) als Aufnahme übernehmen und auswerten — die Auswertungs-Vorlage ist schon im Upload-Dialog wählbar
 - 🖥️ **Bildschirmaufnahme im Browser**: Bildschirm/Fenster/Tab samt Systemton und optionalem Mikrofon direkt im Tool aufnehmen — für Termine ohne Bot (Teams/Zoom/WebEx, Präsenz). **Erfordert HTTPS** und Chrome/Edge, siehe [docs/SCREEN_CAPTURE.md](docs/SCREEN_CAPTURE.md)
 - 📝 **Transkription** wahlweise über einen **eigenen Whisper-Server** (optional mit Sprechertrennung/WhisperX) oder eine **OpenAI-kompatible Cloud-API** — mit fortlaufenden Zeitstempeln über die ganze Aufnahme und strukturierter Anzeige im UI
-- ✨ **KI-Glättung des Transkripts** vor der Auswertung (Füllwörter, Satzzeichen, Erkennungsfehler) — Original bleibt erhalten, im Transkript-Tab umschaltbar; dazu ein **persönliches Glossar** für Abkürzungen und Fachbegriffe
+- ✨ **KI-Glättung des Transkripts** vor der Auswertung (Füllwörter, Satzzeichen, Erkennungsfehler) — Original bleibt erhalten, im Transkript-Tab umschaltbar; dazu ein **persönliches und ein gemeinsames Glossar** für Abkürzungen und Fachbegriffe
 - 🤖 **KI-Zusammenfassung** über jeden **OpenAI-kompatiblen** Chat-Endpoint — lokal (vLLM, Ollama) oder Cloud (OpenAI, Anthropic, Google Gemini, Groq, Mistral …)
 - 🏷️ **Schlagworte & Suche**: Aufnahmen verschlagworten, nach Schlagwort filtern und in Titel, Meeting-URL, Schlagworten sowie auf Wunsch in **Transkript und Zusammenfassung** suchen
 - 🎛️ **Auswertung pro Aufnahme anpassbar**: eigener Auswertungs-Prompt (mit Vorlagen für Vortrag, Interview, Sprachnotiz), maximale Länge, Sprache der Zusammenfassung — und die Sprache der Spracherkennung (auch „automatisch erkennen")
@@ -172,8 +172,10 @@ Zeitstempel und Sprecher-Labels werden nicht dem Modell überlassen: Es bekommt 
 die nummerierten Sätze, die Struktur setzt das Backend selbst wieder davor. Fällt
 die Glättung aus, läuft die Auswertung unbeeinträchtigt mit dem Original weiter.
 
-Unter **Glossar** pflegt jeder Nutzer eigene Abkürzungen und Fachbegriffe; bei
-einer Aufnahme geht das Glossar ihres Besitzers in den Glättungs-Prompt ein.
+Unter **Glossar** stehen zwei Listen: das eigene und ein **gemeinsames Glossar
+der Installation**, das Admins pflegen und alle lesen dürfen. Bei einer Aufnahme
+gehen beide in den Glättungs-Prompt ein — das gemeinsame und das persönliche ihres
+Besitzers; steht ein Begriff in beiden, gewinnt der persönliche Eintrag.
 
 | Einstellung | Standard | Bedeutung |
 |---|---|---|
