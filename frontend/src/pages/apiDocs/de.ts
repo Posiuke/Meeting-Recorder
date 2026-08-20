@@ -266,6 +266,65 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
     },
 
     {
+      id: 'documents',
+      title: 'Beigefügte Unterlagen',
+      intro:
+        'Unterlagen zur Besprechung (Tagesordnung, Folien, Papiere). Ihr Text geht in jede weitere KI-Auswertung der Aufnahme ein. Text- und Markdown-Dateien liest der Server selbst; PDF, Office-Dateien und Scans brauchen einen Apache-Tika-Server (Admin-Einstellung documents.tikaUrl), OCR gescannter Seiten zusätzlich tesseract dort. Die Extraktion läuft im Hintergrund: status ist erst PENDING, dann READY oder FAILED – FAILED heißt auch „kein Text erkannt".',
+      endpoints: [
+        {
+          method: 'GET',
+          path: '/api/recordings/documents/config',
+          summary:
+            'Rahmenbedingungen: an/aus, Größenlimit, erlaubte Endungen, ob ein Tika-Server eingerichtet ist.',
+          response: `{ "enabled": true, "maxFileSizeBytes": 26214400,
+  "extensions": ["csv","doc","docx","md","pdf","png", "…"], "tikaConfigured": true }`,
+        },
+        {
+          method: 'GET',
+          path: '/api/recordings/{id}/documents',
+          summary: 'Unterlagen der Aufnahme (ohne den extrahierten Text selbst).',
+          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/recordings/$ID/documents"`,
+          response: `[
+  { "id": "8c2a...", "filename": "tagesordnung.md", "sizeBytes": 1240,
+    "status": "READY", "textChars": 830, "error": null }
+]`,
+        },
+        {
+          method: 'POST',
+          path: '/api/recordings/{id}/documents',
+          summary:
+            'Unterlage hinzufügen (multipart/form-data, Feld file; nur Besitzer). Antwort: alle Unterlagen. Die Textextraktion läuft danach im Hintergrund.',
+          example: `curl -s -H "X-API-Key: $KEY" -F file=@tagesordnung.pdf \\
+  "$BBB/api/recordings/$ID/documents"`,
+        },
+        {
+          method: 'GET',
+          path: '/api/recordings/{id}/documents/{documentId}/text',
+          summary:
+            'Der extrahierte Text – so ist nachsehbar, was die KI aus der Datei bekommt. 404, solange keiner vorliegt.',
+        },
+        {
+          method: 'GET',
+          path: '/api/recordings/{id}/documents/{documentId}/download',
+          summary: 'Die Originaldatei.',
+          example: `curl -s -H "X-API-Key: $KEY" -OJ \\
+  "$BBB/api/recordings/$ID/documents/$DOCID/download"`,
+        },
+        {
+          method: 'POST',
+          path: '/api/recordings/{id}/documents/{documentId}/extract',
+          summary:
+            'Textextraktion erneut anstoßen (nur Besitzer) – gedacht für den Fall, dass Tika oder OCR erst nach dem Hochladen eingerichtet wurde.',
+        },
+        {
+          method: 'DELETE',
+          path: '/api/recordings/{id}/documents/{documentId}',
+          summary: 'Unterlage entfernen (nur Besitzer). Antwort: alle verbliebenen.',
+        },
+      ],
+    },
+
+    {
       id: 'transcriptions',
       title: 'Direkt transkribieren',
       intro:

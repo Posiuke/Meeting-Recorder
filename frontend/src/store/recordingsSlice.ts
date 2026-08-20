@@ -1,10 +1,11 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
-import { api, errorMessage } from '../api/client';
+import { api, errorMessage, uploadRecordingDocument } from '../api/client';
 import { translate } from '../i18n';
 import type {
   JobView,
   ParticipantView,
   RecordingDetail,
+  RecordingDocumentView,
   RecordingView,
   ShareLinkView,
   ShareView,
@@ -325,6 +326,53 @@ export const setCurrentSummary = createAsyncThunk<
   }
 });
 
+/**
+ * Unterlage hinzufügen. Die Antwort ist die ganze Liste, weil die Textextraktion
+ * im Hintergrund läuft und die Zustände der übrigen sich geändert haben können.
+ */
+export const addRecordingDocument = createAsyncThunk<
+  RecordingDocumentView[],
+  { recordingId: string; file: File },
+  { rejectValue: string }
+>('recordings/addDocument', async ({ recordingId, file }, { rejectWithValue }) => {
+  try {
+    return await uploadRecordingDocument(recordingId, file);
+  } catch (e) {
+    return rejectWithValue(errorMessage(e));
+  }
+});
+
+export const deleteRecordingDocument = createAsyncThunk<
+  RecordingDocumentView[],
+  { recordingId: string; documentId: string },
+  { rejectValue: string }
+>('recordings/deleteDocument', async ({ recordingId, documentId }, { rejectWithValue }) => {
+  try {
+    return await api<RecordingDocumentView[]>(
+      `/api/recordings/${recordingId}/documents/${documentId}`,
+      { method: 'DELETE' },
+    );
+  } catch (e) {
+    return rejectWithValue(errorMessage(e));
+  }
+});
+
+/** Textextraktion erneut anstoßen – z.B. nachdem der Admin Tika eingerichtet hat. */
+export const extractRecordingDocument = createAsyncThunk<
+  RecordingDocumentView[],
+  { recordingId: string; documentId: string },
+  { rejectValue: string }
+>('recordings/extractDocument', async ({ recordingId, documentId }, { rejectWithValue }) => {
+  try {
+    return await api<RecordingDocumentView[]>(
+      `/api/recordings/${recordingId}/documents/${documentId}/extract`,
+      { method: 'POST' },
+    );
+  } catch (e) {
+    return rejectWithValue(errorMessage(e));
+  }
+});
+
 export const fetchShares = createAsyncThunk<ShareView[], string, { rejectValue: string }>(
   'recordings/fetchShares',
   async (recordingId, { rejectWithValue }) => {
@@ -546,6 +594,21 @@ const recordingsSlice = createSlice({
       .addCase(setCurrentSummary.fulfilled, (state, action) => {
         if (state.detail) {
           state.detail.summaries = action.payload;
+        }
+      })
+      .addCase(addRecordingDocument.fulfilled, (state, action) => {
+        if (state.detail) {
+          state.detail.documents = action.payload;
+        }
+      })
+      .addCase(deleteRecordingDocument.fulfilled, (state, action) => {
+        if (state.detail) {
+          state.detail.documents = action.payload;
+        }
+      })
+      .addCase(extractRecordingDocument.fulfilled, (state, action) => {
+        if (state.detail) {
+          state.detail.documents = action.payload;
         }
       })
       .addCase(fetchShares.pending, (state) => {

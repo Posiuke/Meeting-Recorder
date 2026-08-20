@@ -1,12 +1,14 @@
 package bbbbot.startup;
 
 import bbbbot.config.AppProperties;
+import bbbbot.docs.RecordingDocumentService;
 import bbbbot.domain.BotSession;
 import bbbbot.domain.ProcessingJob;
 import bbbbot.domain.Recording;
 import bbbbot.domain.RecordingSegment;
 import bbbbot.repository.Repositories.BotSessionRepo;
 import bbbbot.repository.Repositories.ProcessingJobRepo;
+import bbbbot.repository.Repositories.RecordingDocumentRepo;
 import bbbbot.repository.Repositories.RecordingRepo;
 import bbbbot.repository.Repositories.RecordingSegmentRepo;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +32,8 @@ class StartupRecoveryTest {
     private RecordingRepo recordingRepo;
     private RecordingSegmentRepo segmentRepo;
     private ProcessingJobRepo jobRepo;
+    private RecordingDocumentRepo documentRepo;
+    private RecordingDocumentService documentService;
     private StartupRecovery recovery;
 
     @BeforeEach
@@ -38,6 +42,8 @@ class StartupRecoveryTest {
         recordingRepo = mock(RecordingRepo.class);
         segmentRepo = mock(RecordingSegmentRepo.class);
         jobRepo = mock(ProcessingJobRepo.class);
+        documentRepo = mock(RecordingDocumentRepo.class);
+        documentService = mock(RecordingDocumentService.class);
 
         AppProperties props = mock(AppProperties.class);
         AppProperties.Storage storage = mock(AppProperties.Storage.class);
@@ -49,9 +55,11 @@ class StartupRecoveryTest {
         when(recordingRepo.findByStatusIn(anyList())).thenReturn(List.of());
         when(recordingRepo.findByVideoStatusIn(anyList())).thenReturn(List.of());
         when(jobRepo.findByStatusOrderByCreatedAt(any())).thenReturn(List.of());
+        when(documentRepo.findByStatus(any())).thenReturn(List.of());
 
         this.tmp = tmp;
-        recovery = new StartupRecovery(sessionRepo, recordingRepo, segmentRepo, jobRepo, props);
+        recovery = new StartupRecovery(sessionRepo, recordingRepo, segmentRepo, jobRepo,
+                documentRepo, documentService, props);
     }
 
     private Path tmp;

@@ -1,12 +1,15 @@
 package bbbbot.startup;
 
 import bbbbot.config.AppProperties;
+import bbbbot.docs.RecordingDocumentService;
 import bbbbot.domain.BotSession;
 import bbbbot.domain.ProcessingJob;
 import bbbbot.domain.Recording;
+import bbbbot.domain.RecordingDocument;
 import bbbbot.domain.RecordingSegment;
 import bbbbot.repository.Repositories.BotSessionRepo;
 import bbbbot.repository.Repositories.ProcessingJobRepo;
+import bbbbot.repository.Repositories.RecordingDocumentRepo;
 import bbbbot.repository.Repositories.RecordingRepo;
 import bbbbot.repository.Repositories.RecordingSegmentRepo;
 import org.slf4j.Logger;
@@ -36,6 +39,7 @@ import java.util.List;
  *       zugehoerige Aufnahmen in PROCESSING -> RECORDED</li>
  *   <li>Videos in RECORDING/MUXING -> READY, falls die fertige MP4 schon auf der
  *       Platte liegt, sonst FAILED - unabhaengig vom Status der Aufnahme</li>
+ *   <li>Unterlagen mit unterbrochener Textextraktion (PENDING) -> neu eingereiht</li>
  *   <li>verwaiste Video-Temp-Verzeichnisse werden entfernt</li>
  * </ul>
  */
@@ -50,15 +54,21 @@ public class StartupRecovery implements ApplicationRunner {
     private final RecordingRepo recordingRepo;
     private final RecordingSegmentRepo segmentRepo;
     private final ProcessingJobRepo jobRepo;
+    private final RecordingDocumentRepo documentRepo;
+    private final RecordingDocumentService documentService;
     private final AppProperties props;
 
     public StartupRecovery(BotSessionRepo sessionRepo, RecordingRepo recordingRepo,
                            RecordingSegmentRepo segmentRepo, ProcessingJobRepo jobRepo,
+                           RecordingDocumentRepo documentRepo,
+                           RecordingDocumentService documentService,
                            AppProperties props) {
         this.sessionRepo = sessionRepo;
         this.recordingRepo = recordingRepo;
         this.segmentRepo = segmentRepo;
         this.jobRepo = jobRepo;
+        this.documentRepo = documentRepo;
+        this.documentService = documentService;
         this.props = props;
     }
 
@@ -69,7 +79,24 @@ public class StartupRecovery implements ApplicationRunner {
         recoverRecordings();
         recoverVideos();
         recoverJobs();
+        recoverDocuments();
         sweepVideoTmp();
+    }
+
+    /**
+     * Unterlagen, deren Textextraktion der Neustart unterbrochen hat, werden neu
+     * eingereiht statt auf FAILED gesetzt: Die Datei liegt vollstaendig auf der
+     * Platte, ein zweiter Lauf kostet nur Rechenzeit - und ein Nutzer, der eine
+     * Unterlage hochgeladen hat, soll sie nicht von Hand erneut anstossen muessen.
+     */
+    private void recoverDocuments() {
+        List<RecordingDocument> pending = documentRepo.findByStatus(RecordingDocument.Status.PENDING);
+        for (RecordingDocument document : pending) {
+            documentService.retry(document);
+        }
+        if (!pending.isEmpty()) {
+            log.info("Recovery: {} Unterlage(n) zur Textextraktion neu eingereiht", pending.size());
+        }
     }
 
     private void recoverBotSessions() {

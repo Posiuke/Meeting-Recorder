@@ -132,6 +132,26 @@ public final class Dtos {
     }
 
     /** Haendisch bearbeiteter Inhalt einer Zusammenfassung. */
+    /**
+     * Eine der Aufnahme beigefuegte Unterlage. Der extrahierte Text selbst ist
+     * NICHT dabei - er kann hunderttausend Zeichen haben und wird bei Bedarf
+     * einzeln abgerufen ({@code /documents/{documentId}/text}).
+     *
+     * @param status    PENDING (Text wird noch geholt), READY, FAILED
+     * @param textChars Zeichen des extrahierten Textes; macht sichtbar, ob wirklich
+     *                  Text herauskam - ein Scan ohne OCR liefert nichts
+     * @param error     Grund, wenn kein Text herauskam (z.B. fehlender Tika-Server)
+     */
+    public record RecordingDocumentView(UUID id, String filename, String contentType,
+                                        long sizeBytes, String status, Integer textChars,
+                                        String error, Instant createdAt, Instant extractedAt) {
+        public static RecordingDocumentView of(bbbbot.domain.RecordingDocument d) {
+            return new RecordingDocumentView(d.getId(), d.getFilename(), d.getContentType(),
+                    d.getSizeBytes(), d.getStatus().name(), d.getTextChars(), d.getError(),
+                    d.getCreatedAt(), d.getExtractedAt());
+        }
+    }
+
     public record SummaryUpdateRequest(String markdown) {}
 
     public record JobView(UUID id, String status, boolean immediate, boolean transcribeOnly,
@@ -165,8 +185,20 @@ public final class Dtos {
     public record RecordingDetail(RecordingView recording, List<SegmentView> segments,
                                   List<SummaryView> summaries, List<JobView> jobs,
                                   List<ParticipantView> participants,
+                                  List<RecordingDocumentView> documents,
                                   String participantsLog, String chatLog,
                                   SummaryOptionsView summaryOptions) {}
+
+    /**
+     * Rahmenbedingungen fuer beigefuegte Unterlagen, damit die Oberflaeche nicht
+     * raten muss.
+     *
+     * @param tikaConfigured Ist ein Tika-Server eingerichtet? Ohne ihn lassen sich
+     *                       nur Text- und Markdown-Dateien auswerten - das gehoert
+     *                       vor den Upload gesagt, nicht danach.
+     */
+    public record DocumentConfigView(boolean enabled, long maxFileSizeBytes,
+                                     List<String> extensions, boolean tikaConfigured) {}
 
     /**
      * Teilnehmer einer Aufnahme: aus der Diarisierung erkannter Sprecher

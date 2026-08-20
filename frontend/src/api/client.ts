@@ -1,8 +1,10 @@
 import { translate } from '../i18n';
 import type {
+  DocumentConfigView,
   GlossaryImportResult,
   GlossaryScope,
   PublicShareView,
+  RecordingDocumentView,
   RecordingView,
   ShareLinkClaimView,
 } from '../types';
@@ -400,6 +402,42 @@ export function glossaryPath(scope: GlossaryScope): string {
 export function glossaryExportUrl(scope: GlossaryScope): string {
   const token = getToken() ?? '';
   return `${glossaryPath(scope)}/export?token=${encodeURIComponent(token)}`;
+}
+
+/** Rahmenbedingungen für beigefügte Unterlagen (an/aus, Größe, Endungen, Tika). */
+export function fetchDocumentConfig(): Promise<DocumentConfigView> {
+  return api<DocumentConfigView>('/api/recordings/documents/config');
+}
+
+/**
+ * Unterlage zu einer Aufnahme hinzufügen. Die Antwort ist die ganze Liste – die
+ * Textextraktion läuft danach im Hintergrund weiter.
+ */
+export function uploadRecordingDocument(
+  recordingId: string,
+  file: File,
+): Promise<RecordingDocumentView[]> {
+  const form = new FormData();
+  form.append('file', file);
+  return api<RecordingDocumentView[]>(`/api/recordings/${recordingId}/documents`, {
+    method: 'POST',
+    body: form,
+  });
+}
+
+/**
+ * Download-Adresse der Originaldatei. Token als Query-Parameter, weil der Download
+ * über einen normalen Link läuft (kein Header möglich).
+ */
+export function documentDownloadUrl(recordingId: string, documentId: string): string {
+  const token = getToken() ?? '';
+  return `/api/recordings/${recordingId}/documents/${documentId}/download?token=${encodeURIComponent(token)}`;
+}
+
+/** Adresse des extrahierten Textes – zum Nachsehen, was die KI aus der Datei bekommt. */
+export function documentTextUrl(recordingId: string, documentId: string): string {
+  const token = getToken() ?? '';
+  return `/api/recordings/${recordingId}/documents/${documentId}/text?token=${encodeURIComponent(token)}`;
 }
 
 /** Liest eine CSV-Datei in eine der Listen ein (zusammenführen, nichts wird gelöscht). */

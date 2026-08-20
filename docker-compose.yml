@@ -92,6 +92,25 @@ services:
     shm_size: "1gb"
     restart: unless-stopped
 
+  # --- Textextraktion fuer beigefuegte Unterlagen (optional) ---
+  # Nur noetig, wenn Nutzer PDFs, Office-Dateien oder Scans an eine Aufnahme
+  # haengen sollen (Text- und Markdown-Dateien liest die App selbst). Danach im
+  # Admin-Bereich unter "Beigefuegte Unterlagen" tikaUrl auf http://tika:9998
+  # setzen. Wer schon einen Tika-Server im Netz betreibt, laesst diesen Block
+  # weg und traegt dort dessen Adresse ein.
+  #
+  # Das Standard-Image bringt tesseract mit - damit liest Tika auch gescannte
+  # Seiten (OCR). Fuer deutsche Scans muss das Sprachpaket vorhanden sein;
+  # tika-docker enthaelt die gaengigen Sprachen (deu inklusive).
+  #
+  # tika:
+  #   image: apache/tika:latest-full
+  #   container_name: bbbbot-tika
+  #   restart: unless-stopped
+  #   # Kein Port nach aussen: Nur die App spricht mit Tika.
+  #   expose:
+  #     - "9998"
+
 # Von Docker verwaltete Volumes (Daten bleiben ueber Container-Neustarts hinweg
 # erhalten; werden erst bei `docker-compose down -v` geloescht).
 volumes:

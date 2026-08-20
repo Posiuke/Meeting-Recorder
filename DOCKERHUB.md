@@ -18,6 +18,7 @@ in **einem** Container; PostgreSQL läuft separat.
 - 📝 **Transkription** wahlweise über einen **eigenen Whisper-Server** (optional mit Sprechertrennung/WhisperX) oder eine **OpenAI-kompatible Cloud-API** — mit fortlaufenden Zeitstempeln über die ganze Aufnahme und strukturierter Anzeige im UI
 - ✨ **KI-Glättung des Transkripts** vor der Auswertung (Füllwörter, Satzzeichen, Erkennungsfehler) — Original bleibt erhalten, im Transkript-Tab umschaltbar; dazu ein **persönliches und ein gemeinsames Glossar** für Abkürzungen und Fachbegriffe
 - 🤖 **KI-Zusammenfassung** über jeden **OpenAI-kompatiblen** Chat-Endpoint — lokal (vLLM, Ollama) oder Cloud (OpenAI, Anthropic, Google Gemini, Groq, Mistral …)
+- 📎 **Beigefügte Unterlagen**: Tagesordnung, Folien oder Papiere zu einer Aufnahme hochladen — ihr Text geht in die Zusammenfassung ein (PDF/Office/OCR über einen Apache-Tika-Server)
 - 🏷️ **Schlagworte & Suche**: Aufnahmen verschlagworten, nach Schlagwort filtern und in Titel, Meeting-URL, Schlagworten sowie auf Wunsch in **Transkript und Zusammenfassung** suchen
 - 🎛️ **Auswertung pro Aufnahme anpassbar**: eigener Auswertungs-Prompt (mit Vorlagen für Vortrag, Interview, Sprachnotiz), maximale Länge, Sprache der Zusammenfassung — und die Sprache der Spracherkennung (auch „automatisch erkennen")
 - 📄 **Herunterladen als Markdown oder Word**: Transkript (geglättet oder Original) und Zusammenfassung als `.md` oder als `.doc`, das Word und LibreOffice direkt öffnen — von dort als DOCX oder PDF speicherbar
@@ -40,7 +41,7 @@ in **einem** Container; PostgreSQL läuft separat.
 ## Ports & Volumes
 
 - Port **8080** — UI + API
-- Volume **`/data/recordings`** — Aufnahmen, Transkripte, Zusammenfassungen, MP4s
+- Volume **`/data/recordings`** — Aufnahmen, Transkripte, Zusammenfassungen, MP4s, beigefügte Unterlagen
 
 ## Wichtige Umgebungsvariablen
 
@@ -213,6 +214,26 @@ Chrome/Edge (Firefox schneidet keinen Systemton mit).
 
 Einrichtung, Reverse-Proxy-Konfiguration und Fehlersuche:
 [docs/SCREEN_CAPTURE.md](docs/SCREEN_CAPTURE.md).
+
+## Beigefügte Unterlagen
+
+Im Reiter **Unterlagen** einer Aufnahme lässt sich beifügen, was in der
+Besprechung durchgesprochen wurde — Tagesordnung, Folien, Angebote. Ihr Text geht
+in die nächste KI-Auswertung ein, damit die Zusammenfassung das Thema kennt und
+nicht nur das Gesprochene.
+
+Text- und Markdown-Dateien liest die App selbst. **PDF, Office-Dateien und Scans
+brauchen einen Apache-Tika-Server**; die OCR gescannter Seiten macht Tika mit
+tesseract. Dafür in `docker-compose.yml` den auskommentierten `tika`-Service
+aktivieren (`apache/tika:latest-full` bringt tesseract mit) und im Admin-Bereich
+unter *Beigefügte Unterlagen* `tikaUrl` auf `http://tika:9998` setzen. Wer schon
+einen Tika-Server betreibt, trägt dort einfach dessen Adresse ein. Ohne ihn
+scheitern PDFs mit klarer Meldung — der Reiter sagt das vorher.
+
+Der Unterlagen-Abschnitt geht in **jeden** Auswertungsschritt ein; wie viel davon,
+begrenzen `documents.maxCharsPerDocument` (je Datei) und `documents.promptMaxChars`
+(gesamt). Bei einer Cloud-API verlassen die Unterlagen damit das eigene Netz. In
+der Freigabe-Ansicht erscheinen sie nicht.
 
 ## Auswertung pro Aufnahme anpassen
 

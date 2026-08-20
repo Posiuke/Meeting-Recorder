@@ -2,9 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
+  addRecordingDocument,
   clearDetail,
   deleteRecording,
+  deleteRecordingDocument,
   deleteSummary,
+  extractRecordingDocument,
   fetchRecordingDetail,
   fetchTranscript,
   processRecording,
@@ -26,7 +29,10 @@ import SummaryOptionsDialog from '../components/SummaryOptionsDialog';
 import TagEditor from '../components/TagEditor';
 import {
   audioUrl,
+  documentDownloadUrl,
+  documentTextUrl,
   errorMessage,
+  fetchDocumentConfig,
   fullAudioDownloadUrl,
   fullAudioUrl,
   summaryDownloadUrl,
@@ -38,7 +44,9 @@ import { formatBytes, formatDateTime, formatDuration } from '../utils/format';
 import { useI18n } from '../i18n';
 import type { TranslationKey } from '../i18n';
 import type {
+  DocumentConfigView,
   ParticipantView,
+  RecordingDocumentView,
   RecordingSource,
   RecordingStatus,
   SummaryView,
@@ -52,13 +60,14 @@ const SOURCE_KEYS: Record<RecordingSource, TranslationKey> = {
   CAPTURE: 'recordingDetail.sourceCapture',
 };
 
-type TabKey = 'summary' | 'transcript' | 'chat' | 'participants' | 'jobs';
+type TabKey = 'summary' | 'transcript' | 'chat' | 'participants' | 'documents' | 'jobs';
 
 const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
   { key: 'summary', labelKey: 'recordingDetail.tabSummary' },
   { key: 'transcript', labelKey: 'recordingDetail.tabTranscript' },
   { key: 'chat', labelKey: 'recordingDetail.tabChat' },
   { key: 'participants', labelKey: 'recordingDetail.tabParticipants' },
+  { key: 'documents', labelKey: 'recordingDetail.tabDocuments' },
   { key: 'jobs', labelKey: 'recordingDetail.tabJobs' },
 ];
 
@@ -146,14 +155,17 @@ export default function RecordingDetailPage() {
     (j) => j.status === 'PENDING' && j.immediate && !j.transcribeOnly,
   ) ?? false;
   useEffect(() => {
+    // Eine Unterlage in der Textextraktion (bei OCR dauert das Minuten) ist der
+    // dritte Grund weiterzufragen - sonst bliebe "wird gelesen…" stehen.
+    const documentsPending = detail?.documents.some((d) => d.status === 'PENDING') ?? false;
     const shouldPoll =
-      (status && POLL_STATUSES.includes(status)) || hasActiveJob || videoProcessing;
+      (status && POLL_STATUSES.includes(status)) || hasActiveJob || videoProcessing || documentsPending;
     if (!id || !shouldPoll) return;
     const timer = setInterval(() => {
       dispatch(fetchRecordingDetail({ id, silent: true }));
     }, 4000);
     return () => clearInterval(timer);
-  }, [dispatch, id, status, hasActiveJob, videoProcessing]);
+  }, [dispatch, id, status, hasActiveJob, videoProcessing, detail?.documents]);
 
   // Transkript erst laden, wenn der Tab geöffnet wird.
   useEffect(() => {
@@ -669,6 +681,8 @@ export default function RecordingDetailPage() {
           />
         )}
 
+        {tab === 'documents' && <DocumentsTab recordingId={id} canEdit={rec.mine} />}
+
         {tab === 'jobs' && (
           detail.jobs.length === 0 ? (
             <p className="muted">{t('recordingDetail.jobsEmpty')}</p>
@@ -874,6 +888,213 @@ function ParticipantsTab({
           <h3 className="participant-log-head">{t('recordingDetail.participantsLogHeading')}</h3>
           <pre className="log-pre">{participantsLog}</pre>
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Beigefügte Unterlagen einer Aufnahme: Tagesordnung, Folien, ein Papier, das
+ * durchgesprochen wurde. Ihr Text geht in die nächste KI-Auswertung ein.
+ *
+ * Der Zustand jeder Unterlage steht dabei: Bei einem Scan mit OCR dauert die
+ * Textextraktion Minuten, und ein Scan ohne OCR liefert gar nichts – das muss
+ * sichtbar sein, bevor jemand die Auswertung startet und sich wundert.
+ */
+function DocumentsTab({ recordingId, canEdit }: { recordingId: string; canEdit: boolean }) {
+  const { t } = useI18n();
+  const dispatch = useAppDispatch();
+  const documents = useAppSelector((s) => s.recordings.detail?.documents ?? []);
+  const [config, setConfig] = useState<DocumentConfigView | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<RecordingDocumentView | null>(null);
+  const fileInput = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchDocumentConfig()
+      .then((loaded) => {
+        if (!cancelled) setConfig(loaded);
+      })
+      .catch(() => {
+        // Ohne Konfiguration bleiben nur die Serverfehler beim Hochladen - das
+        // ist ärgerlich, aber kein Grund, den Tab leer zu lassen.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleUpload = async (file: File) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await dispatch(addRecordingDocument({ recordingId, file })).unwrap();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+      if (fileInput.current) fileInput.current.value = '';
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    setBusy(true);
+    try {
+      await dispatch(
+        deleteRecordingDocument({ recordingId, documentId: confirmDelete.id }),
+      ).unwrap();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+      setConfirmDelete(null);
+    }
+  };
+
+  const handleExtract = async (documentId: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await dispatch(extractRecordingDocument({ recordingId, documentId })).unwrap();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const accept = config ? config.extensions.map((e) => `.${e}`).join(',') : undefined;
+  const disabledByAdmin = config !== null && !config.enabled;
+
+  return (
+    <div className="documents-tab">
+      <p className="muted">{t('recordingDetail.documentsIntro')}</p>
+
+      {disabledByAdmin && <Alert kind="info">{t('recordingDetail.documentsDisabled')}</Alert>}
+      {config !== null && config.enabled && !config.tikaConfigured && (
+        <Alert kind="info">{t('recordingDetail.documentsNoTika')}</Alert>
+      )}
+      {error && <Alert kind="error">{error}</Alert>}
+
+      {canEdit && !disabledByAdmin && (
+        <div className="form-field documents-add">
+          <label htmlFor="document-file">{t('recordingDetail.documentsAddLabel')}</label>
+          <input
+            id="document-file"
+            type="file"
+            ref={fileInput}
+            accept={accept}
+            disabled={busy}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void handleUpload(file);
+            }}
+          />
+          <span className="muted">
+            {config
+              ? t('recordingDetail.documentsAddHint', {
+                  size: formatBytes(config.maxFileSizeBytes),
+                  types: config.extensions.join(', '),
+                })
+              : ''}
+          </span>
+        </div>
+      )}
+
+      {busy && <Spinner label={t('recordingDetail.documentsBusy')} />}
+
+      {documents.length === 0 ? (
+        <p className="muted">{t('recordingDetail.documentsEmpty')}</p>
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>{t('recordingDetail.documentsColumnName')}</th>
+                <th>{t('recordingDetail.documentsColumnSize')}</th>
+                <th>{t('common.status')}</th>
+                <th>{t('recordingDetail.documentsColumnText')}</th>
+                {canEdit && <th></th>}
+              </tr>
+            </thead>
+            <tbody>
+              {documents.map((document) => (
+                <tr key={document.id}>
+                  <td>
+                    <a href={documentDownloadUrl(recordingId, document.id)} download>
+                      {document.filename}
+                    </a>
+                  </td>
+                  <td>{formatBytes(document.sizeBytes)}</td>
+                  <td>
+                    <StatusBadge status={document.status} />
+                  </td>
+                  <td>
+                    {document.status === 'READY' && document.textChars !== null ? (
+                      <a
+                        href={documentTextUrl(recordingId, document.id)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {t('recordingDetail.documentsChars', { count: document.textChars })}
+                      </a>
+                    ) : document.status === 'PENDING' ? (
+                      <span className="muted">{t('recordingDetail.documentsExtracting')}</span>
+                    ) : (
+                      <span className="cell-error">
+                        {document.error ?? t('recordingDetail.documentsNoText')}
+                      </span>
+                    )}
+                  </td>
+                  {canEdit && (
+                    <td className="row-actions">
+                      {document.status === 'FAILED' && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          disabled={busy}
+                          title={t('recordingDetail.documentsRetryHint')}
+                          onClick={() => void handleExtract(document.id)}
+                        >
+                          {t('recordingDetail.documentsRetry')}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm btn-danger-text"
+                        disabled={busy}
+                        onClick={() => setConfirmDelete(document)}
+                      >
+                        {t('common.delete')}
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {documents.some((d) => d.status === 'READY') && (
+        <p className="muted documents-note">{t('recordingDetail.documentsEffectHint')}</p>
+      )}
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title={t('recordingDetail.documentsConfirmDeleteTitle')}
+          message={t('recordingDetail.documentsConfirmDeleteMessage', {
+            name: confirmDelete.filename,
+          })}
+          confirmLabel={t('common.delete')}
+          danger
+          busy={busy}
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmDelete(null)}
+        />
       )}
     </div>
   );

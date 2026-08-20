@@ -1,5 +1,6 @@
 package bbbbot.llm;
 
+import bbbbot.docs.RecordingDocumentService;
 import bbbbot.domain.Recording;
 import bbbbot.domain.RecordingSegment;
 import bbbbot.domain.Summary;
@@ -29,6 +30,10 @@ import java.util.UUID;
  * <p>Jede Auswertung legt eine weitere {@link Summary Fassung} an und macht sie
  * nach Erfolg zur aktuellen; die vorherigen bleiben stehen. Ueberschrieben wird
  * nichts - siehe {@link #makeCurrent(Recording, Summary)}.
+ *
+ * <p>Der Aufnahme beigefuegte Unterlagen (Tagesordnung, Folien, Papiere) gehen als
+ * eigener Abschnitt in jeden Aufruf ein - siehe
+ * {@link RecordingDocumentService#promptBlock(java.util.UUID)}.
  */
 @Service
 public class SummaryService {
@@ -39,13 +44,16 @@ public class SummaryService {
     private final SettingsService settings;
     private final SummaryRepo summaryRepo;
     private final ParticipantService participantService;
+    private final RecordingDocumentService documentService;
 
     public SummaryService(LlmClient llm, SettingsService settings, SummaryRepo summaryRepo,
-                          ParticipantService participantService) {
+                          ParticipantService participantService,
+                          RecordingDocumentService documentService) {
         this.llm = llm;
         this.settings = settings;
         this.summaryRepo = summaryRepo;
         this.participantService = participantService;
+        this.documentService = documentService;
     }
 
     /** Baut den Auswertungs-Kontext aus allen Quellen der Aufnahme. */
@@ -123,13 +131,20 @@ public class SummaryService {
 
         String context = buildContext(recording, segments);
         List<String> chunks = TextChunker.chunk(context, chunkChars);
-        log.info("Zusammenfassung fuer {}: {} Kontext-Zeichen in {} Chunk(s), Modell {} (T={})",
-                recording.getId(), context.length(), chunks.size(), model, temperature);
+        // Beigefuegte Unterlagen gehen in JEDEN Aufruf ein, nicht als Teil des
+        // Kontexts: Der wird in Bloecke geschnitten, und das Thema muss in jedem
+        // Block bekannt sein - auch beim Konsolidieren am Ende.
+        String documents = documentService.promptBlock(recording.getId());
+        log.info("Zusammenfassung fuer {}: {} Kontext-Zeichen in {} Chunk(s), {} Zeichen Unterlagen, "
+                        + "Modell {} (T={})",
+                recording.getId(), context.length(), chunks.size(), documents.length(),
+                model, temperature);
 
         try {
             StringBuilder partials = new StringBuilder();
             for (int i = 0; i < chunks.size(); i++) {
                 String userPrompt = "Sprache der Zusammenfassung: " + language + "\n\n"
+                        + documents
                         + (chunks.size() > 1
                         ? "Dies ist Teil %d von %d des Aufnahme-Kontexts. Fasse diesen Teil zusammen.\n\n".formatted(i + 1, chunks.size())
                         : "Fasse die folgende Aufnahme zusammen.\n\n" + lengthInstruction)
@@ -146,6 +161,7 @@ public class SummaryService {
                 markdown = partials.toString().replaceFirst("(?s)^--- Teil 1 ---\n", "").trim();
             } else {
                 String mergePrompt = "Sprache der Zusammenfassung: " + language + "\n\n"
+                        + documents
                         + "Die folgenden Teil-Zusammenfassungen stammen aus EINER Aufnahme. "
                         + "Konsolidiere sie zu einer einzigen, konsistenten Zusammenfassung "
                         + "mit der vorgegebenen Struktur. Entferne Redundanzen.\n\n"

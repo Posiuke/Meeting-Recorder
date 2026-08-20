@@ -32,6 +32,7 @@ const SETTING_GROUPS: SettingsGroupDef[] = [
   { titleKey: 'admin.groupLlm', prefix: 'llm.', noteKey: 'admin.groupLlmNote' },
   { titleKey: 'admin.groupCorrection', prefix: 'correction.', noteKey: 'admin.groupCorrectionNote' },
   { titleKey: 'admin.groupSummary', prefix: 'summary.' },
+  { titleKey: 'admin.groupDocuments', prefix: 'documents.', noteKey: 'admin.groupDocumentsNote' },
   { titleKey: 'admin.groupProcessing', prefix: 'processing.', noteKey: 'admin.groupProcessingNote' },
   { titleKey: 'admin.groupRecording', prefix: 'recording.' },
   { titleKey: 'admin.groupCapture', prefix: 'capture.', noteKey: 'admin.groupCaptureNote' },
@@ -53,6 +54,7 @@ const SECRET_KEYS = new Set(['llm.apiKey', 'whisper.openaiApiKey']);
 const TEST_ENDPOINTS: Record<string, string> = {
   'whisper.': '/api/admin/settings/test-whisper',
   'llm.': '/api/admin/settings/test-llm',
+  'documents.': '/api/admin/settings/test-tika',
 };
 
 /** Einstellungen mit fester Auswahl statt Freitext. */
@@ -60,6 +62,12 @@ const SELECT_OPTIONS: Record<string, { value: string; labelKey: TranslationKey }
   'whisper.provider': [
     { value: 'local', labelKey: 'admin.providerLocal' },
     { value: 'openai', labelKey: 'admin.providerOpenai' },
+  ],
+  'documents.ocrStrategy': [
+    { value: 'auto', labelKey: 'admin.ocrAuto' },
+    { value: 'no_ocr', labelKey: 'admin.ocrNone' },
+    { value: 'ocr_only', labelKey: 'admin.ocrOnly' },
+    { value: 'ocr_and_text_extraction', labelKey: 'admin.ocrBoth' },
   ],
 };
 
@@ -73,6 +81,14 @@ const KEY_HELP: Record<string, TranslationKey> = {
   'llm.baseUrl': 'admin.keyHelp.llmBaseUrl',
   'llm.apiKey': 'admin.keyHelp.llmApiKey',
   'llm.model': 'admin.keyHelp.llmModel',
+  'documents.enabled': 'admin.keyHelp.documentsEnabled',
+  'documents.maxMegabytes': 'admin.keyHelp.documentsMaxMegabytes',
+  'documents.tikaUrl': 'admin.keyHelp.documentsTikaUrl',
+  'documents.tikaTimeoutSec': 'admin.keyHelp.documentsTikaTimeoutSec',
+  'documents.ocrStrategy': 'admin.keyHelp.documentsOcrStrategy',
+  'documents.ocrLanguage': 'admin.keyHelp.documentsOcrLanguage',
+  'documents.maxCharsPerDocument': 'admin.keyHelp.documentsMaxCharsPerDocument',
+  'documents.promptMaxChars': 'admin.keyHelp.documentsPromptMaxChars',
   'llm.disableThinking': 'admin.keyHelp.llmDisableThinking',
   'correction.enabled': 'admin.keyHelp.correctionEnabled',
   'correction.systemPrompt': 'admin.keyHelp.correctionSystemPrompt',

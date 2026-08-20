@@ -3,11 +3,13 @@ package bbbbot.db;
 import bbbbot.domain.AppUser;
 import bbbbot.domain.GlossaryEntry;
 import bbbbot.domain.Recording;
+import bbbbot.domain.RecordingDocument;
 import bbbbot.domain.RecordingSegment;
 import bbbbot.domain.RecordingTag;
 import bbbbot.domain.ShareLink;
 import bbbbot.domain.Summary;
 import bbbbot.repository.Repositories.GlossaryEntryRepo;
+import bbbbot.repository.Repositories.RecordingDocumentRepo;
 import bbbbot.repository.Repositories.RecordingRepo;
 import bbbbot.repository.Repositories.RecordingSegmentRepo;
 import bbbbot.repository.Repositories.RecordingTagRepo;
@@ -82,6 +84,9 @@ class MigrationSchemaIT {
     private SummaryRepo summaryRepo;
 
     @Autowired
+    private RecordingDocumentRepo documentRepo;
+
+    @Autowired
     private EntityManager em;
 
     @Test
@@ -130,6 +135,23 @@ class MigrationSchemaIT {
                 .satisfies(e -> assertThat(e.isShared()).isTrue());
         assertThat(glossaryRepo.findByOwnerIdIsNullOrderByTermKeyAsc()).hasSize(1);
         assertThat(glossaryRepo.countByOwnerIdIsNull()).isEqualTo(1);
+
+        // Beigefuegte Unterlage (V25): Datei-Metadaten und extrahierter Text
+        RecordingDocument document = RecordingDocument.create(recording.getId(),
+                "tagesordnung.md", "text/markdown", recording.getOwnerId());
+        document.setStoredPath("/tmp/x/documents/tagesordnung.md");
+        document.setSizeBytes(1234);
+        document.setExtractedText("1. Projekt Nord");
+        document.setTextChars(15);
+        document.setStatus(RecordingDocument.Status.READY);
+        document.setExtractedAt(java.time.Instant.now());
+        documentRepo.saveAndFlush(document);
+        assertThat(documentRepo.findByRecordingIdOrderByCreatedAtAsc(recording.getId()))
+                .singleElement()
+                .satisfies(d -> assertThat(d.isUsable()).isTrue())
+                .satisfies(d -> assertThat(d.extension()).isEqualTo("md"));
+        assertThat(documentRepo.findByStatus(RecordingDocument.Status.PENDING)).isEmpty();
+        assertThat(documentRepo.countByRecordingId(recording.getId())).isEqualTo(1);
 
         // Oeffentlicher Freigabe-Link (V18)
         ShareLink link = ShareLink.create(recording.getId(), "token-" + UUID.randomUUID(),

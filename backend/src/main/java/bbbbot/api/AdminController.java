@@ -29,7 +29,10 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/** Admin-Funktionen: Einstellungen (STT/LLM/Zeitfenster/Bot), Authentifizierung und Admin-Rollen. */
+/**
+ * Admin-Funktionen: Einstellungen (STT/LLM/Tika/Zeitfenster/Bot), Verbindungstests,
+ * Authentifizierung und Admin-Rollen.
+ */
 @RestController
 @RequestMapping("/api/admin")
 public class AdminController {
@@ -42,11 +45,13 @@ public class AdminController {
     private final LlmClient llm;
     private final WhisperClient whisper;
     private final FfmpegService ffmpeg;
+    private final bbbbot.docs.TikaClient tika;
 
     public AdminController(SettingsService settings, AuthSettingsService authSettings,
                            LdapAuthenticator ldap, AppUserRepo userRepo,
                            RecordingRepo recordingRepo,
-                           LlmClient llm, WhisperClient whisper, FfmpegService ffmpeg) {
+                           LlmClient llm, WhisperClient whisper, FfmpegService ffmpeg,
+                           bbbbot.docs.TikaClient tika) {
         this.settings = settings;
         this.authSettings = authSettings;
         this.ldap = ldap;
@@ -55,6 +60,7 @@ public class AdminController {
         this.llm = llm;
         this.whisper = whisper;
         this.ffmpeg = ffmpeg;
+        this.tika = tika;
     }
 
     @GetMapping("/settings")
@@ -129,6 +135,29 @@ public class AdminController {
                 try { java.nio.file.Files.deleteIfExists(testFile); } catch (java.io.IOException ignored) {}
             }
         }
+    }
+
+    /**
+     * Testet den eingestellten Tika-Server mit einer winzigen Textdatei. Beweist
+     * Erreichbarkeit und Antwortverhalten - ob dort OCR (tesseract) eingerichtet
+     * ist, zeigt erst ein echter Scan.
+     */
+    @PostMapping("/settings/test-tika")
+    public Dtos.ConnectionTestResult testTika() {
+        if (!tika.isConfigured()) {
+            return new Dtos.ConnectionTestResult(false,
+                    "Kein Tika-Server eingerichtet (documents.tikaUrl) - ohne ihn lassen sich nur "
+                            + "Text- und Markdown-Dateien beifuegen", 0);
+        }
+        long start = System.currentTimeMillis();
+        var result = tika.testConnection();
+        long duration = System.currentTimeMillis() - start;
+        if (result.success()) {
+            return new Dtos.ConnectionTestResult(true,
+                    "Tika erreichbar (" + duration + " ms). OCR fuer Scans haengt davon ab, ob dort "
+                            + "tesseract installiert ist.", duration);
+        }
+        return new Dtos.ConnectionTestResult(false, result.error(), duration);
     }
 
     // ----------------------------------------------------- Authentifizierung

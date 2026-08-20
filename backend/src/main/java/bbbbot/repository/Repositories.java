@@ -12,6 +12,7 @@ import bbbbot.domain.PromptTemplate;
 import bbbbot.domain.Recording;
 import bbbbot.domain.RecordingSegment;
 import bbbbot.domain.RecordingTag;
+import bbbbot.domain.RecordingDocument;
 import bbbbot.domain.ShareGrant;
 import bbbbot.domain.ShareLink;
 import bbbbot.domain.Summary;
@@ -126,6 +127,14 @@ public interface Repositories {
 
     interface ParticipantRepo extends JpaRepository<Participant, UUID> {
         List<Participant> findByRecordingIdOrderBySpeakerLabelAsc(UUID recordingId);
+    }
+
+    interface RecordingDocumentRepo extends JpaRepository<RecordingDocument, UUID> {
+        List<RecordingDocument> findByRecordingIdOrderByCreatedAtAsc(UUID recordingId);
+        long countByRecordingId(UUID recordingId);
+
+        /** Nach einem Neustart haengengebliebene Extraktionen (Status PENDING). */
+        List<RecordingDocument> findByStatus(RecordingDocument.Status status);
     }
 
     interface SummaryRepo extends JpaRepository<Summary, UUID> {

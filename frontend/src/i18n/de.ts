@@ -621,7 +621,32 @@ export const de = {
     tabTranscript: 'Transkript',
     tabChat: 'Chat-Protokoll',
     tabParticipants: 'Teilnehmer',
+    tabDocuments: 'Unterlagen',
     tabJobs: 'Verarbeitung',
+    documentsIntro:
+      'Unterlagen zur Besprechung – Tagesordnung, Folien, ein Papier, das durchgesprochen wurde. Ihr Text geht in die KI-Auswertung ein, damit die Zusammenfassung das Thema kennt und nicht nur das Gesprochene. Die Dateien bleiben herunterladbar; in einer Freigabe-Ansicht erscheinen sie nicht.',
+    documentsDisabled:
+      'Beigefügte Unterlagen sind auf diesem Server abgeschaltet. Vorhandene gehen nicht in die Auswertung ein.',
+    documentsNoTika:
+      'Es ist kein Tika-Server eingerichtet: Auswerten lassen sich nur Text- und Markdown-Dateien. PDF, Office-Dateien und Scans brauchen ihn (Admin → Einstellungen → Beigefügte Unterlagen), OCR gescannter Seiten zusätzlich tesseract im Tika-Server.',
+    documentsAddLabel: 'Unterlage hinzufügen',
+    documentsAddHint: 'Max. {{size}} je Datei. Erlaubt: {{types}}',
+    documentsBusy: 'Wird verarbeitet…',
+    documentsEmpty: 'Noch keine Unterlage beigefügt.',
+    documentsColumnName: 'Datei',
+    documentsColumnSize: 'Größe',
+    documentsColumnText: 'Erkannter Text',
+    documentsChars: '{{count}} Zeichen',
+    documentsExtracting: 'Text wird gelesen…',
+    documentsNoText: 'Kein Text erkannt.',
+    documentsRetry: 'Erneut lesen',
+    documentsRetryHint:
+      'Liest den Text noch einmal – sinnvoll, nachdem der Administrator den Tika-Server oder die OCR eingerichtet hat.',
+    documentsEffectHint:
+      'Die Unterlagen wirken bei der nächsten Auswertung: „Erneut auswerten" legt eine neue Fassung der Zusammenfassung an, die sie berücksichtigt.',
+    documentsConfirmDeleteTitle: 'Unterlage entfernen',
+    documentsConfirmDeleteMessage:
+      'Soll „{{name}}" entfernt werden? Die Datei wird gelöscht und geht in künftige Auswertungen nicht mehr ein.',
     period: 'Zeitraum',
     meetingUrl: 'Meeting-URL',
     source: 'Quelle',
@@ -778,6 +803,9 @@ export const de = {
     groupCorrectionNote:
       'Zwischenschritt zwischen Spracherkennung und Auswertung: Das LLM glättet das Rohtranskript (Füllwörter, Satzzeichen, Erkennungsfehler) und bekommt dabei das persönliche Glossar des Aufnahme-Besitzers mit. Geglättet wird satzweise und in Schritten von chunkChars Zeichen – ein Satz wird nie über zwei Schritte zerschnitten. Das Original bleibt erhalten, im Transkript-Tab lässt sich umschalten. Ein Fehlschlag ist unkritisch: Dann wird mit dem Original weiter ausgewertet.',
     groupSummary: 'Zusammenfassung',
+    groupDocuments: 'Beigefügte Unterlagen',
+    groupDocumentsNote:
+      'Nutzer können einer Aufnahme Unterlagen beifügen (Tagesordnung, Folien, Papiere); ihr Text geht in die KI-Auswertung ein. Text- und Markdown-Dateien liest dieser Server selbst. Für PDF, Office-Dateien und Scans wird ein Apache-Tika-Server gebraucht (tikaUrl) – die OCR gescannter Seiten macht Tika, dort muss tesseract installiert sein. „Verbindung testen" prüft nur die Erreichbarkeit; ob OCR läuft, zeigt erst ein echter Scan. Achtung: Bei einer Cloud-API verlassen auch die Unterlagen das eigene Netz.',
     groupProcessing: 'Verarbeitungs-Zeitfenster',
     groupProcessingNote:
       'STT und KI-Auswertung laufen nur in diesem Zeitfenster, um tagsüber Ressourcen zu schonen. Nutzer können einzelne Aufnahmen per „Jetzt auswerten" sofort verarbeiten.',
@@ -791,6 +819,10 @@ export const de = {
     groupBot: 'Bot-Verhalten',
     groupCleanup: 'Aufräumen',
     groupOther: 'Sonstige',
+    ocrAuto: 'auto – OCR nur, wenn kaum Text eingebettet ist',
+    ocrNone: 'no_ocr – keine OCR, nur eingebetteter Text',
+    ocrOnly: 'ocr_only – immer OCR, eingebetteten Text ignorieren',
+    ocrBoth: 'ocr_and_text_extraction – beides und zusammenführen',
     providerLocal: 'local – Whisper-Server im Intranet',
     providerOpenai: 'openai – OpenAI-kompatible Cloud-API',
     authLoading: 'Authentifizierung wird geladen…',
@@ -857,6 +889,22 @@ export const de = {
         'Schaltet das interne „Nachdenken" von Reasoning-Modellen (Qwen3 und Verwandte) ab. Das Nachdenken läuft im selben Token-Budget wie die Antwort: Ist es an, verbraucht das Modell bei der Transkript-Glättung sein Budget und liefert eine leere Antwort. Für Glätten und Zusammenfassen bringt es nichts. Server, die den Schalter nicht kennen, ignorieren ihn.',
       llmModel:
         'Modellname beim Anbieter, z. B. gpt-4o-mini (OpenAI), claude-sonnet-5 (Anthropic) oder der Name des lokal geladenen Modells. Das ist die Vorgabe: Vorlagen und einzelne Aufnahmen dürfen ein anderes Modell wählen (Temperatur ebenso).',
+      documentsEnabled:
+        'Dürfen Nutzer einer Aufnahme Unterlagen beifügen? Aus = keine neuen Unterlagen, und vorhandene gehen NICHT mehr in den Auswertungs-Prompt ein (Datenschutz-Notbremse). Die Dateien bleiben liegen, bis sie gelöscht werden.',
+      documentsMaxMegabytes:
+        'Obergrenze für eine einzelne Unterlage. Schützt die Platte und den Tika-Server – ein 300-MB-Scan ist keine Besprechungsunterlage.',
+      documentsTikaUrl:
+        'Basis-Adresse des Apache-Tika-Servers, z. B. http://tika:9998 (die vollständige Adresse mit /tika ist auch erlaubt). Ohne ihn lassen sich nur Text- und Markdown-Dateien beifügen – PDF, Office-Dateien und Scans scheitern mit Hinweis. Dieser Server bringt keine eigene Textextraktion mit.',
+      documentsTikaTimeoutSec:
+        'Zeitlimit für eine Tika-Anfrage. OCR eines mehrseitigen Scans braucht Minuten – zu klein gesetzt scheitern genau die Dateien, für die man OCR eingerichtet hat.',
+      documentsOcrStrategy:
+        'Wie stark Tika bei PDFs auf OCR setzt. „auto" ist der Regelfall: OCR nur, wenn kaum Text eingebettet ist (ein digital erzeugtes PDF braucht keine). Voraussetzung für OCR ist tesseract im Tika-Server.',
+      documentsOcrLanguage:
+        'Sprache(n) für die OCR als tesseract-Kürzel, z. B. deu oder deu+eng. Ohne passende Sprache erkennt tesseract Umlaute und Fachwörter schlechter; das Sprachpaket muss im Tika-Server installiert sein.',
+      documentsMaxCharsPerDocument:
+        'Wie viel Text EINER Unterlage in den Prompt geht (0 = unbegrenzt). Verhindert, dass ein dickes Handbuch die übrigen Unterlagen verdrängt. Gespeichert wird der ganze Text – eine Erhöhung wirkt ohne erneute Extraktion.',
+      documentsPromptMaxChars:
+        'Obergrenze für den gesamten Unterlagen-Abschnitt im Prompt (0 = unbegrenzt). Der Abschnitt geht in JEDEN Auswertungsschritt ein und kostet dort Kontext – bei einem langen Meeting mehrfach.',
       correctionEnabled:
         'Schaltet die KI-Glättung des Transkripts ein. Aus = es wird nur das Whisper-Original gespeichert und ausgewertet. Bereits geglättete Aufnahmen behalten ihre Fassung.',
       correctionSystemPrompt:

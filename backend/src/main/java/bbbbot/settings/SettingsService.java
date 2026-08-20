@@ -95,6 +95,37 @@ public class SettingsService {
     /** SSRF-Schutz: komma-getrennte erlaubte Host-Suffixe fuer die Meeting-URL. Leer = keine Einschraenkung. */
     public static final String BOT_ALLOWED_URL_HOSTS = "bot.allowedUrlHosts";
 
+    /**
+     * Beigefuegte Unterlagen (Tagesordnung, Folien, Papiere) einer Aufnahme. Aus =
+     * keine neuen Unterlagen, und vorhandene gehen NICHT mehr in den Prompt ein -
+     * ein Ausschalten ist damit auch eine Datenschutz-Notbremse.
+     */
+    public static final String DOCUMENTS_ENABLED = "documents.enabled";
+    /** Obergrenze fuer eine einzelne Unterlage in Megabyte (Plattenschutz). */
+    public static final String DOCUMENTS_MAX_MEGABYTES = "documents.maxMegabytes";
+    /**
+     * Basis-URL des Apache-Tika-Servers fuer PDF, Office-Dateien und Scans. Leer =
+     * nur Text- und Markdown-Dateien lassen sich auswerten. OCR macht Tika (dort
+     * muss tesseract installiert sein) - dieser Server bringt keine eigene mit.
+     */
+    public static final String DOCUMENTS_TIKA_URL = "documents.tikaUrl";
+    /** Zeitlimit fuer eine Tika-Anfrage; OCR eines mehrseitigen Scans braucht Minuten. */
+    public static final String DOCUMENTS_TIKA_TIMEOUT_SEC = "documents.tikaTimeoutSec";
+    /**
+     * OCR-Strategie fuer PDFs, als Kopfzeile an Tika: auto (nur wenn kaum Text
+     * eingebettet ist), no_ocr, ocr_only, ocr_and_text_extraction.
+     */
+    public static final String DOCUMENTS_OCR_STRATEGY = "documents.ocrStrategy";
+    /** Sprache(n) fuer die OCR in Tika (tesseract-Sprachkuerzel, z.B. deu oder deu+eng). */
+    public static final String DOCUMENTS_OCR_LANGUAGE = "documents.ocrLanguage";
+    /** Zeichen je Unterlage im Prompt; 0 = unbegrenzt. Verhindert, dass ein dickes PDF alle anderen verdraengt. */
+    public static final String DOCUMENTS_MAX_CHARS_PER_DOCUMENT = "documents.maxCharsPerDocument";
+    /**
+     * Obergrenze fuer den gesamten Unterlagen-Block im Prompt; 0 = unbegrenzt. Der
+     * Block geht in JEDEN Auswertungsschritt ein und kostet dort Kontext.
+     */
+    public static final String DOCUMENTS_PROMPT_MAX_CHARS = "documents.promptMaxChars";
+
     /** Bildschirmaufnahme im Browser (getDisplayMedia) fuer Nutzer freigeschaltet. */
     public static final String CAPTURE_ENABLED = "capture.enabled";
     /** Obergrenze fuer eine einzelne Bildschirmaufnahme in Megabyte (Plattenschutz). */
@@ -141,6 +172,10 @@ public class SettingsService {
         "Automatische Audioaufzeichnung wurde gestartet. Wenn Sie die Aufzeichnung verhindern moechten, "
         + "schreiben Sie folgendes in den Chat: ${STOP}";
 
+    /** Von Tika unterstuetzte PDF-OCR-Strategien (Kopfzeile X-Tika-PDFOcrStrategy). */
+    private static final java.util.Set<String> OCR_STRATEGIES =
+            java.util.Set.of("auto", "no_ocr", "ocr_only", "ocr_and_text_extraction");
+
     private static final Map<String, String> DEFAULTS = new LinkedHashMap<>();
     static {
         DEFAULTS.put(WHISPER_PROVIDER, "local");
@@ -183,6 +218,17 @@ public class SettingsService {
         DEFAULTS.put(CORRECTION_CHUNK_CHARS, "3000");
         DEFAULTS.put(CORRECTION_MAX_SENTENCE_CHARS, "500");
         DEFAULTS.put(CORRECTION_GLOSSARY_MAX_CHARS, "12000");
+
+        DEFAULTS.put(DOCUMENTS_ENABLED, "true");
+        DEFAULTS.put(DOCUMENTS_MAX_MEGABYTES, "25");
+        DEFAULTS.put(DOCUMENTS_TIKA_URL, "");
+        DEFAULTS.put(DOCUMENTS_TIKA_TIMEOUT_SEC, "300");
+        DEFAULTS.put(DOCUMENTS_OCR_STRATEGY, "auto");
+        DEFAULTS.put(DOCUMENTS_OCR_LANGUAGE, "deu");
+        // Fair aufgeteilt statt "ein PDF nimmt alles": je Unterlage 4000 Zeichen,
+        // zusammen 12000. Der Block geht in jeden Schritt ein.
+        DEFAULTS.put(DOCUMENTS_MAX_CHARS_PER_DOCUMENT, "4000");
+        DEFAULTS.put(DOCUMENTS_PROMPT_MAX_CHARS, "12000");
 
         DEFAULTS.put(PROCESSING_WINDOW_START, "20:00");
         DEFAULTS.put(PROCESSING_WINDOW_END, "06:00");
@@ -283,12 +329,14 @@ public class SettingsService {
                      BOT_RECORD_MIN_OTHERS, BOT_CHECK_INTERVAL_MS, BOT_KEEPALIVE_INTERVAL_MS,
                      BOT_RECONNECT_MAX_ATTEMPTS, BOT_RECONNECT_BACKOFF_BASE_MS,
                      CAPTURE_MAX_MEGABYTES, CAPTURE_STALE_MINUTES,
+                     DOCUMENTS_MAX_MEGABYTES, DOCUMENTS_TIKA_TIMEOUT_SEC,
+                     DOCUMENTS_MAX_CHARS_PER_DOCUMENT, DOCUMENTS_PROMPT_MAX_CHARS,
                      CLEANUP_OLDER_THAN_DAYS -> Long.parseLong(value.trim());
                 case LLM_TEMPERATURE, BOT_RECONNECT_BACKOFF_FACTOR -> Double.parseDouble(value.trim());
                 case WHISPER_VAD_FILTER, WHISPER_DIARIZE, LLM_DISABLE_THINKING,
                      BOT_SEND_CHAT_WARNING, BOT_KEEPALIVE_ENABLED,
                      BOT_AUTO_RECONNECT, CAPTURE_ENABLED, CORRECTION_ENABLED, CLEANUP_ENABLED,
-                     SHARING_PUBLIC_LINKS -> {
+                     DOCUMENTS_ENABLED, SHARING_PUBLIC_LINKS -> {
                     if (!value.trim().equalsIgnoreCase("true") && !value.trim().equalsIgnoreCase("false")) {
                         throw new IllegalArgumentException("erwartet true/false");
                     }
@@ -297,6 +345,13 @@ public class SettingsService {
                 case WHISPER_PROVIDER -> {
                     if (!value.trim().equalsIgnoreCase("local") && !value.trim().equalsIgnoreCase("openai")) {
                         throw new IllegalArgumentException("erwartet local/openai");
+                    }
+                }
+                // Genau die Werte, die Tika als PDF-OCR-Strategie kennt. Ein Tippfehler
+                // wuerde sonst erst beim naechsten Scan als Tika-Fehler auffallen.
+                case DOCUMENTS_OCR_STRATEGY -> {
+                    if (!OCR_STRATEGIES.contains(value.trim().toLowerCase(java.util.Locale.ROOT))) {
+                        throw new IllegalArgumentException("erwartet " + String.join("/", OCR_STRATEGIES));
                     }
                 }
                 default -> { /* freie Textwerte */ }

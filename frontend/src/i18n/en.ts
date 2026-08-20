@@ -612,7 +612,32 @@ export const en: typeof de = {
     tabTranscript: 'Transcript',
     tabChat: 'Chat log',
     tabParticipants: 'Participants',
+    tabDocuments: 'Documents',
     tabJobs: 'Processing',
+    documentsIntro:
+      'Documents for the meeting – agenda, slides, a paper that was discussed. Their text feeds into the AI analysis so the summary knows the subject and not just what was said. The files stay downloadable; they do not appear in a share view.',
+    documentsDisabled:
+      'Attached documents are switched off on this server. Existing ones do not feed into the analysis.',
+    documentsNoTika:
+      'No Tika server is configured: only text and Markdown files can be analysed. PDF, Office files and scans need one (Admin → Settings → Attached documents); OCR of scanned pages additionally needs tesseract in the Tika server.',
+    documentsAddLabel: 'Add a document',
+    documentsAddHint: 'Max. {{size}} per file. Allowed: {{types}}',
+    documentsBusy: 'Working…',
+    documentsEmpty: 'No document attached yet.',
+    documentsColumnName: 'File',
+    documentsColumnSize: 'Size',
+    documentsColumnText: 'Extracted text',
+    documentsChars: '{{count}} characters',
+    documentsExtracting: 'Reading text…',
+    documentsNoText: 'No text found.',
+    documentsRetry: 'Read again',
+    documentsRetryHint:
+      'Reads the text once more – useful after the administrator has set up the Tika server or OCR.',
+    documentsEffectHint:
+      'The documents take effect with the next analysis: "Analyse again" creates a new version of the summary that takes them into account.',
+    documentsConfirmDeleteTitle: 'Remove document',
+    documentsConfirmDeleteMessage:
+      'Remove "{{name}}"? The file is deleted and will no longer feed into future analyses.',
     period: 'Period',
     meetingUrl: 'Meeting URL',
     source: 'Source',
@@ -767,6 +792,9 @@ export const en: typeof de = {
     groupCorrectionNote:
       'Intermediate step between speech recognition and analysis: the LLM smooths the raw transcript (filler words, punctuation, recognition errors) and receives the personal glossary of the recording owner. Smoothing happens sentence by sentence in steps of chunkChars characters – a sentence is never split across two steps. The original is kept; you can switch in the transcript tab. A failure is harmless: the analysis then continues with the original.',
     groupSummary: 'Summary',
+    groupDocuments: 'Attached documents',
+    groupDocumentsNote:
+      'Users can attach documents to a recording (agenda, slides, papers); their text feeds into the AI analysis. Text and Markdown files are read by this server itself. PDF, Office files and scans need an Apache Tika server (tikaUrl) – OCR of scanned pages is done by Tika, which requires tesseract to be installed there. "Test connection" only checks reachability; whether OCR works shows up with a real scan. Careful: with a cloud API the documents leave your network as well.',
     groupProcessing: 'Processing time window',
     groupProcessingNote:
       'STT and AI analysis only run within this window to spare resources during the day. Users can process individual recordings immediately via "Analyse now".',
@@ -780,6 +808,10 @@ export const en: typeof de = {
     groupBot: 'Bot behaviour',
     groupCleanup: 'Clean-up',
     groupOther: 'Other',
+    ocrAuto: 'auto – OCR only when little text is embedded',
+    ocrNone: 'no_ocr – no OCR, embedded text only',
+    ocrOnly: 'ocr_only – always OCR, ignore embedded text',
+    ocrBoth: 'ocr_and_text_extraction – both, merged',
     providerLocal: 'local – Whisper server on the intranet',
     providerOpenai: 'openai – OpenAI-compatible cloud API',
     authLoading: 'Loading authentication…',
@@ -844,6 +876,22 @@ export const en: typeof de = {
         'Turns off the internal "thinking" of reasoning models (Qwen3 and relatives). Thinking runs on the same token budget as the answer: with it enabled, the model spends its budget while smoothing transcripts and returns an empty answer. It adds nothing for smoothing or summarising. Servers that do not know the switch ignore it.',
       llmModel:
         'Model name at the provider, e.g. gpt-4o-mini (OpenAI), claude-sonnet-5 (Anthropic) or the name of the locally loaded model. This is the default: templates and individual recordings may pick a different model (same for the temperature).',
+      documentsEnabled:
+        'May users attach documents to a recording? Off = no new documents, and existing ones no longer feed into the analysis prompt (a data-protection emergency brake). The files stay on disk until deleted.',
+      documentsMaxMegabytes:
+        'Size limit for a single document. Protects the disk and the Tika server – a 300 MB scan is not a meeting document.',
+      documentsTikaUrl:
+        'Base address of the Apache Tika server, e.g. http://tika:9998 (the full address including /tika is accepted too). Without it only text and Markdown files can be attached – PDF, Office files and scans fail with a hint. This server ships no text extraction of its own.',
+      documentsTikaTimeoutSec:
+        'Time limit for one Tika request. OCR of a multi-page scan takes minutes – set too low, exactly the files you enabled OCR for will fail.',
+      documentsOcrStrategy:
+        'How hard Tika tries OCR on PDFs. "auto" is the normal case: OCR only when little text is embedded (a digitally created PDF needs none). OCR requires tesseract in the Tika server.',
+      documentsOcrLanguage:
+        'Language(s) for OCR as tesseract codes, e.g. deu or deu+eng. Without a matching language tesseract does worse on umlauts and technical terms; the language pack must be installed in the Tika server.',
+      documentsMaxCharsPerDocument:
+        'How much text of ONE document goes into the prompt (0 = unlimited). Keeps a thick manual from crowding out the other documents. The full text is stored – raising the limit takes effect without extracting again.',
+      documentsPromptMaxChars:
+        'Limit for the whole documents section in the prompt (0 = unlimited). The section goes into EVERY analysis step and costs context there – several times over for a long meeting.',
       correctionEnabled:
         'Enables AI smoothing of the transcript. Off = only the Whisper original is stored and analysed. Already smoothed recordings keep their version.',
       correctionSystemPrompt:

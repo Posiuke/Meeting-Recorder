@@ -263,6 +263,65 @@ curl -s -H "X-API-Key: $KEY" -F file=@note.m4a \\
     },
 
     {
+      id: 'documents',
+      title: 'Attached documents',
+      intro:
+        'Documents for the meeting (agenda, slides, papers). Their text feeds into every further AI analysis of the recording. Text and Markdown files are read by the server itself; PDF, Office files and scans need an Apache Tika server (admin setting documents.tikaUrl), and OCR of scanned pages needs tesseract there as well. Extraction runs in the background: status is PENDING first, then READY or FAILED – FAILED also means "no text found".',
+      endpoints: [
+        {
+          method: 'GET',
+          path: '/api/recordings/documents/config',
+          summary:
+            'The ground rules: on/off, size limit, allowed extensions, whether a Tika server is configured.',
+          response: `{ "enabled": true, "maxFileSizeBytes": 26214400,
+  "extensions": ["csv","doc","docx","md","pdf","png", "…"], "tikaConfigured": true }`,
+        },
+        {
+          method: 'GET',
+          path: '/api/recordings/{id}/documents',
+          summary: 'Documents of the recording (without the extracted text itself).',
+          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/recordings/$ID/documents"`,
+          response: `[
+  { "id": "8c2a...", "filename": "agenda.md", "sizeBytes": 1240,
+    "status": "READY", "textChars": 830, "error": null }
+]`,
+        },
+        {
+          method: 'POST',
+          path: '/api/recordings/{id}/documents',
+          summary:
+            'Attach a document (multipart/form-data, field file; owner only). Response: all documents. Text extraction then runs in the background.',
+          example: `curl -s -H "X-API-Key: $KEY" -F file=@agenda.pdf \\
+  "$BBB/api/recordings/$ID/documents"`,
+        },
+        {
+          method: 'GET',
+          path: '/api/recordings/{id}/documents/{documentId}/text',
+          summary:
+            'The extracted text – so you can check what the AI gets from the file. 404 while there is none.',
+        },
+        {
+          method: 'GET',
+          path: '/api/recordings/{id}/documents/{documentId}/download',
+          summary: 'The original file.',
+          example: `curl -s -H "X-API-Key: $KEY" -OJ \\
+  "$BBB/api/recordings/$ID/documents/$DOCID/download"`,
+        },
+        {
+          method: 'POST',
+          path: '/api/recordings/{id}/documents/{documentId}/extract',
+          summary:
+            'Run text extraction again (owner only) – for the case that Tika or OCR was set up after the upload.',
+        },
+        {
+          method: 'DELETE',
+          path: '/api/recordings/{id}/documents/{documentId}',
+          summary: 'Remove a document (owner only). Response: all remaining ones.',
+        },
+      ],
+    },
+
+    {
       id: 'transcriptions',
       title: 'Transcribe directly',
       intro:

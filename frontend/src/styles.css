@@ -853,6 +853,20 @@ tbody tr:hover {
   font-size: 0.8rem;
 }
 
+/* Beigefuegte Unterlagen: Dateiauswahl mit Hinweis, darunter die Liste */
+.documents-tab .documents-add {
+  margin: 1rem 0;
+}
+
+.documents-tab .documents-add span {
+  font-size: 0.8rem;
+}
+
+.documents-tab .documents-note {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
 /* Prompt einer Fassung - zugeklappt, weil er nur beim Vergleichen zaehlt */
 .summary-prompt {
   margin-bottom: 0.75rem;

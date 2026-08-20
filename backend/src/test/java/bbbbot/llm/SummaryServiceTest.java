@@ -1,5 +1,6 @@
 package bbbbot.llm;
 
+import bbbbot.docs.RecordingDocumentService;
 import bbbbot.domain.Recording;
 import bbbbot.domain.Summary;
 import bbbbot.recording.ParticipantService;
@@ -22,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -41,13 +43,17 @@ class SummaryServiceTest {
     private Recording recording;
     private LlmClient llm;
     private SettingsService settings;
+    private RecordingDocumentService documentService;
 
     @BeforeEach
     void setUp() {
         SummaryRepo repo = mock(SummaryRepo.class);
         llm = mock(LlmClient.class);
         settings = mock(SettingsService.class);
-        service = new SummaryService(llm, settings, repo, mock(ParticipantService.class));
+        documentService = mock(RecordingDocumentService.class);
+        when(documentService.promptBlock(any(UUID.class))).thenReturn("");
+        service = new SummaryService(llm, settings, repo, mock(ParticipantService.class),
+                documentService);
         recording = Recording.start(null, UUID.randomUUID(), null, dir.toString(), false, true, false);
 
         when(repo.save(any(Summary.class))).thenAnswer(inv -> {
@@ -221,6 +227,53 @@ class SummaryServiceTest {
 
         assertThat(summary.getModel()).isEqualTo("standard-modell");
         assertThat(summary.getTemperature()).isEqualTo(0.3);
+    }
+
+    /**
+     * Beigefuegte Unterlagen gehen in JEDEN Aufruf ein - auch ins Konsolidieren.
+     * Der Kontext wird in Bloecke geschnitten; stuende der Unterlagen-Abschnitt nur
+     * im Kontext, kaeme er in den spaeteren Bloecken nie an.
+     */
+    @Test
+    void unterlagenGehenInJedenAuswertungsschrittEin() {
+        when(settings.get(SettingsService.SUMMARY_SYSTEM_PROMPT)).thenReturn("Fasse zusammen.");
+        when(settings.get(SettingsService.SUMMARY_LANGUAGE)).thenReturn("de");
+        // Kleine Bloecke erzwingen mehrere Aufrufe plus einen Merge-Aufruf
+        when(settings.getInt(SettingsService.SUMMARY_CHUNK_CHARS)).thenReturn(200);
+        when(settings.get(SettingsService.LLM_MODEL)).thenReturn("modell");
+        when(settings.getDouble(SettingsService.LLM_TEMPERATURE)).thenReturn(0.3);
+        when(documentService.promptBlock(recording.getId()))
+                .thenReturn("# Beigefuegte Unterlagen\n## tagesordnung.md\n1. Projekt Nord\n\n");
+        when(llm.chat(anyString(), anyString(), any(LlmClient.Overrides.class)))
+                .thenReturn(new LlmClient.LlmResult(true, "# Teil", null));
+        recording.setParticipantsLog("Teilnehmer trat bei. ".repeat(60));
+
+        service.summarize(recording, List.of());
+
+        ArgumentCaptor<String> prompts = ArgumentCaptor.forClass(String.class);
+        verify(llm, atLeast(3)).chat(anyString(), prompts.capture(), any(LlmClient.Overrides.class));
+        assertThat(prompts.getAllValues())
+                .allSatisfy(prompt -> assertThat(prompt).contains("tagesordnung.md"));
+        // Der letzte Aufruf ist das Konsolidieren - auch dort stehen die Unterlagen
+        assertThat(prompts.getAllValues().getLast()).contains("Teil-Zusammenfassungen");
+    }
+
+    /** Ohne Unterlagen (oder abgeschaltet) entfaellt der Abschnitt ganz. */
+    @Test
+    void ohneUnterlagenBleibtDerPromptWieVorher() {
+        when(settings.get(SettingsService.SUMMARY_SYSTEM_PROMPT)).thenReturn("Fasse zusammen.");
+        when(settings.get(SettingsService.SUMMARY_LANGUAGE)).thenReturn("de");
+        when(settings.getInt(SettingsService.SUMMARY_CHUNK_CHARS)).thenReturn(12_000);
+        when(settings.get(SettingsService.LLM_MODEL)).thenReturn("modell");
+        when(settings.getDouble(SettingsService.LLM_TEMPERATURE)).thenReturn(0.3);
+        when(llm.chat(anyString(), anyString(), any(LlmClient.Overrides.class)))
+                .thenReturn(new LlmClient.LlmResult(true, "# Ergebnis", null));
+
+        service.summarize(recording, List.of());
+
+        ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
+        verify(llm).chat(anyString(), prompt.capture(), any(LlmClient.Overrides.class));
+        assertThat(prompt.getValue()).doesNotContain("Beigefuegte Unterlagen");
     }
 
     /** Eine gescheiterte Fassung darf die aktuelle nicht verdraengen. */

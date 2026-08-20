@@ -83,6 +83,7 @@ public class RecordingController {
     private final bbbbot.settings.SettingsService settings;
     private final ShareLinkService shareLinkService;
     private final bbbbot.recording.RecordingMediaService media;
+    private final bbbbot.docs.RecordingDocumentService documentService;
 
     public RecordingController(AccessService access, RecordingRepo recordingRepo,
                                RecordingSegmentRepo segmentRepo, SummaryRepo summaryRepo,
@@ -97,7 +98,8 @@ public class RecordingController {
                                ParticipantRepo participantRepo, SummaryService summaryService,
                                bbbbot.settings.SettingsService settings,
                                ShareLinkService shareLinkService,
-                               bbbbot.recording.RecordingMediaService media) {
+                               bbbbot.recording.RecordingMediaService media,
+                               bbbbot.docs.RecordingDocumentService documentService) {
         this.access = access;
         this.recordingRepo = recordingRepo;
         this.segmentRepo = segmentRepo;
@@ -118,6 +120,7 @@ public class RecordingController {
         this.settings = settings;
         this.shareLinkService = shareLinkService;
         this.media = media;
+        this.documentService = documentService;
     }
 
     // ---------------------------------------------------------------- Upload
@@ -207,6 +210,20 @@ public class RecordingController {
                 "maxFileSizeBytes", maxUploadSize.toBytes(),
                 "diarizeAllowed", settings.getBool(bbbbot.settings.SettingsService.WHISPER_DIARIZE),
                 "sttLanguage", settings.get(bbbbot.settings.SettingsService.WHISPER_LANGUAGE));
+    }
+
+    /**
+     * Rahmenbedingungen fuer beigefuegte Unterlagen (an/aus, Groesse, erlaubte
+     * Endungen, Tika eingerichtet). Neben upload-config, weil es dieselbe Frage
+     * beantwortet: Was darf ich hochladen, bevor ich es versuche?
+     */
+    @GetMapping("/documents/config")
+    public Dtos.DocumentConfigView documentConfig() {
+        return new Dtos.DocumentConfigView(
+                documentService.isEnabled(),
+                documentService.maxBytes(),
+                List.copyOf(bbbbot.docs.DocumentTextExtractor.allowedExtensions()),
+                documentService.tikaConfigured());
     }
 
     /**
@@ -334,8 +351,11 @@ public class RecordingController {
                 .map(Dtos.JobView::of).toList();
         List<Dtos.ParticipantView> participants = participantService.ensureFromTranscript(recording).stream()
                 .map(Dtos.ParticipantView::of).toList();
+        List<Dtos.RecordingDocumentView> documents = documentService.documentsOf(id).stream()
+                .map(Dtos.RecordingDocumentView::of).toList();
         return new Dtos.RecordingDetail(toView(recording, user), segments, summaries, jobs, participants,
-                recording.getParticipantsLog(), recording.getChatLog(), summaryOptionsView(recording));
+                documents, recording.getParticipantsLog(), recording.getChatLog(),
+                summaryOptionsView(recording));
     }
 
     @DeleteMapping("/{id}")

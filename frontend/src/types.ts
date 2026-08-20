@@ -306,12 +306,48 @@ export interface ParticipantView {
   displayName: string;
 }
 
+/**
+ * Zustand der Textextraktion einer Unterlage. FAILED heißt auch „kein Text
+ * herausgekommen" – ein Scan ohne OCR liefert nichts.
+ */
+export type DocumentStatus = 'PENDING' | 'READY' | 'FAILED';
+
+/**
+ * Eine der Aufnahme beigefügte Unterlage (Tagesordnung, Folien, Papier). Der
+ * extrahierte Text selbst ist hier nicht dabei – er kann sehr lang sein und wird
+ * bei Bedarf einzeln abgerufen.
+ */
+export interface RecordingDocumentView {
+  id: string;
+  filename: string;
+  contentType: string | null;
+  sizeBytes: number;
+  /** PENDING = Text wird noch geholt (bei OCR dauert das). */
+  status: DocumentStatus;
+  /** Zeichen des extrahierten Textes – zeigt, ob wirklich Text herauskam. */
+  textChars: number | null;
+  error: string | null;
+  createdAt: string;
+  extractedAt: string | null;
+}
+
+/** Rahmenbedingungen für beigefügte Unterlagen (Admin-Einstellungen). */
+export interface DocumentConfigView {
+  enabled: boolean;
+  maxFileSizeBytes: number;
+  /** Erlaubte Dateiendungen ohne Punkt. */
+  extensions: string[];
+  /** Ist ein Tika-Server eingerichtet? Ohne ihn gehen nur Text- und Markdown-Dateien. */
+  tikaConfigured: boolean;
+}
+
 export interface RecordingDetail {
   recording: RecordingView;
   segments: SegmentView[];
   summaries: SummaryView[];
   jobs: JobView[];
   participants: ParticipantView[];
+  documents: RecordingDocumentView[];
   participantsLog: string | null;
   chatLog: string | null;
   summaryOptions: SummaryOptionsView;

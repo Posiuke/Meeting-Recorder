@@ -32,6 +32,10 @@ docs/       Anleitungen (u.a. Whisper-Diarisierung), Alt-Dokumentation
   umschalten. Unter **Glossar** pflegt jeder Nutzer eigene Abkürzungen und
   Fachbegriffe; daneben steht ein **gemeinsames Glossar der Installation**, das
   Admins pflegen und alle lesen. Beide gehen in die Glättung ein.
+- **Beigefügte Unterlagen**: Zu einer Aufnahme lassen sich **Tagesordnung, Folien
+  oder Papiere** hochladen (PDF, Office, Markdown, Text, Bilder). Ihr Text geht in
+  die KI-Auswertung ein, damit die Zusammenfassung das Thema kennt. PDF, Office und
+  gescannte Seiten (OCR) übernimmt ein **Apache-Tika-Server**.
 - **Fassungen der Zusammenfassung**: Eine erneute Auswertung ersetzt die
   vorhandene Zusammenfassung nicht, sondern legt eine weitere Fassung daneben —
   beschriftet mit Vorlage, Modell und Zeitpunkt. Im Reiter lässt sich zwischen
@@ -146,6 +150,24 @@ mvn test -Dtest=MigrationSchemaIT \
 docker exec bbbbot-dev-db psql -U bbbbot -d postgres -c 'DROP DATABASE bbbbot_migtest'
 ```
 
+### Textextraktion gegen einen echten Tika-Server prüfen
+
+`TikaClientIT` prüft die Verständigung mit einem echten Tika-Server (Kopfzeilen,
+Antwortformat, Fehlerfälle) an einer Textdatei, einer HTML-Seite, einer PDF und
+einer DOCX — die Testdateien entstehen im Test, es liegt keine Binärdatei im
+Repository. Standardmäßig deaktiviert, weil ein Server nötig ist:
+
+```bash
+docker run -d --name tika-test -p 9998:9998 apache/tika:latest
+cd backend
+mvn test -Dtest=TikaClientIT -Dtika.it.url=http://localhost:9998
+docker rm -f tika-test
+```
+
+OCR ist dort bewusst nicht dabei: Sie hängt daran, ob im Tika-Server tesseract
+samt Sprachpaket steckt (`apache/tika:latest-full`), und ein Test, der je nach
+Image durchfällt, sagt nichts über diesen Code.
+
 ### Live-Integrationstests (echter BBB-Raum)
 
 Die Tests unter `backend/src/test/java/bbbbot/it/` fahren den kompletten
@@ -187,7 +209,7 @@ mvn test -Dtest=UiUploadSmokeTest -Dui.it.url="http://localhost:5173" \
 | `MAX_CONCURRENT_BOTS` | Obergrenze paralleler Bots (Standard 5) |
 | `CHROME_PATH` | Optionaler Pfad zu einem System-Chromium |
 | `INSECURE_TLS` | `true`: Self-Signed-Zertifikate akzeptieren (Intranet) |
-| `STORAGE_DIR` | Ablage für Aufnahmen/Transkripte/Zusammenfassungen |
+| `STORAGE_DIR` | Ablage für Aufnahmen/Transkripte/Zusammenfassungen/beigefügte Unterlagen |
 
 Alle fachlichen Parameter (Whisper-URL und -Parameter, LLM-Endpunkt/Modell,
 Zeitfenster, Segmentlänge, Chat-Befehle, Reconnect-Verhalten, …) werden zur
@@ -436,6 +458,78 @@ umstellen, **„Erneut auswerten"**, und die beiden Fassungen stehen anschließe
 nebeneinander — beschriftet mit Modell und Temperatur (`Qwen3.5-122B · T 0.3`).
 Jede Fassung hält fest, womit sie entstanden ist; die Glättung des Transkripts
 bleibt davon unberührt und nutzt weiter die Admin-Vorgabe.
+
+## Beigefügte Unterlagen (Kontext für die Auswertung)
+
+Eine Zusammenfassung wird besser, wenn die KI das Thema kennt und nicht nur das
+Gesprochene. Im Reiter **Unterlagen** einer Aufnahme lässt sich deshalb beifügen,
+was in der Besprechung durchgesprochen wurde: **Tagesordnung, Folien, Angebote,
+Protokolle**. Der Text der Dateien geht in die nächste Auswertung ein — mit
+**„Erneut auswerten"** entsteht daraus eine neue Fassung der Zusammenfassung
+(siehe oben).
+
+### Woher der Text kommt
+
+| Dateityp | Weg |
+|---|---|
+| `txt`, `md`, `csv`, `json`, `yaml`, `log`, … | **direkt im Backend** — UTF-8, bei Bedarf Windows-1252 als Rückfall |
+| `pdf`, `docx`, `xlsx`, `pptx`, `odt`, `rtf`, `html`, `eml`, … | **Apache Tika** (`documents.tikaUrl`) |
+| `png`, `jpg`, `tif`, … und gescannte PDFs | **Apache Tika + tesseract (OCR)** |
+
+Das Backend bringt **keine eigene Textextraktion und keine OCR** mit: Für alles
+außer Text-/Markdown-Dateien wird ein **Tika-Server** gebraucht. Das ist Absicht —
+Tika deckt Dutzende Formate ab, wird von vielen Häusern ohnehin betrieben, und die
+OCR liegt damit dort, wo auch die Sprachpakete liegen. Ist keiner eingerichtet,
+scheitert eine PDF mit klarer Meldung statt still leer in der Auswertung zu landen;
+der Reiter sagt das vorher. In `docker-compose.yml` steht ein
+auskommentierter `tika`-Service als Startpunkt (`apache/tika:latest-full` enthält
+tesseract samt gängigen Sprachen).
+
+**OCR** steuert `documents.ocrStrategy`: `auto` (Standard) lässt Tika nur dann
+zeichenerkennen, wenn kaum Text im PDF steckt — ein digital erzeugtes PDF braucht
+das nicht. Die Sprache (`documents.ocrLanguage`, Standard `deu`) muss als
+tesseract-Paket im Tika-Server vorhanden sein. Über **Admin → Einstellungen →
+Beigefügte Unterlagen → „Verbindung testen"** lässt sich die Erreichbarkeit prüfen;
+ob OCR läuft, zeigt erst ein echter Scan.
+
+Die Extraktion läuft **im Hintergrund** (ein Lauf je Datei, seriell): Ein
+mehrseitiger Scan mit OCR braucht Minuten, und so lange darf kein Upload offen
+stehen. Die Liste zeigt je Unterlage den Zustand und die **Anzahl erkannter
+Zeichen** — daran ist sofort zu sehen, ob wirklich Text herauskam. Eine
+gescheiterte Unterlage lässt sich über **„Erneut lesen"** nachziehen, etwa nachdem
+Tika oder ein Sprachpaket eingerichtet wurde; neu hochladen muss man sie nicht.
+
+### Was im Prompt landet
+
+Der Unterlagen-Abschnitt geht in **jeden** Auswertungsschritt ein (auch in das
+Konsolidieren am Ende), weil der Kontext in Blöcke geschnitten wird und das Thema
+in jedem Block bekannt sein muss. Deshalb zwei Obergrenzen — und deshalb kosten
+Unterlagen bei einem langen Meeting mehrfach Kontext:
+
+| Schlüssel | Standard | Bedeutung |
+|---|---|---|
+| `documents.enabled` | `true` | Unterlagen erlaubt. Aus = keine neuen, **und vorhandene gehen nicht mehr in den Prompt ein** (Datenschutz-Notbremse) |
+| `documents.maxMegabytes` | `25` | Obergrenze je Datei |
+| `documents.tikaUrl` | (leer) | Basis-Adresse des Tika-Servers, z.B. `http://tika:9998`. Leer = nur Text-/Markdown-Dateien |
+| `documents.tikaTimeoutSec` | `300` | Zeitlimit je Tika-Anfrage; OCR braucht Minuten |
+| `documents.ocrStrategy` | `auto` | `auto`, `no_ocr`, `ocr_only`, `ocr_and_text_extraction` |
+| `documents.ocrLanguage` | `deu` | tesseract-Sprachkürzel, z.B. `deu+eng` |
+| `documents.maxCharsPerDocument` | `4000` | Zeichen **je Unterlage** im Prompt (0 = unbegrenzt) — ein dickes Handbuch soll die übrigen nicht verdrängen |
+| `documents.promptMaxChars` | `12000` | Obergrenze für den **ganzen** Unterlagen-Abschnitt (0 = unbegrenzt) |
+
+Gespeichert wird der **vollständige** extrahierte Text (bis 1 Mio. Zeichen); die
+Grenzen wirken nur auf den Prompt. Ein später erhöhtes Limit gilt damit sofort —
+ohne eine erneute OCR.
+
+Dem Modell wird im Block ausdrücklich gesagt, dass Unterlagen **kein Gesprochenes**
+sind: Es soll daraus Themen, Namen und Zahlen richtig einordnen, aber keine
+Beschlüsse ableiten, die nie gefallen sind. Ohne diesen Satz zieht ein Modell
+Aufgaben aus einer Tagesordnung.
+
+> Datenschutz: Unterlagen gehen denselben Weg wie Transkript und Chat. Bei einer
+> Cloud-API (`llm.baseUrl`) verlassen sie damit das eigene Netz. In der
+> **Freigabe-Ansicht** erscheinen sie bewusst **nicht** — was intern zur
+> Vorbereitung gehört, ist nicht automatisch etwas für Empfänger eines Links.
 
 ## Darstellung von Zusammenfassung und Transkript (Markdown, Mermaid)
 
