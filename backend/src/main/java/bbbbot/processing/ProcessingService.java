@@ -137,9 +137,9 @@ public class ProcessingService {
 
     /**
      * Erneute Auswertung einer bereits ausgewerteten Aufnahme: laeuft sofort;
-     * nach erfolgreichem Abschluss werden die bisherigen Zusammenfassungen durch
-     * die neue ersetzt. Vorhandene Transkripte werden wiederverwendet (kein
-     * erneutes Whisper), nur die Zusammenfassung wird neu erstellt.
+     * nach erfolgreichem Abschluss steht die neue Fassung als aktuelle neben den
+     * bisherigen. Vorhandene Transkripte werden wiederverwendet (kein erneutes
+     * Whisper), nur die Zusammenfassung wird neu erstellt.
      */
     public ProcessingJob enqueueReprocess(UUID recordingId) {
         Recording recording = recordingRepo.findById(recordingId)
@@ -156,7 +156,7 @@ public class ProcessingService {
             throw new IllegalStateException("Keine vorhandene Auswertung - bitte 'Jetzt auswerten' verwenden");
         }
         ProcessingJob job = ProcessingJob.create(recordingId, true);
-        job.setReplaceExisting(true);
+        job.setHadSummary(true);
         jobRepo.save(job);
         return job;
     }
@@ -165,7 +165,7 @@ public class ProcessingService {
      * Erneute Transkription: Die Spracherkennung laeuft fuer ALLE Segmente neu
      * (z.B. nach einem Whisper-Konfigurationsfix oder aktivierter
      * Sprechererkennung), anschliessend wird auch die Zusammenfassung neu
-     * erstellt. Vorhandene Zusammenfassungen werden erst nach Erfolg ersetzt.
+     * erstellt - als weitere Fassung neben den vorhandenen.
      */
     public ProcessingJob enqueueRetranscribe(UUID recordingId) {
         Recording recording = recordingRepo.findById(recordingId)
@@ -188,12 +188,12 @@ public class ProcessingService {
         // Nur FERTIGE Zusammenfassungen zaehlen: uebrig gebliebene FAILED-Zeilen
         // (z.B. aus einem gescheiterten Schritt 2) duerfen die Zwei-Schritt-
         // Auswertung nicht in eine volle Auswertung umwandeln.
-        job.setReplaceExisting(summaryRepo.findByRecordingIdOrderByCreatedAtDesc(recordingId).stream()
+        job.setHadSummary(summaryRepo.findByRecordingIdOrderByCreatedAtDesc(recordingId).stream()
                 .anyMatch(s -> s.getStatus() == bbbbot.domain.Summary.Status.DONE));
         // Mitten in der Zwei-Schritt-Auswertung (TRANSCRIBED, noch keine
         // Zusammenfassung) bleibt auch die erneute Transkription bei Schritt 1.
         job.setTranscribeOnly(recording.getStatus() == Recording.Status.TRANSCRIBED
-                && !job.isReplaceExisting());
+                && !job.isHadSummary());
         jobRepo.save(job);
         return job;
     }
@@ -317,15 +317,10 @@ public class ProcessingService {
             // Schritt 2: Zusammenfassung
             var summary = summaryService.summarize(recording, segments);
             if (summary.getStatus() == bbbbot.domain.Summary.Status.DONE) {
-                if (job.isReplaceExisting()) {
-                    // Erneute Auswertung: alte Zusammenfassungen erst nach Erfolg
-                    // entfernen, damit bei einem Fehlschlag nichts verloren geht.
-                    summaryRepo.findByRecordingIdOrderByCreatedAtDesc(recording.getId()).stream()
-                            .filter(s -> !s.getId().equals(summary.getId()))
-                            .forEach(summaryRepo::delete);
-                    log.info("Alte Zusammenfassungen von Aufnahme {} durch neue Auswertung ersetzt",
-                            recording.getId());
-                }
+                // Die neue Fassung ist ab jetzt die aktuelle (das erledigt der
+                // SummaryService). Die vorherigen bleiben zum Vergleich stehen -
+                // eine von Hand ueberarbeitete Fassung darf eine erneute
+                // Auswertung nicht kosten.
                 saveStatus(recording.getId(), Recording.Status.DONE);
                 finishJob(job, true, null);
             } else {

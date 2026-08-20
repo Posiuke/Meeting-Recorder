@@ -111,11 +111,23 @@ public final class Dtos {
         }
     }
 
+    /**
+     * Eine Fassung der Zusammenfassung.
+     *
+     * @param templateName Vorlage, mit der die Fassung erzeugt wurde (null = keine benannte)
+     * @param systemPrompt Auswertungs-Prompt dieser Fassung - damit sich zwei
+     *                     Fassungen nicht nur am Ergebnis vergleichen lassen
+     * @param current      die eine Fassung, die als "die" Zusammenfassung gilt
+     * @param editedAt     Zeitpunkt der letzten haendischen Bearbeitung (null = unberuehrt)
+     */
     public record SummaryView(UUID id, String status, String markdown, String model,
-                              String error, Instant createdAt, Instant finishedAt) {
+                              String templateName, String systemPrompt, boolean current,
+                              String error, Instant createdAt, Instant finishedAt,
+                              Instant editedAt) {
         public static SummaryView of(Summary s) {
             return new SummaryView(s.getId(), s.getStatus().name(), s.getMarkdown(), s.getModel(),
-                    s.getError(), s.getCreatedAt(), s.getFinishedAt());
+                    s.getTemplateName(), s.getSystemPrompt(), s.isCurrent(),
+                    s.getError(), s.getCreatedAt(), s.getFinishedAt(), s.getEditedAt());
         }
     }
 
@@ -183,12 +195,12 @@ public final class Dtos {
      * @param defaultSttLanguage Admin-Standard der Spracherkennung (whisper.language);
      *                           leer bedeutet dort ebenfalls "automatisch erkennen"
      */
-    public record SummaryOptionsView(String prompt, Integer maxWords, String language,
-                                     String sttLanguage, String defaultPrompt,
+    public record SummaryOptionsView(String prompt, String templateName, Integer maxWords,
+                                     String language, String sttLanguage, String defaultPrompt,
                                      String defaultLanguage, String defaultSttLanguage) {}
 
-    public record SummaryOptionsRequest(String prompt, Integer maxWords, String language,
-                                        String sttLanguage) {}
+    public record SummaryOptionsRequest(String prompt, String templateName, Integer maxWords,
+                                        String language, String sttLanguage) {}
 
     /** Persoenliche Promptvorlage des angemeldeten Nutzers. */
     public record PromptTemplateView(UUID id, String name, String prompt,
@@ -306,7 +318,7 @@ public final class Dtos {
      * bleiben der angemeldeten Ansicht vorbehalten.
      *
      * @param transcript Zusammengefuehrtes Transkript (geglaettete Fassung, falls vorhanden)
-     * @param summary    Neueste fertige Zusammenfassung als Markdown; null wenn keine existiert
+     * @param summary    Aktuelle Fassung der Zusammenfassung als Markdown; null wenn keine existiert
      * @param language   Oberflaechensprache des Freigebenden (null = nie gewaehlt). Die
      *                   Freigabe-Ansicht startet damit statt mit der Browsersprache des
      *                   Empfaengers: Inhalt und Beschriftung passen so eher zusammen.

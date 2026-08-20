@@ -832,6 +832,43 @@ tbody tr:hover {
   gap: 0.4rem;
 }
 
+/* Auswahl der Fassung: Die Beschriftungen sind lang (Vorlage, Modell,
+   Zeitpunkt), darum ein Auswahlfeld statt einer Reiterleiste. */
+.summary-versions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.summary-versions select {
+  max-width: 100%;
+  flex: 1 1 20rem;
+}
+
+.summary-versions-hint {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+/* Prompt einer Fassung - zugeklappt, weil er nur beim Vergleichen zaehlt */
+.summary-prompt {
+  margin-bottom: 0.75rem;
+}
+
+.summary-prompt > summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.summary-prompt .log-pre {
+  margin-top: 0.5rem;
+  max-height: 16rem;
+}
+
 /* Haendische Bearbeitung der Zusammenfassung */
 .summary-edit textarea {
   width: 100%;

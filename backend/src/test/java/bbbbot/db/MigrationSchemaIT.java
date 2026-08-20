@@ -6,11 +6,13 @@ import bbbbot.domain.Recording;
 import bbbbot.domain.RecordingSegment;
 import bbbbot.domain.RecordingTag;
 import bbbbot.domain.ShareLink;
+import bbbbot.domain.Summary;
 import bbbbot.repository.Repositories.GlossaryEntryRepo;
 import bbbbot.repository.Repositories.RecordingRepo;
 import bbbbot.repository.Repositories.RecordingSegmentRepo;
 import bbbbot.repository.Repositories.RecordingTagRepo;
 import bbbbot.repository.Repositories.ShareLinkRepo;
+import bbbbot.repository.Repositories.SummaryRepo;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -21,7 +23,10 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Fuehrt ALLE Flyway-Migrationen gegen eine echte PostgreSQL-Datenbank aus und
@@ -72,6 +77,9 @@ class MigrationSchemaIT {
 
     @Autowired
     private ShareLinkRepo shareLinkRepo;
+
+    @Autowired
+    private SummaryRepo summaryRepo;
 
     @Autowired
     private EntityManager em;
@@ -135,7 +143,37 @@ class MigrationSchemaIT {
                 .hasSize(1);
 
         recording.setCorrectionStatus(Recording.CorrectionStatus.READY);
+        recording.setSummaryTemplateName("Meeting");
         recordingRepo.saveAndFlush(recording);
+
+        // Fassungen der Zusammenfassung (V23): zwei Fassungen, genau eine aktuell.
+        Summary alt = summary(recording.getId(), "# Alte Fassung\n", false);
+        Summary aktuell = summary(recording.getId(), "# Aktuelle Fassung\n", true);
+        assertThat(summaryRepo.findByRecordingIdAndCurrentIsTrue(recording.getId()))
+                .get()
+                .satisfies(sum -> assertThat(sum.getId()).isEqualTo(aktuell.getId()))
+                .satisfies(sum -> assertThat(sum.getTemplateName()).isEqualTo("Meeting"));
+        assertThat(summaryRepo.findByRecordingIdOrderByCreatedAtDesc(recording.getId())).hasSize(2);
+        // Die Suche in Zusammenfassungen findet nur die aktuelle Fassung
+        assertThat(summaryRepo.findRecordingIdsByMarkdownLike("%aktuelle fassung%"))
+                .contains(recording.getId());
+        assertThat(summaryRepo.findRecordingIdsByMarkdownLike("%alte fassung%")).isEmpty();
+
+        // Der Teil-Index uq_summary_current laesst nur eine aktuelle Fassung zu
+        alt.setCurrent(true);
+        assertThatThrownBy(() -> summaryRepo.saveAndFlush(alt))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    /** Fertige Fassung mit Inhalt, direkt gespeichert. */
+    private Summary summary(UUID recordingId, String markdown, boolean current) {
+        Summary summary = Summary.create(recordingId);
+        summary.setStatus(Summary.Status.DONE);
+        summary.setMarkdown(markdown);
+        summary.setSystemPrompt("Fasse die Aufnahme zusammen.");
+        summary.setTemplateName("Meeting");
+        summary.setCurrent(current);
+        return summaryRepo.saveAndFlush(summary);
     }
 
     /**

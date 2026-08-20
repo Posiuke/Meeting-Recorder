@@ -664,12 +664,12 @@ export const de = {
     modeTranscribeOnly: ' · Nur Transkription',
     confirmReprocessTitle: 'Aufnahme erneut auswerten',
     confirmReprocessMessage:
-      'Die Zusammenfassung wird aus dem vorhandenen Transkript neu erstellt. Die bisherige Zusammenfassung wird dabei ersetzt – das kann nicht rückgängig gemacht werden. Fortfahren?',
+      'Die Zusammenfassung wird aus dem vorhandenen Transkript neu erstellt und ist danach die aktuelle Fassung. Die bisherige bleibt als ältere Fassung erhalten und lässt sich jederzeit wieder nach vorn holen. Fortfahren?',
     confirmRetranscribeTitle: 'Transkription neu erstellen',
     confirmRetranscribeTranscribed:
       'Achtung: Die Spracherkennung läuft für alle Segmente neu, das vorhandene Transkript wird dabei ersetzt – das kann nicht rückgängig gemacht werden. Die KI-Auswertung startest du danach wieder separat. Fortfahren?',
     confirmRetranscribeFull:
-      'Achtung: Die Spracherkennung läuft für alle Segmente neu, anschließend wird auch die Zusammenfassung neu erstellt. Vorhandenes Transkript und Zusammenfassung werden dabei ersetzt – das kann nicht rückgängig gemacht werden. Fortfahren?',
+      'Achtung: Die Spracherkennung läuft für alle Segmente neu, anschließend wird auch die Zusammenfassung neu erstellt. Das vorhandene Transkript wird dabei ersetzt – das kann nicht rückgängig gemacht werden. Die Zusammenfassung kommt als neue Fassung hinzu; die bisherige bleibt erhalten. Fortfahren?',
     confirmDeleteTitle: 'Aufnahme löschen',
     confirmDeleteMessage:
       'Die Aufnahme wird mit allen Segmenten, Transkripten und Zusammenfassungen unwiderruflich gelöscht. Fortfahren?',
@@ -687,8 +687,8 @@ export const de = {
     jobRunning: '{{kind}} läuft…',
     jobAttempt: ' (Versuch {{attempt}})',
     editOrphaned:
-      'Die bearbeitete Zusammenfassung wurde inzwischen durch eine neue Auswertung ersetzt oder gelöscht. Dein Entwurf ist unten erhalten.',
-    adoptEdit: 'In aktuelle Zusammenfassung übernehmen',
+      'Die bearbeitete Fassung ist inzwischen gelöscht. Dein Entwurf ist unten erhalten.',
+    adoptEdit: 'In aktuelle Fassung übernehmen',
     discardDraft: 'Entwurf verwerfen',
     analysisRunning: 'Auswertung läuft…',
     waitingWindowHint:
@@ -702,9 +702,20 @@ export const de = {
     stillRecording: 'Die Aufnahme läuft noch – eine Zusammenfassung entsteht nach Abschluss.',
     noSummary: 'Keine Zusammenfassung vorhanden.',
     summaryEditHint:
-      'Markdown-Format. Hinweis: „Erneut auswerten" ersetzt die Bearbeitung durch eine neue KI-Zusammenfassung.',
+      'Markdown-Format. Die Bearbeitung bleibt erhalten: „Erneut auswerten" legt eine weitere Fassung daneben, statt diese zu überschreiben.',
     summaryFailed: 'Zusammenfassung fehlgeschlagen.',
     noContent: 'Kein Inhalt vorhanden.',
+    versionsLabel: 'Fassungen ({{count}})',
+    versionsHint:
+      'Jede Auswertung legt eine weitere Fassung an; die vorherigen bleiben zum Vergleich stehen. Die aktuelle Fassung ist die, die in Download, API, Freigabe-Ansicht und summary.md steht.',
+    versionCurrent: 'Aktuell',
+    versionNoTemplate: 'ohne Vorlage',
+    versionEdited: 'bearbeitet',
+    versionEditedAt: 'bearbeitet am {{date}}',
+    versionPrompt: 'Prompt dieser Fassung',
+    makeCurrent: 'Als aktuelle Fassung',
+    makeCurrentHint:
+      'Download, API, Freigabe-Ansicht und summary.md folgen dann dieser Fassung; die andere bleibt erhalten.',
   },
 
   sharePage: {

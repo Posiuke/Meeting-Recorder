@@ -10,6 +10,7 @@ import {
   processRecording,
   reprocessRecording,
   retranscribeRecording,
+  setCurrentSummary,
   transcribeRecording,
   updateParticipant,
   updateSummary,
@@ -40,6 +41,7 @@ import type {
   ParticipantView,
   RecordingSource,
   RecordingStatus,
+  SummaryView,
   TranscriptEntry,
 } from '../types';
 
@@ -233,9 +235,8 @@ export default function RecordingDetailPage() {
   }
 
   const rec = detail.recording;
-  const hasDownloadableSummary = detail.summaries.some(
-    (s) => s.status === 'DONE' && s.markdown,
-  );
+  // Herunterladen gibt es die aktuelle Fassung - genau die kennt der Endpunkt.
+  const hasDownloadableSummary = detail.summaries.some((s) => s.current);
 
   const handleProcess = async () => {
     setActionError(null);
@@ -894,6 +895,8 @@ function SummaryTab({
   const dispatch = useAppDispatch();
   const detail = useAppSelector((s) => s.recordings.detail);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  /** Vom Nutzer gewählte Fassung; null = die aktuelle anzeigen. */
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [editBusy, setEditBusy] = useState(false);
@@ -922,6 +925,17 @@ function SummaryTab({
     setDeleteError(null);
     try {
       await dispatch(deleteSummary({ recordingId, summaryId })).unwrap();
+      // Die gelöschte Fassung war womöglich die angezeigte
+      if (selectedId === summaryId) setSelectedId(null);
+    } catch (e) {
+      setDeleteError(errorMessage(e));
+    }
+  };
+
+  const handleSetCurrent = async (summaryId: string) => {
+    setDeleteError(null);
+    try {
+      await dispatch(setCurrentSummary({ recordingId, summaryId })).unwrap();
     } catch (e) {
       setDeleteError(errorMessage(e));
     }
@@ -953,15 +967,15 @@ function SummaryTab({
   // (z.B. weil "Erneut auswerten" sie ersetzt hat). Der Entwurf bleibt dann
   // erhalten und kann in die neue Zusammenfassung uebernommen werden.
   const editOrphaned = editId !== null && !summaries.some((s) => s.id === editId);
-  const newestDone = summaries.find((s) => s.status === 'DONE' && s.markdown);
+  const currentSummary = summaries.find((s) => s.current);
 
   const handleAdoptEdit = async () => {
-    if (!newestDone || !editText.trim()) return;
+    if (!currentSummary || !editText.trim()) return;
     setEditError(null);
     setEditBusy(true);
     try {
       await dispatch(
-        updateSummary({ recordingId, summaryId: newestDone.id, markdown: editText }),
+        updateSummary({ recordingId, summaryId: currentSummary.id, markdown: editText }),
       ).unwrap();
       setEditId(null);
     } catch (e) {
@@ -978,7 +992,7 @@ function SummaryTab({
         {editError && <Alert kind="error">{editError}</Alert>}
         <textarea value={editText} onChange={(e) => setEditText(e.target.value)} />
         <div className="summary-edit-actions">
-          {newestDone && (
+          {currentSummary && (
             <button
               type="button"
               className="btn btn-primary"
@@ -1085,78 +1099,139 @@ function SummaryTab({
     return <p className="muted">{t('recordingDetail.noSummary')}</p>;
   }
 
+  // Angezeigt wird die aktuelle Fassung, solange keine andere gewählt ist. Eine
+  // gewählte Fassung kann verschwinden (Löschen in einem anderen Tab) – dann
+  // fällt die Anzeige auf die aktuelle zurück.
+  const shown = summaries.find((s) => s.id === selectedId) ?? currentSummary ?? summaries[0];
+
+  /** Fassung in der Auswahlliste: Vorlage, Modell und Zeitpunkt machen sie unterscheidbar. */
+  const versionLabel = (summary: SummaryView) =>
+    [
+      summary.current ? t('recordingDetail.versionCurrent') : null,
+      summary.templateName ?? t('recordingDetail.versionNoTemplate'),
+      summary.model,
+      formatDateTime(summary.createdAt),
+      summary.editedAt ? t('recordingDetail.versionEdited') : null,
+      summary.status !== 'DONE' ? t(`status.${summary.status}`) : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+
   return (
     <div>
       {deleteError && <Alert kind="error">{deleteError}</Alert>}
       {jobProgressLabel && <Spinner label={jobProgressLabel} />}
-      {summaries.map((summary) => (
-        <div key={summary.id} className="summary-block">
-          <div className="summary-block-head">
-            <StatusBadge status={summary.status} />
-            <span className="muted">
-              {summary.model ? `${summary.model} · ` : ''}
-              {formatDateTime(summary.createdAt)}
-            </span>
-            {rec.mine && editId !== summary.id && (
-              <div className="summary-actions">
-                {summary.status === 'DONE' && summary.markdown && (
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => startEdit(summary.id, summary.markdown ?? '')}
-                  >
-                    {t('common.edit')}
-                  </button>
-                )}
+
+      {summaries.length > 1 && (
+        <div className="summary-versions">
+          <label htmlFor="summary-version">
+            {t('recordingDetail.versionsLabel', { count: summaries.length })}
+          </label>
+          <select
+            id="summary-version"
+            value={shown.id}
+            onChange={(e) => {
+              setSelectedId(e.target.value);
+              setEditId(null);
+            }}
+          >
+            {summaries.map((summary) => (
+              <option key={summary.id} value={summary.id}>
+                {versionLabel(summary)}
+              </option>
+            ))}
+          </select>
+          <p className="muted summary-versions-hint">{t('recordingDetail.versionsHint')}</p>
+        </div>
+      )}
+
+      <div className="summary-block">
+        <div className="summary-block-head">
+          <StatusBadge status={shown.status} />
+          {shown.current && <span className="tag">{t('recordingDetail.versionCurrent')}</span>}
+          <span className="muted">
+            {shown.templateName ?? t('recordingDetail.versionNoTemplate')}
+            {shown.model ? ` · ${shown.model}` : ''}
+            {` · ${formatDateTime(shown.createdAt)}`}
+            {shown.editedAt
+              ? ` · ${t('recordingDetail.versionEditedAt', {
+                  date: formatDateTime(shown.editedAt),
+                })}`
+              : ''}
+          </span>
+          {rec.mine && editId !== shown.id && (
+            <div className="summary-actions">
+              {shown.status === 'DONE' && shown.markdown && (
                 <button
                   type="button"
-                  className="btn btn-ghost btn-sm btn-danger-text"
-                  onClick={() => handleDeleteSummary(summary.id)}
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => startEdit(shown.id, shown.markdown ?? '')}
                 >
-                  {t('common.delete')}
+                  {t('common.edit')}
                 </button>
-              </div>
-            )}
-          </div>
-          {editId === summary.id ? (
-            <div className="summary-edit">
-              {editError && <Alert kind="error">{editError}</Alert>}
-              <textarea
-                value={editText}
-                onChange={(e) => setEditText(e.target.value)}
-                autoFocus
-              />
-              <p className="muted summary-edit-hint">{t('recordingDetail.summaryEditHint')}</p>
-              <div className="summary-edit-actions">
+              )}
+              {!shown.current && shown.status === 'DONE' && shown.markdown && (
                 <button
                   type="button"
-                  className="btn btn-primary"
-                  onClick={handleSaveEdit}
-                  disabled={editBusy || !editText.trim()}
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => void handleSetCurrent(shown.id)}
+                  title={t('recordingDetail.makeCurrentHint')}
                 >
-                  {editBusy ? t('recordingDetail.saving') : t('common.save')}
+                  {t('recordingDetail.makeCurrent')}
                 </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setEditId(null)}
-                  disabled={editBusy}
-                >
-                  {t('common.cancel')}
-                </button>
-              </div>
+              )}
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm btn-danger-text"
+                onClick={() => void handleDeleteSummary(shown.id)}
+              >
+                {t('common.delete')}
+              </button>
             </div>
-          ) : summary.status === 'RUNNING' || summary.status === 'PENDING' ? (
-            <Spinner label={t('recordingDetail.analysisRunning')} />
-          ) : summary.status === 'FAILED' ? (
-            <Alert kind="error">{summary.error ?? t('recordingDetail.summaryFailed')}</Alert>
-          ) : summary.markdown ? (
-            <Markdown>{summary.markdown}</Markdown>
-          ) : (
-            <p className="muted">{t('recordingDetail.noContent')}</p>
           )}
         </div>
-      ))}
+
+        {shown.systemPrompt && (
+          <details className="summary-prompt">
+            <summary>{t('recordingDetail.versionPrompt')}</summary>
+            <pre className="log-pre">{shown.systemPrompt}</pre>
+          </details>
+        )}
+
+        {editId === shown.id ? (
+          <div className="summary-edit">
+            {editError && <Alert kind="error">{editError}</Alert>}
+            <textarea value={editText} onChange={(e) => setEditText(e.target.value)} autoFocus />
+            <p className="muted summary-edit-hint">{t('recordingDetail.summaryEditHint')}</p>
+            <div className="summary-edit-actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSaveEdit}
+                disabled={editBusy || !editText.trim()}
+              >
+                {editBusy ? t('recordingDetail.saving') : t('common.save')}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setEditId(null)}
+                disabled={editBusy}
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
+          </div>
+        ) : shown.status === 'RUNNING' || shown.status === 'PENDING' ? (
+          <Spinner label={t('recordingDetail.analysisRunning')} />
+        ) : shown.status === 'FAILED' ? (
+          <Alert kind="error">{shown.error ?? t('recordingDetail.summaryFailed')}</Alert>
+        ) : shown.markdown ? (
+          <Markdown>{shown.markdown}</Markdown>
+        ) : (
+          <p className="muted">{t('recordingDetail.noContent')}</p>
+        )}
+      </div>
     </div>
   );
 }

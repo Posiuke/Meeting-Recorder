@@ -4,7 +4,11 @@ import Modal from './Modal';
 import Alert from './Alert';
 import ConfirmDialog from './ConfirmDialog';
 import HelpTip from './HelpTip';
-import PromptPresetSelect, { findOwnTemplate, resolvePresetPrompt } from './PromptPresetSelect';
+import PromptPresetSelect, {
+  findOwnTemplate,
+  presetLabel,
+  resolvePresetPrompt,
+} from './PromptPresetSelect';
 import SttLanguageSelect from './SttLanguageSelect';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { updateSummaryOptions } from '../store/recordingsSlice';
@@ -51,6 +55,13 @@ export default function SummaryOptionsDialog({
     error: templatesError,
   } = useAppSelector((s) => s.promptTemplates);
   const [prompt, setPrompt] = useState(options.prompt ?? '');
+  /**
+   * Name der Vorlage, aus der der Prompt stammt (null = keine benannte). Er
+   * benennt später die erzeugte Fassung. Sobald der Prompt von Hand geändert
+   * wird, ist er nicht mehr der der Vorlage – dann fällt der Name weg, statt
+   * eine Fassung falsch zu beschriften.
+   */
+  const [promptTemplateName, setPromptTemplateName] = useState(options.templateName ?? null);
   const [maxWords, setMaxWords] = useState(options.maxWords?.toString() ?? '');
   const [language, setLanguage] = useState(options.language ?? '');
   const [sttLanguage, setSttLanguage] = useState(options.sttLanguage ?? '');
@@ -81,6 +92,7 @@ export default function SummaryOptionsDialog({
   const applyPreset = (key: string) => {
     setPreset(key);
     setPrompt(resolvePresetPrompt(key, templates));
+    setPromptTemplateName(presetLabel(key, templates));
   };
 
   /**
@@ -93,6 +105,7 @@ export default function SummaryOptionsDialog({
   const applyDefaultPrompt = () => {
     setPreset('');
     setPrompt(options.defaultPrompt ?? '');
+    setPromptTemplateName(null);
   };
 
   const handleCreateTemplate = async () => {
@@ -104,6 +117,7 @@ export default function SummaryOptionsDialog({
         createPromptTemplate({ name: templateName.trim(), prompt: prompt.trim() }),
       ).unwrap();
       setPreset(`tpl:${created.id}`);
+      setPromptTemplateName(created.name);
       setTemplateSaveOpen(false);
       setTemplateName('');
     } catch (e) {
@@ -139,6 +153,7 @@ export default function SummaryOptionsDialog({
     try {
       await dispatch(deletePromptTemplate(selectedTemplate.id)).unwrap();
       setPreset('');
+      setPromptTemplateName(null);
       setConfirmTemplateDelete(false);
     } catch (e) {
       setError(errorMessage(e));
@@ -157,6 +172,7 @@ export default function SummaryOptionsDialog({
         updateSummaryOptions({
           id: recordingId,
           prompt: prompt.trim() === '' ? null : prompt.trim(),
+          templateName: prompt.trim() === '' ? null : promptTemplateName,
           maxWords: maxWordsNum,
           language: language === '' ? null : language,
           sttLanguage: sttLanguage === '' ? null : sttLanguage,
@@ -250,7 +266,11 @@ export default function SummaryOptionsDialog({
           value={prompt}
           disabled={busy}
           placeholder={`${t('summaryOptions.promptPlaceholder')}\n\n${options.defaultPrompt}`}
-          onChange={(e) => setPrompt(e.target.value)}
+          onChange={(e) => {
+            setPrompt(e.target.value);
+            // Von Hand geändert: der Text ist nicht mehr der der Vorlage
+            setPromptTemplateName(null);
+          }}
         />
         <div className="template-actions">
           {templateSaveOpen ? (

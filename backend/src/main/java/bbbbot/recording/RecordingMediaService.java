@@ -114,19 +114,19 @@ public class RecordingMediaService {
                 .body(new FileSystemResource(path));
     }
 
-    /** Neueste fertige Zusammenfassung als Markdown-Datei. */
+    /** Aktuelle Fassung der Zusammenfassung als Markdown-Datei. */
     public ResponseEntity<byte[]> summaryDownload(Recording recording) {
         return summaryDownload(recording, ExportFormat.MARKDOWN);
     }
 
     /**
-     * Neueste fertige Zusammenfassung als Datei - als Markdown (Rohfassung) oder
-     * in der Word-Fassung, die sich ohne Umweg weiterreichen laesst.
+     * Aktuelle Fassung der Zusammenfassung als Datei - als Markdown (Rohfassung)
+     * oder in der Word-Fassung, die sich ohne Umweg weiterreichen laesst.
      */
     public ResponseEntity<byte[]> summaryDownload(Recording recording, ExportFormat format) {
-        Summary summary = summaryRepo.findByRecordingIdOrderByCreatedAtDesc(recording.getId()).stream()
-                .filter(s -> s.getStatus() == Summary.Status.DONE && s.getMarkdown() != null)
-                .findFirst()
+        // Ausgeliefert wird die aktuelle Fassung - dieselbe, die die Anzeige und
+        // summary.md zeigen. Aeltere Fassungen sind bewusst kein Download-Ziel.
+        Summary summary = summaryRepo.findByRecordingIdAndCurrentIsTrue(recording.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Keine Zusammenfassung vorhanden"));
         byte[] body = format == ExportFormat.WORD

@@ -654,12 +654,12 @@ export const en: typeof de = {
     modeTranscribeOnly: ' · transcript only',
     confirmReprocessTitle: 'Analyse recording again',
     confirmReprocessMessage:
-      'The summary will be recreated from the existing transcript. The current summary will be replaced – this cannot be undone. Continue?',
+      'The summary will be recreated from the existing transcript and becomes the current version. The previous one is kept as an earlier version and can be brought back at any time. Continue?',
     confirmRetranscribeTitle: 'Recreate transcript',
     confirmRetranscribeTranscribed:
       'Caution: speech recognition runs again for all segments and the existing transcript will be replaced – this cannot be undone. You then start the AI analysis separately again. Continue?',
     confirmRetranscribeFull:
-      'Caution: speech recognition runs again for all segments, after which the summary is recreated as well. The existing transcript and summary will be replaced – this cannot be undone. Continue?',
+      'Caution: speech recognition runs again for all segments, after which the summary is recreated as well. The existing transcript will be replaced – this cannot be undone. The summary is added as a new version; the previous one is kept. Continue?',
     confirmDeleteTitle: 'Delete recording',
     confirmDeleteMessage:
       'The recording will be deleted irrevocably, including all segments, transcripts and summaries. Continue?',
@@ -676,8 +676,8 @@ export const en: typeof de = {
     jobRunning: '{{kind}} running…',
     jobAttempt: ' (attempt {{attempt}})',
     editOrphaned:
-      'The summary you were editing has meanwhile been replaced by a new analysis or deleted. Your draft is preserved below.',
-    adoptEdit: 'Apply to the current summary',
+      'The version you were editing has meanwhile been deleted. Your draft is preserved below.',
+    adoptEdit: 'Apply to the current version',
     discardDraft: 'Discard draft',
     analysisRunning: 'Analysis running…',
     waitingWindowHint:
@@ -691,9 +691,20 @@ export const en: typeof de = {
     stillRecording: 'The recording is still running – a summary is created once it finishes.',
     noSummary: 'No summary available.',
     summaryEditHint:
-      'Markdown format. Note: "Analyse again" replaces your edit with a new AI summary.',
+      'Markdown format. Your edit is kept: "Analyse again" adds another version instead of overwriting this one.',
     summaryFailed: 'Summary failed.',
     noContent: 'No content available.',
+    versionsLabel: 'Versions ({{count}})',
+    versionsHint:
+      'Every analysis adds another version; the earlier ones stay for comparison. The current version is the one used in the download, the API, the share view and summary.md.',
+    versionCurrent: 'Current',
+    versionNoTemplate: 'no template',
+    versionEdited: 'edited',
+    versionEditedAt: 'edited on {{date}}',
+    versionPrompt: 'Prompt of this version',
+    makeCurrent: 'Make current',
+    makeCurrentHint:
+      'The download, the API, the share view and summary.md then follow this version; the other one is kept.',
   },
 
   sharePage: {

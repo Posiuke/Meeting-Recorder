@@ -29,6 +29,22 @@ export function findOwnTemplate(
 }
 
 /**
+ * Name der getroffenen Auswahl, wie er einer erzeugten Fassung als Beschriftung
+ * mitgegeben wird: `null` bei „Meeting (Standard)" – dort gibt es keine benannte
+ * Vorlage, sondern die jeweils aktuelle Vorgabe des Administrators.
+ */
+export function presetLabel(
+  selection: string,
+  templates: PromptTemplateView[],
+): string | null {
+  if (selection === '') return null;
+  const own = findOwnTemplate(selection, templates);
+  if (own) return own.name;
+  const builtIn = PRESET_KEYS.find((p) => p.key === selection);
+  return builtIn ? translate(builtIn.labelKey) : null;
+}
+
+/**
  * Prompt zur getroffenen Auswahl: leerer String bei „Meeting (Standard)" –
  * das bedeutet überall „Standardvorgabe des Administrators verwenden".
  */

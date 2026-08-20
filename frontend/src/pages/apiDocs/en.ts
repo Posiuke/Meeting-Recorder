@@ -183,17 +183,23 @@ curl -s -H "X-API-Key: $KEY" -F file=@note.m4a \\
     {
       id: 'summaries',
       title: 'Summaries',
+      intro:
+        'Every analysis adds another version instead of overwriting the existing one; exactly one is the current version. All versions of a recording are listed in the detail view under summaries – with template (templateName), model, prompt (systemPrompt) and current.',
       endpoints: [
         {
           method: 'GET',
           path: '/api/recordings/{id}/summary',
-          summary: 'Latest summary as Markdown. 404 while there is none.',
+          summary: 'Current version as Markdown. 404 while there is none.',
           example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/recordings/$ID/summary"`,
           response: `{
   "id": "b21f...",
   "status": "DONE",
   "markdown": "# Weekly meeting engineering\\n\\n## Outcomes\\n- ...",
   "model": "qwen2.5-32b-instruct",
+  "templateName": "Meeting",
+  "systemPrompt": "Summarise the recording...",
+  "current": true,
+  "editedAt": null,
   "finishedAt": "2026-07-22T02:14:51Z"
 }`,
         },
@@ -201,7 +207,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@note.m4a \\
           method: 'GET',
           path: '/api/recordings/{id}/summary/download',
           summary:
-            'The same summary as a file – as Markdown or as a Word file (.doc) that Word and LibreOffice open directly.',
+            'The same (current) version as a file – as Markdown or as a Word file (.doc) that Word and LibreOffice open directly.',
           params: [{ name: 'format', description: 'md (default) or doc for the Word version' }],
           example: `curl -s -H "X-API-Key: $KEY" -OJ \\
   "$BBB/api/recordings/$ID/summary/download?format=doc"`,
@@ -217,29 +223,39 @@ curl -s -H "X-API-Key: $KEY" -F file=@note.m4a \\
           method: 'POST',
           path: '/api/recordings/{id}/reprocess',
           summary:
-            'Process again: existing transcripts are reused, only the summary is recreated and replaces the old one.',
+            'Process again: existing transcripts are reused, the summary is recreated and becomes the current version. The previous one is kept alongside.',
         },
         {
           method: 'POST',
           path: '/api/recordings/{id}/summary-options',
           summary:
-            'Adjust the analysis: custom prompt, word count, language. Applies to the next run for this recording.',
+            'Adjust the analysis: custom prompt, word count, language. Applies to the next run for this recording. templateName only labels the resulting version.',
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
-  -d '{"prompt":"Decisions and tasks only.","maxWords":300,"language":"en"}' \\
+  -d '{"prompt":"Decisions and tasks only.","templateName":"Decisions only","maxWords":300,"language":"en"}' \\
   "$BBB/api/recordings/$ID/summary-options"`,
         },
         {
           method: 'PUT',
           path: '/api/recordings/{id}/summaries/{summaryId}',
-          summary: 'Overwrite a summary by hand (owner only).',
+          summary:
+            'Overwrite one version by hand (owner only). The edit is kept – a later analysis adds another version alongside it.',
           example: `curl -s -X PUT -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
   -d '{"markdown":"# Outcome\\n- Decision A"}' \\
   "$BBB/api/recordings/$ID/summaries/$SID"`,
         },
         {
+          method: 'POST',
+          path: '/api/recordings/{id}/summaries/{summaryId}/current',
+          summary:
+            'Make this version the current one (owner only): the download, /summary, the share view and summary.md follow it. Response: all versions.',
+          example: `curl -s -X POST -H "X-API-Key: $KEY" \\
+  "$BBB/api/recordings/$ID/summaries/$SID/current"`,
+        },
+        {
           method: 'DELETE',
           path: '/api/recordings/{id}/summaries/{summaryId}',
-          summary: 'Delete one summary (owner only).',
+          summary:
+            'Delete one version (owner only). If it was the current one, the newest remaining takes over. Response: all remaining versions.',
         },
       ],
     },

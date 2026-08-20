@@ -192,7 +192,7 @@ export const transcribeRecording = createAsyncThunk<JobView, string, { rejectVal
   },
 );
 
-/** Erneute Auswertung: nur die Zusammenfassung wird neu erstellt und ersetzt die vorhandene. */
+/** Erneute Auswertung: die Zusammenfassung wird neu erstellt – als weitere Fassung neben den vorhandenen. */
 export const reprocessRecording = createAsyncThunk<JobView, string, { rejectValue: string }>(
   'recordings/reprocess',
   async (id, { rejectWithValue }) => {
@@ -213,19 +213,20 @@ export const updateSummaryOptions = createAsyncThunk<
   {
     id: string;
     prompt: string | null;
+    templateName: string | null;
     maxWords: number | null;
     language: string | null;
     sttLanguage: string | null;
   },
   { rejectValue: string }
 >('recordings/updateSummaryOptions', async (
-  { id, prompt, maxWords, language, sttLanguage },
+  { id, prompt, templateName, maxWords, language, sttLanguage },
   { rejectWithValue },
 ) => {
   try {
     return await api<SummaryOptionsView>(`/api/recordings/${id}/summary-options`, {
       method: 'POST',
-      body: { prompt, maxWords, language, sttLanguage },
+      body: { prompt, templateName, maxWords, language, sttLanguage },
     });
   } catch (e) {
     return rejectWithValue(errorMessage(e));
@@ -287,16 +288,35 @@ export const updateSummary = createAsyncThunk<
   }
 });
 
+/**
+ * Fassung löschen. Die Antwort enthält alle verbliebenen Fassungen, weil beim
+ * Löschen der aktuellen eine andere übernimmt – das lässt sich lokal nicht raten.
+ */
 export const deleteSummary = createAsyncThunk<
-  string,
+  SummaryView[],
   { recordingId: string; summaryId: string },
   { rejectValue: string }
 >('recordings/deleteSummary', async ({ recordingId, summaryId }, { rejectWithValue }) => {
   try {
-    await api<void>(`/api/recordings/${recordingId}/summaries/${summaryId}`, {
+    return await api<SummaryView[]>(`/api/recordings/${recordingId}/summaries/${summaryId}`, {
       method: 'DELETE',
     });
-    return summaryId;
+  } catch (e) {
+    return rejectWithValue(errorMessage(e));
+  }
+});
+
+/** Diese Fassung gilt ab jetzt als „die" Zusammenfassung (Download, API, Freigabe, summary.md). */
+export const setCurrentSummary = createAsyncThunk<
+  SummaryView[],
+  { recordingId: string; summaryId: string },
+  { rejectValue: string }
+>('recordings/setCurrentSummary', async ({ recordingId, summaryId }, { rejectWithValue }) => {
+  try {
+    return await api<SummaryView[]>(
+      `/api/recordings/${recordingId}/summaries/${summaryId}/current`,
+      { method: 'POST' },
+    );
   } catch (e) {
     return rejectWithValue(errorMessage(e));
   }
@@ -517,9 +537,12 @@ const recordingsSlice = createSlice({
       })
       .addCase(deleteSummary.fulfilled, (state, action) => {
         if (state.detail) {
-          state.detail.summaries = state.detail.summaries.filter(
-            (s) => s.id !== action.payload,
-          );
+          state.detail.summaries = action.payload;
+        }
+      })
+      .addCase(setCurrentSummary.fulfilled, (state, action) => {
+        if (state.detail) {
+          state.detail.summaries = action.payload;
         }
       })
       .addCase(fetchShares.pending, (state) => {

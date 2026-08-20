@@ -73,10 +73,9 @@ public class PublicShareController {
         // Zusammenfassung. Eine Umschaltung aufs Whisper-Original braucht die
         // oeffentliche Ansicht nicht.
         List<TranscriptAssembler.Entry> entries = TranscriptAssembler.assemble(segments, true);
-        Summary summary = summaryRepo.findByRecordingIdOrderByCreatedAtDesc(recording.getId()).stream()
-                .filter(s -> s.getStatus() == Summary.Status.DONE && s.getMarkdown() != null)
-                .findFirst()
-                .orElse(null);
+        // Nur die aktuelle Fassung: Wer einen Link erhaelt, soll die eine Fassung
+        // sehen, die der Freigebende fuer die richtige haelt - nicht die Historie.
+        Summary summary = summaryRepo.findByRecordingIdAndCurrentIsTrue(recording.getId()).orElse(null);
         AppUser owner = userRepo.findById(recording.getOwnerId()).orElse(null);
 
         return new Dtos.PublicShareView(

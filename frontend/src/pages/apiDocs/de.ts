@@ -184,17 +184,23 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
     {
       id: 'summaries',
       title: 'Zusammenfassungen',
+      intro:
+        'Jede Auswertung legt eine weitere Fassung an, statt die vorhandene zu überschreiben; genau eine ist die aktuelle. Alle Fassungen einer Aufnahme stehen in der Einzelansicht unter summaries – mit Vorlage (templateName), Modell, Prompt (systemPrompt) und current.',
       endpoints: [
         {
           method: 'GET',
           path: '/api/recordings/{id}/summary',
-          summary: 'Neueste Zusammenfassung als Markdown. 404, wenn es noch keine gibt.',
+          summary: 'Aktuelle Fassung als Markdown. 404, wenn es noch keine gibt.',
           example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/recordings/$ID/summary"`,
           response: `{
   "id": "b21f...",
   "status": "DONE",
   "markdown": "# Wochenbesprechung Technik\\n\\n## Ergebnisse\\n- ...",
   "model": "qwen2.5-32b-instruct",
+  "templateName": "Meeting",
+  "systemPrompt": "Fasse die Aufnahme zusammen...",
+  "current": true,
+  "editedAt": null,
   "finishedAt": "2026-07-22T02:14:51Z"
 }`,
         },
@@ -202,7 +208,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
           method: 'GET',
           path: '/api/recordings/{id}/summary/download',
           summary:
-            'Dieselbe Zusammenfassung als Datei zum Speichern – als Markdown oder als Word-Datei (.doc), die Word und LibreOffice direkt öffnen.',
+            'Dieselbe (aktuelle) Fassung als Datei zum Speichern – als Markdown oder als Word-Datei (.doc), die Word und LibreOffice direkt öffnen.',
           params: [
             { name: 'format', description: 'md (Standard) oder doc für die Word-Fassung' },
           ],
@@ -220,29 +226,39 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
           method: 'POST',
           path: '/api/recordings/{id}/reprocess',
           summary:
-            'Erneut auswerten: vorhandene Transkripte bleiben, nur die Zusammenfassung wird neu erstellt und ersetzt die alte.',
+            'Erneut auswerten: vorhandene Transkripte bleiben, die Zusammenfassung wird neu erstellt und ist danach die aktuelle Fassung. Die bisherige bleibt daneben stehen.',
         },
         {
           method: 'POST',
           path: '/api/recordings/{id}/summary-options',
           summary:
-            'Auswertung anpassen: eigener Prompt, Wortzahl, Sprache. Gilt für die nächste Auswertung dieser Aufnahme.',
+            'Auswertung anpassen: eigener Prompt, Wortzahl, Sprache. Gilt für die nächste Auswertung dieser Aufnahme. templateName ist reine Beschriftung der erzeugten Fassung.',
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
-  -d '{"prompt":"Nur Beschlüsse und Aufgaben.","maxWords":300,"language":"de"}' \\
+  -d '{"prompt":"Nur Beschlüsse und Aufgaben.","templateName":"Nur Beschlüsse","maxWords":300,"language":"de"}' \\
   "$BBB/api/recordings/$ID/summary-options"`,
         },
         {
           method: 'PUT',
           path: '/api/recordings/{id}/summaries/{summaryId}',
-          summary: 'Zusammenfassung händisch überschreiben (nur Besitzer).',
+          summary:
+            'Eine Fassung händisch überschreiben (nur Besitzer). Die Bearbeitung bleibt erhalten – eine erneute Auswertung legt eine weitere Fassung daneben.',
           example: `curl -s -X PUT -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
   -d '{"markdown":"# Ergebnis\\n- Beschluss A"}' \\
   "$BBB/api/recordings/$ID/summaries/$SID"`,
         },
         {
+          method: 'POST',
+          path: '/api/recordings/{id}/summaries/{summaryId}/current',
+          summary:
+            'Diese Fassung wird die aktuelle (nur Besitzer): Download, /summary, Freigabe-Ansicht und summary.md folgen ihr. Antwort: alle Fassungen.',
+          example: `curl -s -X POST -H "X-API-Key: $KEY" \\
+  "$BBB/api/recordings/$ID/summaries/$SID/current"`,
+        },
+        {
           method: 'DELETE',
           path: '/api/recordings/{id}/summaries/{summaryId}',
-          summary: 'Eine Zusammenfassung löschen (nur Besitzer).',
+          summary:
+            'Eine Fassung löschen (nur Besitzer). War es die aktuelle, übernimmt die neueste verbliebene. Antwort: alle verbliebenen Fassungen.',
         },
       ],
     },

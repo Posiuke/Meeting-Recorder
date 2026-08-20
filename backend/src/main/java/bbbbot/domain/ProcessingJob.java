@@ -35,9 +35,14 @@ public class ProcessingJob {
     @Column(nullable = false)
     private boolean immediate;
 
-    /** Erneute Auswertung: nach Erfolg werden die alten Zusammenfassungen ersetzt. */
+    /**
+     * Bei Anlage des Auftrags lag schon eine fertige Zusammenfassung vor. Alte
+     * Fassungen werden nicht mehr ersetzt (jede Auswertung legt eine weitere
+     * Fassung daneben) - die Angabe entscheidet nur noch, ob eine erneute
+     * Transkription bei Schritt 1 stehen bleibt.
+     */
     @Column(nullable = false)
-    private boolean replaceExisting;
+    private boolean hadSummary;
 
     /** Erneute Transkription: vorhandene Segment-Transkripte werden neu erstellt. */
     @Column(nullable = false)
@@ -77,8 +82,8 @@ public class ProcessingJob {
     public void setStatus(Status status) { this.status = status; }
     public boolean isImmediate() { return immediate; }
     public void setImmediate(boolean immediate) { this.immediate = immediate; }
-    public boolean isReplaceExisting() { return replaceExisting; }
-    public void setReplaceExisting(boolean replaceExisting) { this.replaceExisting = replaceExisting; }
+    public boolean isHadSummary() { return hadSummary; }
+    public void setHadSummary(boolean hadSummary) { this.hadSummary = hadSummary; }
     public boolean isRedoTranscripts() { return redoTranscripts; }
     public void setRedoTranscripts(boolean redoTranscripts) { this.redoTranscripts = redoTranscripts; }
     public boolean isTranscribeOnly() { return transcribeOnly; }

@@ -32,6 +32,11 @@ docs/       Anleitungen (u.a. Whisper-Diarisierung), Alt-Dokumentation
   umschalten. Unter **Glossar** pflegt jeder Nutzer eigene Abkürzungen und
   Fachbegriffe; daneben steht ein **gemeinsames Glossar der Installation**, das
   Admins pflegen und alle lesen. Beide gehen in die Glättung ein.
+- **Fassungen der Zusammenfassung**: Eine erneute Auswertung ersetzt die
+  vorhandene Zusammenfassung nicht, sondern legt eine weitere Fassung daneben —
+  beschriftet mit Vorlage, Modell und Zeitpunkt. Im Reiter lässt sich zwischen
+  ihnen umschalten; eine ist die aktuelle (Download, API, Freigabe), ältere
+  lassen sich wieder nach vorn holen oder löschen.
 - **Vorlagen**: Im Tab **Vorlagen** pflegt jeder Nutzer eigene
   Auswertungs-Prompts (Liste links, großer Editor rechts; integrierte Vorlagen
   für Meeting, Vortrag, Interview und Sprachnotiz lassen sich als Kopie öffnen,
@@ -376,6 +381,44 @@ Log samt `finish_reason` und Länge des Reasonings.
 
 Ein Hinweis zum Modell: Für deutsche Besprechungstexte ist ein **Instruct**-Modell
 die bessere Wahl als ein Coder-Modell (`llm.model`).
+
+## Fassungen der Zusammenfassung
+
+Eine erneute Auswertung **ersetzt die Zusammenfassung nicht**, sondern legt eine
+weitere **Fassung** daneben. Das hat zwei Gründe: Eine von Hand überarbeitete
+Fassung soll ein zweiter Versuch nicht kosten, und ob eine andere Vorlage die
+bessere Zusammenfassung liefert, lässt sich nur beurteilen, wenn beide noch da
+sind.
+
+Im Reiter **Zusammenfassung** steht dafür über dem Text eine Auswahl der
+Fassungen, beschriftet mit **Vorlage, Modell und Zeitpunkt** (und dem Hinweis
+*bearbeitet*, wenn Handarbeit darin steckt). Der Prompt, mit dem eine Fassung
+entstanden ist, lässt sich pro Fassung aufklappen — er wird an der Fassung
+gespeichert, nicht nur an der Aufnahme, weil er sich bis zur nächsten Auswertung
+geändert haben kann.
+
+Genau **eine Fassung ist die aktuelle**. Sie ist die eine, die zählt:
+
+- `GET /api/recordings/{id}/summary` und der Download liefern sie,
+- die Freigabe-Ansicht zeigt sie,
+- `summary.md` im Aufnahme-Verzeichnis enthält sie,
+- die Inhaltssuche findet nur in ihr — ein Treffer soll in dem Text stehen, den
+  die Aufnahme auch anzeigt.
+
+Die neueste erfolgreiche Auswertung wird automatisch die aktuelle. Über **„Als
+aktuelle Fassung"** lässt sich eine ältere wieder nach vorn holen, ohne die neue
+zu löschen (`POST /api/recordings/{id}/summaries/{summaryId}/current`). Wird die
+aktuelle Fassung gelöscht, übernimmt die neueste verbliebene; ist keine mehr da,
+verschwindet auch `summary.md`.
+
+Aufgeräumt wird **nicht automatisch**: Alte Fassungen bleiben, bis jemand sie
+löscht. Genau das Automatische wäre der Fehler, den diese Änderung behebt — eine
+Aufräumregel würde als erstes die von Hand überarbeitete Fassung treffen. Eine
+Fassung ist Text von einigen Kilobyte; wer eine Aufnahme zwanzigmal auswertet,
+räumt in der Fassungsliste selbst auf.
+
+Bei Bestandsdaten (Migration V23) wird je Aufnahme die neueste fertige
+Zusammenfassung zur aktuellen — also genau die, die vorher überall gezeigt wurde.
 
 ## Darstellung von Zusammenfassung und Transkript (Markdown, Mermaid)
 

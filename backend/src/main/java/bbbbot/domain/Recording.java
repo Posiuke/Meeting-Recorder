@@ -101,6 +101,14 @@ public class Recording {
     @Column(columnDefinition = "text")
     private String summaryPrompt;
 
+    /**
+     * Name der Vorlage, aus der {@link #summaryPrompt} stammt (null = keine
+     * benannte Vorlage). Er wandert in jede erzeugte Fassung und macht die
+     * Fassungen einer Aufnahme unterscheidbar.
+     */
+    @Column(length = 200)
+    private String summaryTemplateName;
+
     /** Maximale Laenge der Zusammenfassung in Woertern (null = keine Vorgabe). */
     private Integer summaryMaxWords;
 
@@ -174,6 +182,8 @@ public class Recording {
     public void setCorrectionStatus(CorrectionStatus correctionStatus) { this.correctionStatus = correctionStatus; }
     public String getSummaryPrompt() { return summaryPrompt; }
     public void setSummaryPrompt(String summaryPrompt) { this.summaryPrompt = summaryPrompt; }
+    public String getSummaryTemplateName() { return summaryTemplateName; }
+    public void setSummaryTemplateName(String name) { this.summaryTemplateName = name; }
     public Integer getSummaryMaxWords() { return summaryMaxWords; }
     public void setSummaryMaxWords(Integer summaryMaxWords) { this.summaryMaxWords = summaryMaxWords; }
     public String getSummaryLanguage() { return summaryLanguage; }

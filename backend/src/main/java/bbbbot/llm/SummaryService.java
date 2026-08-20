@@ -19,10 +19,16 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Erstellt die Meeting-Zusammenfassung aus Transkript, Teilnehmer-Protokoll und
  * Chat (Map-Reduce ueber Kontext-Chunks, Portierung von src/summary.ts).
+ *
+ * <p>Jede Auswertung legt eine weitere {@link Summary Fassung} an und macht sie
+ * nach Erfolg zur aktuellen; die vorherigen bleiben stehen. Ueberschrieben wird
+ * nichts - siehe {@link #makeCurrent(Recording, Summary)}.
  */
 @Service
 public class SummaryService {
@@ -78,11 +84,6 @@ public class SummaryService {
      * bei mehreren Chunks ein konsolidierender Merge-Aufruf.
      */
     public Summary summarize(Recording recording, List<RecordingSegment> segments) {
-        Summary summary = Summary.create(recording.getId());
-        summary.setStatus(Summary.Status.RUNNING);
-        summary.setModel(settings.get(SettingsService.LLM_MODEL));
-        summaryRepo.save(summary);
-
         // Pro-Aufnahme-Einstellungen gehen vor den Admin-Standards (null/leer = Standard)
         String systemPrompt = recording.getSummaryPrompt() != null && !recording.getSummaryPrompt().isBlank()
                 ? recording.getSummaryPrompt().trim()
@@ -90,6 +91,16 @@ public class SummaryService {
         String language = recording.getSummaryLanguage() != null && !recording.getSummaryLanguage().isBlank()
                 ? recording.getSummaryLanguage().trim()
                 : settings.get(SettingsService.SUMMARY_LANGUAGE);
+
+        // Die Herkunft wird an der Fassung festgehalten, nicht nur an der
+        // Aufnahme: Nur so ist spaeter zu sehen, womit DIESE Fassung entstanden ist.
+        Summary summary = Summary.create(recording.getId());
+        summary.setStatus(Summary.Status.RUNNING);
+        summary.setModel(settings.get(SettingsService.LLM_MODEL));
+        summary.setTemplateName(recording.getSummaryTemplateName());
+        summary.setSystemPrompt(systemPrompt);
+        summaryRepo.save(summary);
+
         Integer maxWords = recording.getSummaryMaxWords();
         // Laengenvorgabe nur im finalen Aufruf: Teil-Zusammenfassungen sollen
         // detailliert bleiben, gekuerzt wird erst beim Konsolidieren.
@@ -139,8 +150,11 @@ public class SummaryService {
             summary.setStatus(Summary.Status.DONE);
             summary.setFinishedAt(Instant.now());
             summaryRepo.save(summary);
-            writeSummaryFile(recording, document);
-            log.info("Zusammenfassung fuer {} fertig ({} Zeichen).", recording.getId(), document.length());
+            // Die neue Fassung wird die aktuelle; die vorherige bleibt daneben stehen.
+            makeCurrent(recording, summary);
+            log.info("Zusammenfassung fuer {} fertig ({} Zeichen, Fassung {}).",
+                    recording.getId(), document.length(),
+                    summaryRepo.findByRecordingIdOrderByCreatedAtDesc(recording.getId()).size());
             return summary;
         } catch (RuntimeException e) {
             return fail(summary, "Unerwarteter Fehler: " + e.getMessage());
@@ -166,19 +180,56 @@ public class SummaryService {
                 + aiSummary.trim() + "\n";
     }
 
+    /** Die aktuelle Fassung der Aufnahme, falls es eine gibt. */
+    public Optional<Summary> current(UUID recordingId) {
+        return summaryRepo.findByRecordingIdAndCurrentIsTrue(recordingId);
+    }
+
     /**
-     * Gleicht summary.md mit der Datenbank ab: Die Datei spiegelt immer die
-     * neueste FERTIGE Zusammenfassung wider; gibt es keine mehr, wird sie
-     * geloescht. Nach jeder Mutation (Bearbeiten, Loeschen) aufrufen, damit
-     * Datei und API nicht auseinanderlaufen.
+     * Macht diese Fassung zur aktuellen und schreibt sie nach summary.md. Die
+     * bisherige verliert nur ihre Markierung - geloescht wird sie nicht.
+     *
+     * <p>Die alte Markierung wird vor der neuen gespeichert und geleert
+     * ({@code saveAndFlush}), weil der Teil-Index {@code uq_summary_current}
+     * genau eine aktuelle Fassung je Aufnahme zulaesst.
      */
-    public void syncSummaryFile(Recording recording) {
-        Summary latestDone = summaryRepo.findByRecordingIdOrderByCreatedAtDesc(recording.getId()).stream()
-                .filter(s -> s.getStatus() == Summary.Status.DONE && s.getMarkdown() != null)
-                .findFirst()
-                .orElse(null);
-        if (latestDone != null) {
-            writeSummaryFile(recording, latestDone.getMarkdown());
+    public void makeCurrent(Recording recording, Summary summary) {
+        if (!summary.isUsable()) {
+            throw new IllegalArgumentException("Nur eine fertige Fassung mit Inhalt kann die aktuelle sein");
+        }
+        summaryRepo.findByRecordingIdAndCurrentIsTrue(recording.getId())
+                .filter(previous -> !previous.getId().equals(summary.getId()))
+                .ifPresent(previous -> {
+                    previous.setCurrent(false);
+                    summaryRepo.saveAndFlush(previous);
+                });
+        if (!summary.isCurrent()) {
+            summary.setCurrent(true);
+            summaryRepo.save(summary);
+        }
+        writeSummaryFile(recording, summary.getMarkdown());
+    }
+
+    /**
+     * Gleicht aktuelle Fassung und summary.md mit der Datenbank ab: Ist keine
+     * Fassung mehr aktuell - weil die aktuelle geloescht wurde -, uebernimmt die
+     * neueste brauchbare; gibt es keine mehr, verschwindet summary.md. Nach jeder
+     * Mutation (Bearbeiten, Loeschen) aufrufen, damit Datei, API und Anzeige nicht
+     * auseinanderlaufen.
+     */
+    public void syncCurrent(Recording recording) {
+        Optional<Summary> current = summaryRepo.findByRecordingIdAndCurrentIsTrue(recording.getId());
+        if (current.isEmpty()) {
+            current = summaryRepo.findByRecordingIdOrderByCreatedAtDesc(recording.getId()).stream()
+                    .filter(Summary::isUsable)
+                    .findFirst();
+            current.ifPresent(s -> {
+                s.setCurrent(true);
+                summaryRepo.save(s);
+            });
+        }
+        if (current.isPresent()) {
+            writeSummaryFile(recording, current.get().getMarkdown());
             return;
         }
         try {

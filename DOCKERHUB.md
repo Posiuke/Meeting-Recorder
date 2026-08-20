@@ -22,7 +22,7 @@ in **einem** Container; PostgreSQL läuft separat.
 - 🎛️ **Auswertung pro Aufnahme anpassbar**: eigener Auswertungs-Prompt (mit Vorlagen für Vortrag, Interview, Sprachnotiz), maximale Länge, Sprache der Zusammenfassung — und die Sprache der Spracherkennung (auch „automatisch erkennen")
 - 📄 **Herunterladen als Markdown oder Word**: Transkript (geglättet oder Original) und Zusammenfassung als `.md` oder als `.doc`, das Word und LibreOffice direkt öffnen — von dort als DOCX oder PDF speicherbar
 - ▶️ **Vom Transkript in die Aufnahme springen**: Klick auf eine Transkriptzeile setzt die Abspielposition, die laufende Zeile wird hervorgehoben — dazu ein durchgehender Player und der Download der kompletten Aufnahme als eine MP3
-- 🔁 **Erneut auswerten** (nur Zusammenfassung) und **Transkription neu erstellen** (Spracherkennung + Zusammenfassung) per Klick
+- 🔁 **Erneut auswerten** (nur Zusammenfassung) und **Transkription neu erstellen** (Spracherkennung + Zusammenfassung) per Klick — jede Auswertung legt eine weitere **Fassung** an, zwischen denen sich umschalten lässt
 - ⏱️ **Verarbeitungs-Zeitfenster** (STT/LLM z. B. nachts) plus „Jetzt auswerten"
 - 🧪 **Verbindungstests** für Whisper und LLM direkt im Admin-Bereich
 - 👥 **Teilen & Gruppen**, Admin-Bereich für Einstellungen und Benutzer
@@ -228,6 +228,14 @@ bei der nächsten Auswertung („Jetzt auswerten", „Erneut auswerten" oder
 „Transkription neu erstellen"). Die Standardvorgabe des Administrators lässt sich über
 **„Standard übernehmen"** in das Feld holen und dort anpassen, statt sie
 vollständig ersetzen zu müssen.
+
+Eine erneute Auswertung **ersetzt die Zusammenfassung nicht**, sondern legt eine
+weitere **Fassung** daneben — beschriftet mit Vorlage, Modell und Zeitpunkt, samt
+dem Prompt, mit dem sie entstanden ist. Im Reiter **Zusammenfassung** lässt sich
+zwischen den Fassungen umschalten; genau eine ist die aktuelle und steht in
+Download, API, Freigabe-Ansicht und `summary.md`. Eine ältere Fassung lässt sich
+über **„Als aktuelle Fassung"** wieder nach vorn holen, ältere einzeln löschen.
+Automatisch aufgeräumt wird nichts — von Hand überarbeitete Fassungen bleiben.
 
 Zusammenfassung und geglättetes Transkript werden als GitHub-Markdown angezeigt
 — Tabellen und Aufgabenlisten erscheinen als solche. Codeblöcke mit der Sprache

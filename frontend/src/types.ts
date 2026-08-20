@@ -237,14 +237,25 @@ export interface ConnectionTestResult {
 
 export type ProcessStatus = 'PENDING' | 'RUNNING' | 'DONE' | 'FAILED';
 
+/**
+ * Eine Fassung der Zusammenfassung. Jede Auswertung legt eine weitere an; genau
+ * eine ist die aktuelle (`current`) und gilt überall als „die" Zusammenfassung.
+ */
 export interface SummaryView {
   id: string;
   status: ProcessStatus;
   markdown: string | null;
   model: string | null;
+  /** Vorlage, mit der die Fassung erzeugt wurde (null = keine benannte). */
+  templateName: string | null;
+  /** Auswertungs-Prompt dieser Fassung – damit sich zwei Fassungen erklären lassen. */
+  systemPrompt: string | null;
+  current: boolean;
   error: string | null;
   createdAt: string;
   finishedAt: string | null;
+  /** Zeitpunkt der letzten händischen Bearbeitung (null = unberührt vom Modell). */
+  editedAt: string | null;
 }
 
 export interface JobView {
@@ -265,6 +276,8 @@ export interface JobView {
  */
 export interface SummaryOptionsView {
   prompt: string | null;
+  /** Name der gewählten Vorlage; benennt später die erzeugte Fassung. */
+  templateName: string | null;
   maxWords: number | null;
   /** Sprache der Zusammenfassung. */
   language: string | null;

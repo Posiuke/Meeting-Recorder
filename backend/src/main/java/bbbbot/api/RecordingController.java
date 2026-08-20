@@ -45,6 +45,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -133,6 +134,9 @@ public class RecordingController {
     /** Laengengrenze des Auswertungs-Prompts - gleich beim Upload und pro Aufnahme. */
     private static final int MAX_SUMMARY_PROMPT_LENGTH = 8000;
 
+    /** Wie die Namensspalte der Vorlagen - der Name kommt von dort. */
+    private static final int MAX_TEMPLATE_NAME_LENGTH = 200;
+
     /**
      * Normalisiert einen Auswertungs-Prompt: leer bedeutet "Admin-Standard
      * verwenden" (null), zu lang wird abgelehnt.
@@ -159,6 +163,19 @@ public class RecordingController {
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
+    }
+
+    /**
+     * Normalisiert den Namen der gewaehlten Vorlage: leer bedeutet "keine
+     * benannte Vorlage" (null). Der Name ist reine Beschriftung der Fassung -
+     * ein zu langer wird gekuerzt statt den Aufruf scheitern zu lassen.
+     */
+    private static String checkTemplateName(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String name = raw.trim();
+        return name.length() > MAX_TEMPLATE_NAME_LENGTH
+                ? name.substring(0, MAX_TEMPLATE_NAME_LENGTH)
+                : name;
     }
 
     /**
@@ -203,6 +220,9 @@ public class RecordingController {
      *                      eine andere Vorlage als "Meeting" waehlen - sonst
      *                      liefe eine Sofort-Auswertung noch mit dem Standard,
      *                      bevor man sie im Nachhinein anpassen koennte.
+     * @param summaryTemplateName Name der gewaehlten Vorlage (leer = keine
+     *                      benannte). Er benennt spaeter die erzeugte Fassung in
+     *                      der Fassungsliste.
      * @param sttLanguage   Sprache der Spracherkennung (leer = Admin-Standard,
      *                      "auto" = automatisch erkennen). Aus demselben Grund
      *                      schon hier waehlbar - ein mit falscher Sprache
@@ -215,6 +235,7 @@ public class RecordingController {
                                      @RequestParam(value = "processNow", defaultValue = "false") boolean processNow,
                                      @RequestParam(value = "diarize", defaultValue = "false") boolean diarize,
                                      @RequestParam(value = "summaryPrompt", required = false) String summaryPrompt,
+                                     @RequestParam(value = "summaryTemplateName", required = false) String summaryTemplateName,
                                      @RequestParam(value = "sttLanguage", required = false) String sttLanguage) {
         AppUser user = CurrentUser.get();
         if (file == null || file.isEmpty()) {
@@ -225,11 +246,13 @@ public class RecordingController {
         boolean diarizeEffective = diarize
                 && settings.getBool(bbbbot.settings.SettingsService.WHISPER_DIARIZE);
         String prompt = requireSummaryPrompt(summaryPrompt);
+        String templateName = checkTemplateName(summaryTemplateName);
         String language = requireSttLanguage(sttLanguage);
         try (InputStream in = file.getInputStream()) {
             var recording = recordingService.createUploadedRecording(user.getId(),
                     bbbbot.recording.RecordingService.UploadOptions.forUpload(
-                            title, aiAnalysis, processNow, diarizeEffective, prompt, language),
+                            title, aiAnalysis, processNow, diarizeEffective, prompt, templateName,
+                            language),
                     original, in);
             return toView(recording, user);
         } catch (IOException e) {
@@ -299,8 +322,7 @@ public class RecordingController {
         Recording recording = access.requireReadable(id, user);
         List<Dtos.SegmentView> segments = segmentRepo.findByRecordingIdOrderBySeq(id).stream()
                 .map(Dtos.SegmentView::of).toList();
-        List<Dtos.SummaryView> summaries = summaryRepo.findByRecordingIdOrderByCreatedAtDesc(id).stream()
-                .map(Dtos.SummaryView::of).toList();
+        List<Dtos.SummaryView> summaries = summaries(id);
         List<Dtos.JobView> jobs = jobRepo.findByRecordingIdOrderByCreatedAtDesc(id).stream()
                 .map(Dtos.JobView::of).toList();
         List<Dtos.ParticipantView> participants = participantService.ensureFromTranscript(recording).stream()
@@ -561,6 +583,7 @@ public class RecordingController {
         }
 
         recording.setSummaryPrompt(prompt);
+        recording.setSummaryTemplateName(checkTemplateName(request.templateName()));
         recording.setSummaryMaxWords(maxWords);
         recording.setSummaryLanguage(language);
         recording.setSttLanguage(requireSttLanguage(request.sttLanguage()));
@@ -570,7 +593,8 @@ public class RecordingController {
 
     private Dtos.SummaryOptionsView summaryOptionsView(Recording recording) {
         return new Dtos.SummaryOptionsView(
-                recording.getSummaryPrompt(), recording.getSummaryMaxWords(), recording.getSummaryLanguage(),
+                recording.getSummaryPrompt(), recording.getSummaryTemplateName(),
+                recording.getSummaryMaxWords(), recording.getSummaryLanguage(),
                 recording.getSttLanguage(),
                 settings.get(bbbbot.settings.SettingsService.SUMMARY_SYSTEM_PROMPT),
                 settings.get(bbbbot.settings.SettingsService.SUMMARY_LANGUAGE),
@@ -697,12 +721,16 @@ public class RecordingController {
 
     // ------------------------------------------------------- Zusammenfassung
 
+    /**
+     * Die aktuelle Fassung der Zusammenfassung. Aeltere Fassungen stehen in der
+     * Einzelansicht ({@code GET /api/recordings/{id}}) unter {@code summaries};
+     * hier antwortet bewusst nur die eine, die als "die" Zusammenfassung gilt.
+     */
     @GetMapping("/{id}/summary")
-    public Dtos.SummaryView latestSummary(@PathVariable UUID id) {
+    public Dtos.SummaryView currentSummary(@PathVariable UUID id) {
         AppUser user = CurrentUser.get();
         access.requireReadable(id, user);
-        return summaryRepo.findByRecordingIdOrderByCreatedAtDesc(id).stream()
-                .findFirst()
+        return summaryService.current(id)
                 .map(Dtos.SummaryView::of)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Keine Zusammenfassung vorhanden"));
     }
@@ -717,10 +745,10 @@ public class RecordingController {
     }
 
     /**
-     * Zusammenfassung nachtraeglich haendisch bearbeiten (nur Besitzer). Der
-     * neue Markdown-Inhalt ersetzt den bisherigen; summary.md wird aktualisiert,
-     * sofern es sich um die neueste fertige Zusammenfassung handelt. Eine
-     * spaetere "Erneut auswerten"-Auswertung ueberschreibt die Bearbeitung.
+     * Fassung nachtraeglich haendisch bearbeiten (nur Besitzer). Der neue
+     * Markdown-Inhalt ersetzt den bisherigen dieser Fassung; summary.md wird
+     * nachgezogen, sofern es die aktuelle Fassung ist. Eine erneute Auswertung
+     * legt eine weitere Fassung daneben - die Bearbeitung bleibt erhalten.
      */
     @PutMapping("/{id}/summaries/{summaryId}")
     public Dtos.SummaryView updateSummary(@PathVariable UUID id, @PathVariable UUID summaryId,
@@ -740,20 +768,55 @@ public class RecordingController {
                     "Nur fertige Zusammenfassungen koennen bearbeitet werden");
         }
         summary.setMarkdown(markdown.trim() + "\n");
+        summary.setEditedAt(Instant.now());
         summaryRepo.save(summary);
-        summaryService.syncSummaryFile(recording);
+        summaryService.syncCurrent(recording);
         return Dtos.SummaryView.of(summary);
     }
 
+    /**
+     * Legt fest, welche Fassung als "die" Zusammenfassung gilt (nur Besitzer):
+     * Download, API, Freigabe-Ansicht und summary.md folgen ihr. Damit laesst
+     * sich nach einem Vergleich die aeltere Fassung wieder nach vorn holen, ohne
+     * die neue zu loeschen.
+     */
+    @PostMapping("/{id}/summaries/{summaryId}/current")
+    public List<Dtos.SummaryView> makeSummaryCurrent(@PathVariable UUID id,
+                                                     @PathVariable UUID summaryId) {
+        AppUser user = CurrentUser.get();
+        Recording recording = access.requireOwner(id, user);
+        Summary summary = summaryRepo.findById(summaryId)
+                .filter(s -> s.getRecordingId().equals(id))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Zusammenfassung nicht gefunden"));
+        if (!summary.isUsable()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Nur eine fertige Fassung mit Inhalt kann die aktuelle sein");
+        }
+        summaryService.makeCurrent(recording, summary);
+        return summaries(id);
+    }
+
+    /**
+     * Eine Fassung loeschen (nur Besitzer). War es die aktuelle, uebernimmt die
+     * neueste verbliebene - die Antwort enthaelt deshalb alle Fassungen, damit
+     * die Anzeige nicht auf eine geratene Reihenfolge angewiesen ist.
+     */
     @DeleteMapping("/{id}/summaries/{summaryId}")
-    public void deleteSummary(@PathVariable UUID id, @PathVariable UUID summaryId) {
+    public List<Dtos.SummaryView> deleteSummary(@PathVariable UUID id, @PathVariable UUID summaryId) {
         AppUser user = CurrentUser.get();
         Recording recording = access.requireOwner(id, user);
         summaryRepo.findById(summaryId)
                 .filter(s -> s.getRecordingId().equals(id))
                 .ifPresent(summaryRepo::delete);
-        // summary.md nachziehen, damit die Datei keinen geloeschten Inhalt behaelt
-        summaryService.syncSummaryFile(recording);
+        // Aktuelle Fassung und summary.md nachziehen, damit die Datei keinen
+        // geloeschten Inhalt behaelt
+        summaryService.syncCurrent(recording);
+        return summaries(id);
+    }
+
+    private List<Dtos.SummaryView> summaries(UUID recordingId) {
+        return summaryRepo.findByRecordingIdOrderByCreatedAtDesc(recordingId).stream()
+                .map(Dtos.SummaryView::of).toList();
     }
 
     // ---------------------------------------------------------------- intern

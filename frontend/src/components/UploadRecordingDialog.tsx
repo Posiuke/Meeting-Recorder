@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import Modal from './Modal';
 import Alert from './Alert';
 import HelpTip from './HelpTip';
-import PromptPresetSelect, { resolvePresetPrompt } from './PromptPresetSelect';
+import PromptPresetSelect, { presetLabel, resolvePresetPrompt } from './PromptPresetSelect';
 import SttLanguageSelect from './SttLanguageSelect';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchPromptTemplates } from '../store/promptTemplatesSlice';
@@ -68,6 +68,8 @@ export default function UploadRecordingDialog({ onClose, onUploaded }: UploadRec
   const tooLarge = file !== null && maxFileSize !== null && file.size > maxFileSize;
   // Leer = Standardvorgabe des Administrators (Meeting)
   const summaryPrompt = resolvePresetPrompt(preset, templates);
+  // Der Name benennt später die erzeugte Fassung in der Fassungsliste
+  const summaryTemplateName = presetLabel(preset, templates);
 
   const handleUpload = async () => {
     if (!file || uploading || tooLarge) return;
@@ -76,7 +78,7 @@ export default function UploadRecordingDialog({ onClose, onUploaded }: UploadRec
     try {
       await uploadRecording(
         file,
-        { title, aiAnalysis, processNow, diarize, summaryPrompt, sttLanguage },
+        { title, aiAnalysis, processNow, diarize, summaryPrompt, summaryTemplateName, sttLanguage },
         setProgress,
       );
       onUploaded();

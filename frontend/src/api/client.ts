@@ -180,6 +180,11 @@ export interface UploadRecordingOptions {
    */
   summaryPrompt?: string | null;
   /**
+   * Name der gewählten Vorlage; leer/undefined = keine benannte Vorlage. Er
+   * benennt später die erzeugte Fassung in der Fassungsliste.
+   */
+  summaryTemplateName?: string | null;
+  /**
    * Sprache der Spracherkennung; leer/undefined = Admin-Standard, `auto` =
    * Whisper erkennt sie selbst. Muss beim Hochladen feststehen: Ein mit
    * falscher Sprache erzeugtes Transkript ist nachträglich nicht zu retten.
@@ -258,6 +263,9 @@ export function uploadRecording(
     form.append('processNow', String(options.processNow));
     form.append('diarize', String(options.diarize ?? false));
     if (options.summaryPrompt?.trim()) form.append('summaryPrompt', options.summaryPrompt.trim());
+    if (options.summaryTemplateName?.trim()) {
+      form.append('summaryTemplateName', options.summaryTemplateName.trim());
+    }
     if (options.sttLanguage?.trim()) form.append('sttLanguage', options.sttLanguage.trim());
     xhr.send(form);
   });
