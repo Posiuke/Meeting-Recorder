@@ -144,6 +144,9 @@ class MigrationSchemaIT {
 
         recording.setCorrectionStatus(Recording.CorrectionStatus.READY);
         recording.setSummaryTemplateName("Meeting");
+        // Modell und Temperatur je Aufnahme (V24)
+        recording.setSummaryModel("vergleichs-modell");
+        recording.setSummaryTemperature(0.9);
         recordingRepo.saveAndFlush(recording);
 
         // Fassungen der Zusammenfassung (V23): zwei Fassungen, genau eine aktuell.
@@ -152,7 +155,8 @@ class MigrationSchemaIT {
         assertThat(summaryRepo.findByRecordingIdAndCurrentIsTrue(recording.getId()))
                 .get()
                 .satisfies(sum -> assertThat(sum.getId()).isEqualTo(aktuell.getId()))
-                .satisfies(sum -> assertThat(sum.getTemplateName()).isEqualTo("Meeting"));
+                .satisfies(sum -> assertThat(sum.getTemplateName()).isEqualTo("Meeting"))
+                .satisfies(sum -> assertThat(sum.getTemperature()).isEqualTo(0.9));
         assertThat(summaryRepo.findByRecordingIdOrderByCreatedAtDesc(recording.getId())).hasSize(2);
         // Die Suche in Zusammenfassungen findet nur die aktuelle Fassung
         assertThat(summaryRepo.findRecordingIdsByMarkdownLike("%aktuelle fassung%"))
@@ -172,6 +176,8 @@ class MigrationSchemaIT {
         summary.setMarkdown(markdown);
         summary.setSystemPrompt("Fasse die Aufnahme zusammen.");
         summary.setTemplateName("Meeting");
+        summary.setModel("vergleichs-modell");
+        summary.setTemperature(0.9);
         summary.setCurrent(current);
         return summaryRepo.saveAndFlush(summary);
     }

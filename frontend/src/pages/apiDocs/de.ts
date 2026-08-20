@@ -198,6 +198,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
   "markdown": "# Wochenbesprechung Technik\\n\\n## Ergebnisse\\n- ...",
   "model": "qwen2.5-32b-instruct",
   "templateName": "Meeting",
+  "temperature": 0.3,
   "systemPrompt": "Fasse die Aufnahme zusammen...",
   "current": true,
   "editedAt": null,
@@ -232,9 +233,10 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
           method: 'POST',
           path: '/api/recordings/{id}/summary-options',
           summary:
-            'Auswertung anpassen: eigener Prompt, Wortzahl, Sprache. Gilt für die nächste Auswertung dieser Aufnahme. templateName ist reine Beschriftung der erzeugten Fassung.',
+            'Auswertung anpassen: eigener Prompt, Wortzahl, Sprache, Modell und Temperatur. Gilt für die nächste Auswertung dieser Aufnahme; null heißt jeweils „Admin-Vorgabe". templateName ist reine Beschriftung der erzeugten Fassung. Zwei Modelle vergleichen: model setzen, /reprocess, danach stehen beide Fassungen nebeneinander.',
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
-  -d '{"prompt":"Nur Beschlüsse und Aufgaben.","templateName":"Nur Beschlüsse","maxWords":300,"language":"de"}' \\
+  -d '{"prompt":"Nur Beschlüsse und Aufgaben.","templateName":"Nur Beschlüsse","maxWords":300,
+       "language":"de","model":"qwen2.5-72b-instruct","temperature":0.1}' \\
   "$BBB/api/recordings/$ID/summary-options"`,
         },
         {
@@ -580,7 +582,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
       id: 'templates',
       title: 'Promptvorlagen',
       intro:
-        'Eigene Auswertungs-Prompts, die Sie beim Auswerten wiederverwenden – im Frontend im Tab „Vorlagen" pflegbar.',
+        'Eigene Auswertungs-Prompts, die Sie beim Auswerten wiederverwenden – im Frontend im Tab „Vorlagen" pflegbar. Optional mit eigenem model und temperature (0–2); null bedeutet „Vorgabe des Administrators verwenden".',
       endpoints: [
         { method: 'GET', path: '/api/prompt-templates', summary: 'Eigene Vorlagen auflisten.' },
         {
@@ -592,9 +594,10 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
         {
           method: 'POST',
           path: '/api/prompt-templates',
-          summary: 'Vorlage anlegen.',
+          summary: 'Vorlage anlegen. model und temperature sind optional (null = Admin-Vorgabe).',
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
-  -d '{"name":"Nur Aufgaben","prompt":"Liste ausschließlich Aufgaben mit Zuständigkeit."}' \\
+  -d '{"name":"Nur Aufgaben","prompt":"Liste ausschließlich Aufgaben mit Zuständigkeit.",
+       "model":"qwen2.5-72b-instruct","temperature":0.1}' \\
   "$BBB/api/prompt-templates"`,
         },
         { method: 'PUT', path: '/api/prompt-templates/{id}', summary: 'Vorlage ändern.' },

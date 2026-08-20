@@ -315,7 +315,7 @@ class TranscriptCorrectionServiceTest {
 
         // Ein kurzer Block braucht kein Budget fuer 3000 Zeichen: Die Antwort ist
         // etwa so lang wie die Anfrage ("1 | erster satz.\n" = 17 Zeichen).
-        verify(llm).chat(anyString(), anyString(), eq(17 / 2 + 512));
+        verify(llm).chat(anyString(), anyString(), eq(LlmClient.Overrides.maxTokens(17 / 2 + 512)));
     }
 
     @Test
@@ -328,7 +328,8 @@ class TranscriptCorrectionServiceTest {
 
         service.correct(segment("[00:01] erster satz."), "");
 
-        verify(llm).chat(anyString(), anyString(), eq(17 / 2 + 512 + 2048));
+        verify(llm).chat(anyString(), anyString(),
+                eq(LlmClient.Overrides.maxTokens(17 / 2 + 512 + 2048)));
     }
 
     @Test
@@ -339,7 +340,7 @@ class TranscriptCorrectionServiceTest {
         service.correct(segment("[00:01] erster satz."), glossar);
 
         // Das Glossar geht in die Frage ein, nicht in die Antwort
-        verify(llm).chat(anyString(), anyString(), eq(17 / 2 + 512));
+        verify(llm).chat(anyString(), anyString(), eq(LlmClient.Overrides.maxTokens(17 / 2 + 512)));
     }
 
     /** Erzeugt {@code count} Saetze, jeder gut 500 Zeichen lang. */

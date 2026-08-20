@@ -20,6 +20,9 @@ import type { PromptTemplateView } from '../types';
 /** Serverseitige Grenzen (PromptTemplateController). */
 const MAX_PROMPT_LENGTH = 8000;
 const MAX_NAME_LENGTH = 100;
+const MAX_MODEL_LENGTH = 200;
+/** Bandbreite der Temperatur bei OpenAI-kompatiblen Endpunkten. */
+const MAX_TEMPERATURE = 2;
 const MAX_TEMPLATES = 100;
 /** Ab dieser Anzahl lohnt sich das Filterfeld in der Liste. */
 const FILTER_THRESHOLD = 6;
@@ -29,29 +32,41 @@ interface EditorState {
   id: string | null;
   name: string;
   prompt: string;
+  /** Modell dieser Vorlage; leer = Vorgabe des Administrators. */
+  model: string;
+  /** Temperatur dieser Vorlage als Eingabetext; leer = Vorgabe des Administrators. */
+  temperature: string;
   /** Schlüssel der integrierten Vorlage, aus der der Entwurf entstanden ist. */
   fromBuiltIn: string | null;
   /** Zuletzt gespeicherter Stand – Grundlage der "nicht gespeichert"-Erkennung. */
-  base: { name: string; prompt: string };
+  base: { name: string; prompt: string; model: string; temperature: string };
 }
 
-const editorFor = (template: PromptTemplateView): EditorState => ({
-  id: template.id,
-  name: template.name,
-  prompt: template.prompt,
-  fromBuiltIn: null,
-  base: { name: template.name, prompt: template.prompt },
-});
+const editorFor = (template: PromptTemplateView): EditorState => {
+  const model = template.model ?? '';
+  const temperature = template.temperature?.toString() ?? '';
+  return {
+    id: template.id,
+    name: template.name,
+    prompt: template.prompt,
+    model,
+    temperature,
+    fromBuiltIn: null,
+    base: { name: template.name, prompt: template.prompt, model, temperature },
+  };
+};
 
 const draft = (name: string, prompt: string, fromBuiltIn: string | null = null): EditorState => ({
   id: null,
   name,
   prompt,
+  model: '',
+  temperature: '',
   fromBuiltIn,
   // Der vorbelegte Stand ist die Vergleichsbasis: Wer eine integrierte Vorlage
   // nur ansieht, hat nichts geaendert und soll beim Weiterklicken auch nicht
   // gefragt werden. Speichern ist trotzdem moeglich (siehe canSave).
-  base: { name, prompt },
+  base: { name, prompt, model: '', temperature: '' },
 });
 
 /**
@@ -99,12 +114,25 @@ export default function TemplatesPage() {
 
   const name = editor?.name ?? '';
   const prompt = editor?.prompt ?? '';
+  const model = editor?.model ?? '';
+  const temperature = editor?.temperature ?? '';
   const trimmedName = name.trim();
   const trimmedPrompt = prompt.trim();
   const dirty =
-    editor !== null && (name !== editor.base.name || prompt !== editor.base.prompt);
+    editor !== null &&
+    (name !== editor.base.name ||
+      prompt !== editor.base.prompt ||
+      model !== editor.base.model ||
+      temperature !== editor.base.temperature);
   const promptTooLong = prompt.length > MAX_PROMPT_LENGTH;
   const nameTooLong = name.length > MAX_NAME_LENGTH;
+  // Leer heißt "Vorgabe des Administrators"; sonst eine Zahl in der Bandbreite,
+  // die OpenAI-kompatible Endpunkte annehmen.
+  const temperatureNum = temperature.trim() === '' ? null : Number(temperature);
+  const temperatureInvalid =
+    temperatureNum !== null &&
+    (Number.isNaN(temperatureNum) || temperatureNum < 0 || temperatureNum > MAX_TEMPERATURE);
+  const modelTooLong = model.length > MAX_MODEL_LENGTH;
   // Ein Entwurf laesst sich immer speichern, sobald Name und Prompt stehen -
   // auch unveraendert aus einer integrierten Vorlage uebernommen. Bei einer
   // gespeicherten Vorlage gibt es ohne Aenderung nichts zu speichern.
@@ -115,7 +143,9 @@ export default function TemplatesPage() {
     trimmedName !== '' &&
     trimmedPrompt !== '' &&
     !promptTooLong &&
-    !nameTooLong;
+    !nameTooLong &&
+    !modelTooLong &&
+    !temperatureInvalid;
 
   const flashSaved = () => {
     setSaved(true);
@@ -146,17 +176,30 @@ export default function TemplatesPage() {
     if (!editor || !canSave) return;
     const nextName = editor.name.trim();
     const nextPrompt = editor.prompt.trim();
+    const nextModel = editor.model.trim() === '' ? null : editor.model.trim();
+    const nextTemperature = temperatureNum;
     setBusy(true);
     setFormError(null);
     try {
       if (editor.id) {
         const updated = await dispatch(
-          updatePromptTemplate({ id: editor.id, name: nextName, prompt: nextPrompt }),
+          updatePromptTemplate({
+            id: editor.id,
+            name: nextName,
+            prompt: nextPrompt,
+            model: nextModel,
+            temperature: nextTemperature,
+          }),
         ).unwrap();
         setEditor(editorFor(updated));
       } else {
         const created = await dispatch(
-          createPromptTemplate({ name: nextName, prompt: nextPrompt }),
+          createPromptTemplate({
+            name: nextName,
+            prompt: nextPrompt,
+            model: nextModel,
+            temperature: nextTemperature,
+          }),
         ).unwrap();
         setEditor(editorFor(created));
       }
@@ -166,7 +209,7 @@ export default function TemplatesPage() {
     } finally {
       setBusy(false);
     }
-  }, [canSave, dispatch, editor]);
+  }, [canSave, dispatch, editor, temperatureNum]);
 
   // Strg+S / ⌘+S speichert – bei langen Prompts erwartet man das. Nur solange
   // ein Editor offen ist, sonst bleibt das Browser-Kürzel unangetastet.
@@ -369,6 +412,46 @@ export default function TemplatesPage() {
                 )}
               </div>
 
+              <div className="form-row">
+                <div className="form-field grow">
+                  <label htmlFor="template-model">
+                    {t('templates.modelLabel')}
+                    <HelpTip text={t('templates.modelHelp')} />
+                  </label>
+                  <input
+                    id="template-model"
+                    type="text"
+                    value={model}
+                    maxLength={MAX_MODEL_LENGTH}
+                    placeholder={t('templates.modelPlaceholder')}
+                    disabled={busy}
+                    onChange={(e) => setEditor({ ...editor, model: e.target.value })}
+                  />
+                </div>
+                <div className="form-field">
+                  <label htmlFor="template-temperature">
+                    {t('templates.temperatureLabel')}
+                    <HelpTip text={t('templates.temperatureHelp')} />
+                  </label>
+                  <input
+                    id="template-temperature"
+                    type="number"
+                    min={0}
+                    max={MAX_TEMPERATURE}
+                    step={0.1}
+                    value={temperature}
+                    placeholder={t('templates.temperaturePlaceholder')}
+                    disabled={busy}
+                    onChange={(e) => setEditor({ ...editor, temperature: e.target.value })}
+                  />
+                  {temperatureInvalid && (
+                    <span className="field-error">
+                      {t('templates.temperatureInvalid', { max: MAX_TEMPERATURE })}
+                    </span>
+                  )}
+                </div>
+              </div>
+
               <div className="form-field template-prompt">
                 <label htmlFor="template-prompt">
                   {t('templates.promptLabel')}
@@ -407,7 +490,13 @@ export default function TemplatesPage() {
                   disabled={busy || (!dirty && editor.id !== null)}
                   onClick={() =>
                     editor.id
-                      ? open({ ...editor, name: editor.base.name, prompt: editor.base.prompt })
+                      ? open({
+                          ...editor,
+                          name: editor.base.name,
+                          prompt: editor.base.prompt,
+                          model: editor.base.model,
+                          temperature: editor.base.temperature,
+                        })
                       : guarded(() => open(null))
                   }
                 >

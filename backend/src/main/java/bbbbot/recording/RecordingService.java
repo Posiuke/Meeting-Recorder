@@ -140,6 +140,8 @@ public class RecordingService {
      *                       schon bei der ersten (auch sofortigen) Auswertung.
      * @param summaryTemplateName Name der gewaehlten Vorlage; null = keine benannte.
      *                       Er benennt spaeter die erzeugte Fassung.
+     * @param summaryModel   Modell fuer die Auswertung; null = Admin-Vorgabe
+     * @param summaryTemperature Temperatur fuer die Auswertung; null = Admin-Vorgabe
      * @param sttLanguage    Sprache der Spracherkennung; null = Admin-Standard,
      *                       "auto" = Whisper erkennt sie selbst. Sie muss - wie der
      *                       Prompt - vor dem Verarbeitungs-Job feststehen.
@@ -147,19 +149,22 @@ public class RecordingService {
     public record UploadOptions(String title, boolean aiAnalysis, boolean processNow,
                                 boolean diarize, boolean transcribeOnly, boolean keepVideo,
                                 String summaryPrompt, String summaryTemplateName,
+                                String summaryModel, Double summaryTemperature,
                                 String sttLanguage) {
 
         /** Upload aus der Weboberflaeche: vollstaendige Aufnahme inkl. Video. */
         public static UploadOptions forUpload(String title, boolean aiAnalysis, boolean processNow,
                                               boolean diarize, String summaryPrompt,
-                                              String summaryTemplateName, String sttLanguage) {
+                                              String summaryTemplateName, String summaryModel,
+                                              Double summaryTemperature, String sttLanguage) {
             return new UploadOptions(title, aiAnalysis, aiAnalysis && processNow, diarize, false, true,
-                    summaryPrompt, summaryTemplateName, sttLanguage);
+                    summaryPrompt, summaryTemplateName, summaryModel, summaryTemperature, sttLanguage);
         }
 
         /** API-Transkription: sofort transkribieren, keine Zusammenfassung, kein Video. */
         public static UploadOptions forTranscription(String title, boolean diarize, String sttLanguage) {
-            return new UploadOptions(title, true, true, diarize, true, false, null, null, sttLanguage);
+            return new UploadOptions(title, true, true, diarize, true, false, null, null, null, null,
+                    sttLanguage);
         }
     }
 
@@ -186,6 +191,8 @@ public class RecordingService {
         // Auswertung schon mit ihr laeuft.
         recording.setSummaryPrompt(options.summaryPrompt());
         recording.setSummaryTemplateName(options.summaryTemplateName());
+        recording.setSummaryModel(options.summaryModel());
+        recording.setSummaryTemperature(options.summaryTemperature());
         // Dasselbe gilt fuer die Sprache der Spracherkennung: Sie wird beim
         // Transkribieren gebraucht, das direkt im Anschluss laufen kann.
         recording.setSttLanguage(options.sttLanguage());

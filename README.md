@@ -36,13 +36,16 @@ docs/       Anleitungen (u.a. Whisper-Diarisierung), Alt-Dokumentation
   vorhandene Zusammenfassung nicht, sondern legt eine weitere Fassung daneben —
   beschriftet mit Vorlage, Modell und Zeitpunkt. Im Reiter lässt sich zwischen
   ihnen umschalten; eine ist die aktuelle (Download, API, Freigabe), ältere
-  lassen sich wieder nach vorn holen oder löschen.
+  lassen sich wieder nach vorn holen oder löschen. **Modell und Temperatur**
+  lassen sich je Vorlage und je Aufnahme überschreiben — so lassen sich zwei
+  Modelle an derselben Aufnahme vergleichen.
 - **Vorlagen**: Im Tab **Vorlagen** pflegt jeder Nutzer eigene
   Auswertungs-Prompts (Liste links, großer Editor rechts; integrierte Vorlagen
   für Meeting, Vortrag, Interview und Sprachnotiz lassen sich als Kopie öffnen,
   die Admin-Vorgabe als Ausgangspunkt übernehmen). Die gespeicherten Vorlagen stehen
   anschließend unter "Auswertung anpassen" und im Upload-Dialog zur Auswahl
-  (`/api/prompt-templates`).
+  (`/api/prompt-templates`); jede Vorlage darf ein eigenes **Modell** und eine
+  eigene **Temperatur** mitbringen.
 - **Verwaltung**: Aufnahmen anhören (Streaming), herunterladen, löschen,
   mit Nutzern und selbst erstellten Gruppen teilen — oder per **Freigabe-Link**
   weitergeben, entweder kontogebunden (Empfänger meldet sich an und bekommt die
@@ -419,6 +422,20 @@ räumt in der Fassungsliste selbst auf.
 
 Bei Bestandsdaten (Migration V23) wird je Aufnahme die neueste fertige
 Zusammenfassung zur aktuellen — also genau die, die vorher überall gezeigt wurde.
+
+### Modell und Temperatur je Vorlage und Aufnahme
+
+`llm.model` und `llm.temperature` sind die **Vorgabe** des Admins. Eine
+**Vorlage** darf beides überschreiben (Tab **Vorlagen**), ebenso eine **einzelne
+Aufnahme** (**„Auswertung anpassen"**); leer heißt überall „Vorgabe verwenden".
+Wird eine Vorlage ausgewählt, bringt sie ihr Modell und ihre Temperatur mit — im
+Dialog und schon im Upload-Dialog.
+
+Damit lassen sich **zwei Modelle an derselben Aufnahme** vergleichen: Modell
+umstellen, **„Erneut auswerten"**, und die beiden Fassungen stehen anschließend
+nebeneinander — beschriftet mit Modell und Temperatur (`Qwen3.5-122B · T 0.3`).
+Jede Fassung hält fest, womit sie entstanden ist; die Glättung des Transkripts
+bleibt davon unberührt und nutzt weiter die Admin-Vorgabe.
 
 ## Darstellung von Zusammenfassung und Transkript (Markdown, Mermaid)
 

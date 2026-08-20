@@ -92,11 +92,23 @@ public class SummaryService {
                 ? recording.getSummaryLanguage().trim()
                 : settings.get(SettingsService.SUMMARY_LANGUAGE);
 
+        // Modell und Temperatur der Aufnahme gehen vor den Admin-Vorgaben. Sie
+        // stammen in der Regel aus der gewaehlten Vorlage - so laesst sich
+        // dasselbe Transkript mit zwei Modellen auswerten und vergleichen.
+        String model = recording.getSummaryModel() != null && !recording.getSummaryModel().isBlank()
+                ? recording.getSummaryModel().trim()
+                : settings.get(SettingsService.LLM_MODEL);
+        Double temperature = recording.getSummaryTemperature() != null
+                ? recording.getSummaryTemperature()
+                : settings.getDouble(SettingsService.LLM_TEMPERATURE);
+        LlmClient.Overrides overrides = LlmClient.Overrides.modelAndTemperature(model, temperature);
+
         // Die Herkunft wird an der Fassung festgehalten, nicht nur an der
         // Aufnahme: Nur so ist spaeter zu sehen, womit DIESE Fassung entstanden ist.
         Summary summary = Summary.create(recording.getId());
         summary.setStatus(Summary.Status.RUNNING);
-        summary.setModel(settings.get(SettingsService.LLM_MODEL));
+        summary.setModel(model);
+        summary.setTemperature(temperature);
         summary.setTemplateName(recording.getSummaryTemplateName());
         summary.setSystemPrompt(systemPrompt);
         summaryRepo.save(summary);
@@ -111,8 +123,8 @@ public class SummaryService {
 
         String context = buildContext(recording, segments);
         List<String> chunks = TextChunker.chunk(context, chunkChars);
-        log.info("Zusammenfassung fuer {}: {} Kontext-Zeichen in {} Chunk(s)",
-                recording.getId(), context.length(), chunks.size());
+        log.info("Zusammenfassung fuer {}: {} Kontext-Zeichen in {} Chunk(s), Modell {} (T={})",
+                recording.getId(), context.length(), chunks.size(), model, temperature);
 
         try {
             StringBuilder partials = new StringBuilder();
@@ -122,7 +134,7 @@ public class SummaryService {
                         ? "Dies ist Teil %d von %d des Aufnahme-Kontexts. Fasse diesen Teil zusammen.\n\n".formatted(i + 1, chunks.size())
                         : "Fasse die folgende Aufnahme zusammen.\n\n" + lengthInstruction)
                         + chunks.get(i);
-                LlmClient.LlmResult result = llm.chat(systemPrompt, userPrompt);
+                LlmClient.LlmResult result = llm.chat(systemPrompt, userPrompt, overrides);
                 if (!result.success()) {
                     return fail(summary, "Chunk " + (i + 1) + "/" + chunks.size() + ": " + result.error());
                 }
@@ -138,7 +150,7 @@ public class SummaryService {
                         + "Konsolidiere sie zu einer einzigen, konsistenten Zusammenfassung "
                         + "mit der vorgegebenen Struktur. Entferne Redundanzen.\n\n"
                         + lengthInstruction + partials;
-                LlmClient.LlmResult merged = llm.chat(systemPrompt, mergePrompt);
+                LlmClient.LlmResult merged = llm.chat(systemPrompt, mergePrompt, overrides);
                 if (!merged.success()) {
                     return fail(summary, "Merge: " + merged.error());
                 }

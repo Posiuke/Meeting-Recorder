@@ -22,7 +22,8 @@ import java.util.UUID;
 
 /**
  * Persoenliche Promptvorlagen: Jeder Nutzer verwaltet seine eigenen benannten
- * Auswertungs-Prompts und kann sie im Dialog "Auswertung anpassen" abrufen.
+ * Auswertungs-Prompts - optional mit eigenem Modell und eigener Temperatur - und
+ * kann sie im Dialog "Auswertung anpassen" abrufen.
  */
 @RestController
 @RequestMapping("/api/prompt-templates")
@@ -32,6 +33,14 @@ public class PromptTemplateController {
     private static final int MAX_NAME_LENGTH = 100;
     /** Gleiche Grenze wie fuer den Auswertungs-Prompt pro Aufnahme. */
     private static final int MAX_PROMPT_LENGTH = 8000;
+    /** Wie die Spalte; Modellnamen sind kurz, aber manche Repo-Pfade sind lang. */
+    private static final int MAX_MODEL_LENGTH = 200;
+    /**
+     * Bandbreite der Temperatur bei OpenAI-kompatiblen Endpunkten. Ausserhalb
+     * antwortet der Server mit einem Fehler - besser hier abfangen als in jedem
+     * Auswertungslauf.
+     */
+    private static final double MAX_TEMPERATURE = 2.0;
 
     private final PromptTemplateRepo templateRepo;
     private final SettingsService settings;
@@ -72,6 +81,8 @@ public class PromptTemplateController {
                     "Eine Vorlage mit diesem Namen existiert bereits");
         }
         PromptTemplate template = PromptTemplate.create(user.getId(), name, prompt);
+        template.setModel(checkModel(request.model()));
+        template.setTemperature(checkTemperature(request.temperature()));
         saveHandlingDuplicate(template);
         return Dtos.PromptTemplateView.of(template);
     }
@@ -90,6 +101,8 @@ public class PromptTemplateController {
         }
         template.setName(name);
         template.setPrompt(prompt);
+        template.setModel(checkModel(request.model()));
+        template.setTemperature(checkTemperature(request.temperature()));
         template.setUpdatedAt(Instant.now());
         saveHandlingDuplicate(template);
         return Dtos.PromptTemplateView.of(template);
@@ -119,6 +132,31 @@ public class PromptTemplateController {
         return templateRepo.findById(id)
                 .filter(t -> t.getOwnerId().equals(user.getId()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vorlage nicht gefunden"));
+    }
+
+    /**
+     * Modellname der Vorlage: leer bedeutet "Admin-Vorgabe verwenden" (null).
+     * Geprueft wird nur die Laenge - welche Modelle der Endpunkt kennt, weiss
+     * dieser Server nicht.
+     */
+    static String checkModel(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String model = raw.trim();
+        if (model.length() > MAX_MODEL_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Modellname ist zu lang (max. " + MAX_MODEL_LENGTH + " Zeichen)");
+        }
+        return model;
+    }
+
+    /** Temperatur der Vorlage: null bedeutet "Admin-Vorgabe verwenden". */
+    static Double checkTemperature(Double raw) {
+        if (raw == null) return null;
+        if (raw.isNaN() || raw < 0 || raw > MAX_TEMPERATURE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Temperatur muss zwischen 0 und " + MAX_TEMPERATURE + " liegen");
+        }
+        return raw;
     }
 
     private String requireName(String raw) {

@@ -67,20 +67,62 @@ class PromptTemplateControllerTest {
         when(templateRepo.existsByOwnerIdAndNameIgnoreCase(eq(user.getId()), anyString()))
                 .thenReturn(false);
 
-        var view = controller.create(new Dtos.PromptTemplateRequest("  Nur Aufgaben  ", " Liste Aufgaben. "));
+        var view = controller.create(new Dtos.PromptTemplateRequest("  Nur Aufgaben  ", " Liste Aufgaben. ", null, null));
 
         assertThat(view.name()).isEqualTo("Nur Aufgaben");
         assertThat(view.prompt()).isEqualTo("Liste Aufgaben.");
         verify(templateRepo).save(any(PromptTemplate.class));
     }
 
+    /**
+     * Modell und Temperatur gehoeren zur Vorlage; leer bedeutet "Vorgabe des
+     * Admins verwenden" und wird deshalb als null gespeichert.
+     */
+    @Test
+    void uebernimmtModellUndTemperaturDerVorlage() {
+        when(templateRepo.countByOwnerId(user.getId())).thenReturn(0L);
+        when(templateRepo.existsByOwnerIdAndNameIgnoreCase(eq(user.getId()), anyString()))
+                .thenReturn(false);
+
+        var view = controller.create(new Dtos.PromptTemplateRequest(
+                "Beschluesse", "Nur Beschluesse.", "  qwen2.5-72b  ", 0.1));
+
+        assertThat(view.model()).isEqualTo("qwen2.5-72b");
+        assertThat(view.temperature()).isEqualTo(0.1);
+    }
+
+    @Test
+    void leeresModellBedeutetAdminVorgabe() {
+        when(templateRepo.countByOwnerId(user.getId())).thenReturn(0L);
+        when(templateRepo.existsByOwnerIdAndNameIgnoreCase(eq(user.getId()), anyString()))
+                .thenReturn(false);
+
+        var view = controller.create(new Dtos.PromptTemplateRequest(
+                "Standard", "Fasse zusammen.", "   ", null));
+
+        assertThat(view.model()).isNull();
+        assertThat(view.temperature()).isNull();
+    }
+
+    @Test
+    void weistTemperaturAusserhalbDerBandbreiteAb() {
+        assertThatThrownBy(() -> controller.create(new Dtos.PromptTemplateRequest(
+                "Zu heiss", "Text", null, 2.5)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Temperatur");
+        assertThatThrownBy(() -> controller.create(new Dtos.PromptTemplateRequest(
+                "Zu kalt", "Text", null, -0.1)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Temperatur");
+    }
+
     @Test
     void weistLeerenNamenUndLeerenPromptAb() {
-        assertThatThrownBy(() -> controller.create(new Dtos.PromptTemplateRequest("   ", "Text")))
+        assertThatThrownBy(() -> controller.create(new Dtos.PromptTemplateRequest("   ", "Text", null, null)))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Name darf nicht leer sein");
 
-        assertThatThrownBy(() -> controller.create(new Dtos.PromptTemplateRequest("Name", "  ")))
+        assertThatThrownBy(() -> controller.create(new Dtos.PromptTemplateRequest("Name", "  ", null, null)))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Prompt darf nicht leer sein");
 
@@ -94,7 +136,7 @@ class PromptTemplateControllerTest {
                 .thenReturn(true);
 
         assertThatThrownBy(() ->
-                controller.create(new Dtos.PromptTemplateRequest("Nur Aufgaben", "Liste Aufgaben.")))
+                controller.create(new Dtos.PromptTemplateRequest("Nur Aufgaben", "Liste Aufgaben.", null, null)))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("existiert bereits");
     }
@@ -104,7 +146,7 @@ class PromptTemplateControllerTest {
         PromptTemplate own = PromptTemplate.create(user.getId(), "Alt", "Alter Text");
         when(templateRepo.findById(own.getId())).thenReturn(Optional.of(own));
 
-        var view = controller.update(own.getId(), new Dtos.PromptTemplateRequest("Neu", "Neuer Text"));
+        var view = controller.update(own.getId(), new Dtos.PromptTemplateRequest("Neu", "Neuer Text", null, null));
 
         assertThat(view.name()).isEqualTo("Neu");
         assertThat(view.prompt()).isEqualTo("Neuer Text");
@@ -117,7 +159,7 @@ class PromptTemplateControllerTest {
         when(templateRepo.findById(foreign.getId())).thenReturn(Optional.of(foreign));
 
         assertThatThrownBy(() ->
-                controller.update(foreign.getId(), new Dtos.PromptTemplateRequest("Neu", "Neuer Text")))
+                controller.update(foreign.getId(), new Dtos.PromptTemplateRequest("Neu", "Neuer Text", null, null)))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("nicht gefunden");
 

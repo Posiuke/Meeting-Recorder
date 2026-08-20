@@ -56,7 +56,7 @@ export const fetchDefaultPrompt = createAsyncThunk<string, void, { rejectValue: 
 
 export const createPromptTemplate = createAsyncThunk<
   PromptTemplateView,
-  { name: string; prompt: string },
+  { name: string; prompt: string; model?: string | null; temperature?: number | null },
   { rejectValue: string }
 >('promptTemplates/create', async (body, { rejectWithValue }) => {
   try {
@@ -68,13 +68,22 @@ export const createPromptTemplate = createAsyncThunk<
 
 export const updatePromptTemplate = createAsyncThunk<
   PromptTemplateView,
-  { id: string; name: string; prompt: string },
+  {
+    id: string;
+    name: string;
+    prompt: string;
+    model?: string | null;
+    temperature?: number | null;
+  },
   { rejectValue: string }
->('promptTemplates/update', async ({ id, name, prompt }, { rejectWithValue }) => {
+>('promptTemplates/update', async (
+  { id, name, prompt, model, temperature },
+  { rejectWithValue },
+) => {
   try {
     return await api<PromptTemplateView>(`/api/prompt-templates/${id}`, {
       method: 'PUT',
-      body: { name, prompt },
+      body: { name, prompt, model: model ?? null, temperature: temperature ?? null },
     });
   } catch (e) {
     return rejectWithValue(errorMessage(e));

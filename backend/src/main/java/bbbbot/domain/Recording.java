@@ -109,6 +109,17 @@ public class Recording {
     @Column(length = 200)
     private String summaryTemplateName;
 
+    /**
+     * Modell fuer die Auswertung dieser Aufnahme (null = Admin-Vorgabe
+     * {@code llm.model}). Damit lassen sich zwei Modelle an derselben Aufnahme
+     * vergleichen: umstellen, erneut auswerten, Fassungen nebeneinander lesen.
+     */
+    @Column(length = 200)
+    private String summaryModel;
+
+    /** Temperatur fuer die Auswertung dieser Aufnahme (null = Admin-Vorgabe). */
+    private Double summaryTemperature;
+
     /** Maximale Laenge der Zusammenfassung in Woertern (null = keine Vorgabe). */
     private Integer summaryMaxWords;
 
@@ -184,6 +195,10 @@ public class Recording {
     public void setSummaryPrompt(String summaryPrompt) { this.summaryPrompt = summaryPrompt; }
     public String getSummaryTemplateName() { return summaryTemplateName; }
     public void setSummaryTemplateName(String name) { this.summaryTemplateName = name; }
+    public String getSummaryModel() { return summaryModel; }
+    public void setSummaryModel(String summaryModel) { this.summaryModel = summaryModel; }
+    public Double getSummaryTemperature() { return summaryTemperature; }
+    public void setSummaryTemperature(Double t) { this.summaryTemperature = t; }
     public Integer getSummaryMaxWords() { return summaryMaxWords; }
     public void setSummaryMaxWords(Integer summaryMaxWords) { this.summaryMaxWords = summaryMaxWords; }
     public String getSummaryLanguage() { return summaryLanguage; }

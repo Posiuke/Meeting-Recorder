@@ -229,6 +229,11 @@ bei der nächsten Auswertung („Jetzt auswerten", „Erneut auswerten" oder
 **„Standard übernehmen"** in das Feld holen und dort anpassen, statt sie
 vollständig ersetzen zu müssen.
 
+Modell und Temperatur lassen sich **je Vorlage und je Aufnahme** überschreiben
+(`llm.model`/`llm.temperature` bleiben die Vorgabe). Damit lassen sich zwei
+Modelle an derselben Aufnahme vergleichen: umstellen, „Erneut auswerten", beide
+Fassungen nebeneinander lesen.
+
 Eine erneute Auswertung **ersetzt die Zusammenfassung nicht**, sondern legt eine
 weitere **Fassung** daneben — beschriftet mit Vorlage, Modell und Zeitpunkt, samt
 dem Prompt, mit dem sie entstanden ist. Im Reiter **Zusammenfassung** lässt sich

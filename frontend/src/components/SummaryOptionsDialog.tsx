@@ -23,6 +23,9 @@ import { useI18n } from '../i18n';
 import type { SummaryOptionsView } from '../types';
 
 /** Zielsprachen der Zusammenfassung (unabhängig von der Oberflächensprache). */
+/** Bandbreite der Temperatur bei OpenAI-kompatiblen Endpunkten (PromptTemplateController). */
+const MAX_TEMPERATURE = 2;
+
 const SUMMARY_LANGUAGES = [
   { value: 'de', labelKey: 'summaryOptions.langDe' },
   { value: 'en', labelKey: 'summaryOptions.langEn' },
@@ -62,6 +65,9 @@ export default function SummaryOptionsDialog({
    * eine Fassung falsch zu beschriften.
    */
   const [promptTemplateName, setPromptTemplateName] = useState(options.templateName ?? null);
+  /** Modell und Temperatur dieser Aufnahme; leer = Vorgabe des Administrators. */
+  const [model, setModel] = useState(options.model ?? '');
+  const [temperature, setTemperature] = useState(options.temperature?.toString() ?? '');
   const [maxWords, setMaxWords] = useState(options.maxWords?.toString() ?? '');
   const [language, setLanguage] = useState(options.language ?? '');
   const [sttLanguage, setSttLanguage] = useState(options.sttLanguage ?? '');
@@ -85,6 +91,10 @@ export default function SummaryOptionsDialog({
   const maxWordsNum = maxWords.trim() === '' ? null : Number(maxWords);
   const maxWordsInvalid =
     maxWordsNum !== null && (!Number.isInteger(maxWordsNum) || maxWordsNum < 10 || maxWordsNum > 10000);
+  const temperatureNum = temperature.trim() === '' ? null : Number(temperature);
+  const temperatureInvalid =
+    temperatureNum !== null &&
+    (Number.isNaN(temperatureNum) || temperatureNum < 0 || temperatureNum > MAX_TEMPERATURE);
 
   // Auswahl "tpl:<id>" = eigene Vorlage, sonst integrierte Vorlage
   const selectedTemplate = findOwnTemplate(preset, templates);
@@ -93,6 +103,12 @@ export default function SummaryOptionsDialog({
     setPreset(key);
     setPrompt(resolvePresetPrompt(key, templates));
     setPromptTemplateName(presetLabel(key, templates));
+    // Eine eigene Vorlage bringt ihr Modell und ihre Temperatur mit; hat sie
+    // keine, gilt wieder die Vorgabe des Administrators. Genau darüber lassen
+    // sich zwei Modelle an derselben Aufnahme vergleichen.
+    const own = findOwnTemplate(key, templates);
+    setModel(own?.model ?? '');
+    setTemperature(own?.temperature?.toString() ?? '');
   };
 
   /**
@@ -114,7 +130,12 @@ export default function SummaryOptionsDialog({
     setTemplateBusy(true);
     try {
       const created = await dispatch(
-        createPromptTemplate({ name: templateName.trim(), prompt: prompt.trim() }),
+        createPromptTemplate({
+          name: templateName.trim(),
+          prompt: prompt.trim(),
+          model: model.trim() === '' ? null : model.trim(),
+          temperature: temperatureNum,
+        }),
       ).unwrap();
       setPreset(`tpl:${created.id}`);
       setPromptTemplateName(created.name);
@@ -137,6 +158,8 @@ export default function SummaryOptionsDialog({
           id: selectedTemplate.id,
           name: selectedTemplate.name,
           prompt: prompt.trim(),
+          model: model.trim() === '' ? null : model.trim(),
+          temperature: temperatureNum,
         }),
       ).unwrap();
     } catch (e) {
@@ -164,7 +187,7 @@ export default function SummaryOptionsDialog({
   };
 
   const handleSave = async () => {
-    if (maxWordsInvalid) return;
+    if (maxWordsInvalid || temperatureInvalid) return;
     setError(null);
     setBusy(true);
     try {
@@ -176,6 +199,8 @@ export default function SummaryOptionsDialog({
           maxWords: maxWordsNum,
           language: language === '' ? null : language,
           sttLanguage: sttLanguage === '' ? null : sttLanguage,
+          model: model.trim() === '' ? null : model.trim(),
+          temperature: temperatureNum,
         }),
       ).unwrap();
       onClose();
@@ -199,7 +224,7 @@ export default function SummaryOptionsDialog({
           <button
             type="button"
             className="btn btn-primary"
-            disabled={busy || maxWordsInvalid}
+            disabled={busy || maxWordsInvalid || temperatureInvalid}
             onClick={handleSave}
           >
             {busy ? t('common.saving') : t('common.save')}
@@ -341,7 +366,14 @@ export default function SummaryOptionsDialog({
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm"
-                    disabled={busy || templateBusy || !prompt.trim() || prompt.trim() === selectedTemplate.prompt}
+                    disabled={
+                      busy ||
+                      templateBusy ||
+                      !prompt.trim() ||
+                      (prompt.trim() === selectedTemplate.prompt &&
+                        (model.trim() === '' ? null : model.trim()) === selectedTemplate.model &&
+                        temperatureNum === selectedTemplate.temperature)
+                    }
                     title={t('summaryOptions.updateTemplateHint', { name: selectedTemplate.name })}
                     onClick={handleUpdateTemplate}
                   >
@@ -382,6 +414,47 @@ export default function SummaryOptionsDialog({
           />
           {maxWordsInvalid && (
             <span className="field-error">{t('summaryOptions.maxWordsInvalid')}</span>
+          )}
+        </div>
+
+        <div className="form-field">
+          <label htmlFor="so-model">
+            {t('summaryOptions.modelLabel')}
+            <HelpTip text={t('summaryOptions.modelHelp')} />
+          </label>
+          <input
+            id="so-model"
+            type="text"
+            value={model}
+            maxLength={200}
+            disabled={busy}
+            placeholder={t('summaryOptions.modelPlaceholder', { model: options.defaultModel })}
+            onChange={(e) => setModel(e.target.value)}
+          />
+        </div>
+
+        <div className="form-field">
+          <label htmlFor="so-temperature">
+            {t('summaryOptions.temperatureLabel')}
+            <HelpTip text={t('summaryOptions.temperatureHelp')} />
+          </label>
+          <input
+            id="so-temperature"
+            type="number"
+            min={0}
+            max={MAX_TEMPERATURE}
+            step={0.1}
+            value={temperature}
+            disabled={busy}
+            placeholder={t('summaryOptions.temperaturePlaceholder', {
+              temperature: options.defaultTemperature,
+            })}
+            onChange={(e) => setTemperature(e.target.value)}
+          />
+          {temperatureInvalid && (
+            <span className="field-error">
+              {t('summaryOptions.temperatureInvalid', { max: MAX_TEMPERATURE })}
+            </span>
           )}
         </div>
 

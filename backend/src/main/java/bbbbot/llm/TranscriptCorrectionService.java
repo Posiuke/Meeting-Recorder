@@ -252,7 +252,8 @@ public class TranscriptCorrectionService {
         int maxTokens = settings.getBool(SettingsService.LLM_DISABLE_THINKING)
                 ? answerTokens
                 : answerTokens + settings.getInt(SettingsService.LLM_MAX_TOKENS);
-        LlmClient.LlmResult result = llm.chat(systemPrompt, userPrompt.toString(), maxTokens);
+        LlmClient.LlmResult result = llm.chat(systemPrompt, userPrompt.toString(),
+                LlmClient.Overrides.maxTokens(maxTokens));
         if (!result.success()) {
             log.warn("Glaettungsschritt fehlgeschlagen: {}", result.error());
             return StepResult.llmFailed(result.error());

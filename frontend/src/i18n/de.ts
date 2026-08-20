@@ -294,6 +294,15 @@ export const de = {
       'Die Arbeitsanweisung an die KI: Sie bestimmt, wie der Inhalt interpretiert wird und welche Struktur und Schwerpunkte die Zusammenfassung bekommt (z.B. Beschlüsse und Aufgaben bei Meetings, Kernaussagen bei Vorträgen). Die Zusammenfassung wird als Markdown dargestellt – Tabellen und Mermaid-Diagramme (```mermaid-Block) kannst du hier ausdrücklich anfordern.',
     promptPlaceholder:
       'Beschreibe, wie die KI den Inhalt auswerten soll – z. B. gewünschte Abschnitte, Schwerpunkte und Tonfall.',
+    modelLabel: 'Modell (optional)',
+    modelHelp:
+      'Modell, mit dem diese Vorlage auswertet – z. B. ein größeres Modell für ausführliche Protokolle. Leer = die Vorgabe des Administrators (llm.model). So lassen sich zwei Vorlagen mit unterschiedlichen Modellen an derselben Aufnahme vergleichen.',
+    modelPlaceholder: 'Vorgabe des Administrators',
+    temperatureLabel: 'Temperatur',
+    temperatureHelp:
+      'Wie frei das Modell formuliert: kleine Werte (0–0,3) bleiben nah am Gesagten, größere Werte formulieren freier. Für Protokolle sind kleine Werte die bessere Wahl. Leer = die Vorgabe des Administrators (llm.temperature).',
+    temperaturePlaceholder: 'Vorgabe',
+    temperatureInvalid: 'Bitte eine Zahl zwischen 0 und {{max}} angeben.',
     charCount: '{{count}} von {{max}} Zeichen',
     saveShortcutHint: 'Speichern auch mit Strg+S bzw. ⌘+S',
     unsaved: 'Nicht gespeichert',
@@ -566,6 +575,15 @@ export const de = {
       'Begrenzt die Länge der fertigen Zusammenfassung. Kleine Werte (z.B. 150) ergeben einen kompakten Überblick, große Werte (z.B. 1500) eine ausführliche Zusammenfassung. Leer = die KI wählt die Länge passend zum Inhalt.',
     maxWordsPlaceholder: 'automatisch',
     maxWordsInvalid: 'Bitte eine ganze Zahl zwischen 10 und 10000 angeben.',
+    modelLabel: 'Modell',
+    modelHelp:
+      'Modell für die Auswertung dieser Aufnahme. Eine gewählte Vorlage bringt ihr Modell mit; leer = die Vorgabe des Administrators. Zwei Modelle vergleichen: hier umstellen, „Erneut auswerten" – die Fassungen stehen danach nebeneinander.',
+    modelPlaceholder: 'Standard ({{model}})',
+    temperatureLabel: 'Temperatur',
+    temperatureHelp:
+      'Wie frei das Modell formuliert: kleine Werte (0–0,3) bleiben nah am Gesagten, größere formulieren freier. Leer = die Vorgabe des Administrators.',
+    temperaturePlaceholder: 'Standard ({{temperature}})',
+    temperatureInvalid: 'Bitte eine Zahl zwischen 0 und {{max}} angeben.',
     languageLabel: 'Sprache',
     languageHelp:
       'Die Sprache, in der die Zusammenfassung geschrieben wird – unabhängig von der Sprache der Aufnahme (z.B. deutsche Zusammenfassung eines englischen Vortrags).',
@@ -838,7 +856,7 @@ export const de = {
       llmDisableThinking:
         'Schaltet das interne „Nachdenken" von Reasoning-Modellen (Qwen3 und Verwandte) ab. Das Nachdenken läuft im selben Token-Budget wie die Antwort: Ist es an, verbraucht das Modell bei der Transkript-Glättung sein Budget und liefert eine leere Antwort. Für Glätten und Zusammenfassen bringt es nichts. Server, die den Schalter nicht kennen, ignorieren ihn.',
       llmModel:
-        'Modellname beim Anbieter, z. B. gpt-4o-mini (OpenAI), claude-sonnet-5 (Anthropic) oder der Name des lokal geladenen Modells.',
+        'Modellname beim Anbieter, z. B. gpt-4o-mini (OpenAI), claude-sonnet-5 (Anthropic) oder der Name des lokal geladenen Modells. Das ist die Vorgabe: Vorlagen und einzelne Aufnahmen dürfen ein anderes Modell wählen (Temperatur ebenso).',
       correctionEnabled:
         'Schaltet die KI-Glättung des Transkripts ein. Aus = es wird nur das Whisper-Original gespeichert und ausgewertet. Bereits geglättete Aufnahmen behalten ihre Fassung.',
       correctionSystemPrompt:

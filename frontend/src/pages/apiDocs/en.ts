@@ -197,6 +197,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@note.m4a \\
   "markdown": "# Weekly meeting engineering\\n\\n## Outcomes\\n- ...",
   "model": "qwen2.5-32b-instruct",
   "templateName": "Meeting",
+  "temperature": 0.3,
   "systemPrompt": "Summarise the recording...",
   "current": true,
   "editedAt": null,
@@ -229,9 +230,10 @@ curl -s -H "X-API-Key: $KEY" -F file=@note.m4a \\
           method: 'POST',
           path: '/api/recordings/{id}/summary-options',
           summary:
-            'Adjust the analysis: custom prompt, word count, language. Applies to the next run for this recording. templateName only labels the resulting version.',
+            'Adjust the analysis: custom prompt, word count, language, model and temperature. Applies to the next run for this recording; null means "administrator default" in each case. templateName only labels the resulting version. To compare two models: set model, call /reprocess, and both versions sit side by side.',
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
-  -d '{"prompt":"Decisions and tasks only.","templateName":"Decisions only","maxWords":300,"language":"en"}' \\
+  -d '{"prompt":"Decisions and tasks only.","templateName":"Decisions only","maxWords":300,
+       "language":"en","model":"qwen2.5-72b-instruct","temperature":0.1}' \\
   "$BBB/api/recordings/$ID/summary-options"`,
         },
         {
@@ -577,7 +579,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
       id: 'templates',
       title: 'Prompt templates',
       intro:
-        'Your own analysis prompts, reusable when processing a recording – managed in the “Templates” tab of the frontend.',
+        'Your own analysis prompts, reusable when processing a recording – managed in the “Templates” tab of the frontend. Optionally with their own model and temperature (0–2); null means “use the administrator default”.',
       endpoints: [
         { method: 'GET', path: '/api/prompt-templates', summary: 'List your templates.' },
         {
@@ -589,9 +591,10 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
         {
           method: 'POST',
           path: '/api/prompt-templates',
-          summary: 'Create a template.',
+          summary: 'Create a template. model and temperature are optional (null = administrator default).',
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
-  -d '{"name":"Tasks only","prompt":"List tasks with owners, nothing else."}' \\
+  -d '{"name":"Tasks only","prompt":"List tasks with owners, nothing else.",
+       "model":"qwen2.5-72b-instruct","temperature":0.1}' \\
   "$BBB/api/prompt-templates"`,
         },
         { method: 'PUT', path: '/api/prompt-templates/{id}', summary: 'Change a template.' },

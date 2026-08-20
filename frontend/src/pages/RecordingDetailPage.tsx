@@ -1104,12 +1104,23 @@ function SummaryTab({
   // fällt die Anzeige auf die aktuelle zurück.
   const shown = summaries.find((s) => s.id === selectedId) ?? currentSummary ?? summaries[0];
 
+  /**
+   * Modell mit Temperatur: Zwei Fassungen desselben Modells unterscheiden sich
+   * sonst nicht sichtbar.
+   */
+  const modelLabel = (summary: SummaryView) =>
+    summary.model === null
+      ? null
+      : summary.temperature === null
+        ? summary.model
+        : `${summary.model} · T ${summary.temperature}`;
+
   /** Fassung in der Auswahlliste: Vorlage, Modell und Zeitpunkt machen sie unterscheidbar. */
   const versionLabel = (summary: SummaryView) =>
     [
       summary.current ? t('recordingDetail.versionCurrent') : null,
       summary.templateName ?? t('recordingDetail.versionNoTemplate'),
-      summary.model,
+      modelLabel(summary),
       formatDateTime(summary.createdAt),
       summary.editedAt ? t('recordingDetail.versionEdited') : null,
       summary.status !== 'DONE' ? t(`status.${summary.status}`) : null,
@@ -1151,7 +1162,7 @@ function SummaryTab({
           {shown.current && <span className="tag">{t('recordingDetail.versionCurrent')}</span>}
           <span className="muted">
             {shown.templateName ?? t('recordingDetail.versionNoTemplate')}
-            {shown.model ? ` · ${shown.model}` : ''}
+            {modelLabel(shown) ? ` · ${modelLabel(shown)}` : ''}
             {` · ${formatDateTime(shown.createdAt)}`}
             {shown.editedAt
               ? ` · ${t('recordingDetail.versionEditedAt', {

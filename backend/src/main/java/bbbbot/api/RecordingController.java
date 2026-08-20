@@ -223,6 +223,9 @@ public class RecordingController {
      * @param summaryTemplateName Name der gewaehlten Vorlage (leer = keine
      *                      benannte). Er benennt spaeter die erzeugte Fassung in
      *                      der Fassungsliste.
+     * @param summaryModel  Modell fuer die Auswertung (leer = Admin-Vorgabe) -
+     *                      kommt aus der gewaehlten Vorlage
+     * @param summaryTemperature Temperatur fuer die Auswertung (leer = Admin-Vorgabe)
      * @param sttLanguage   Sprache der Spracherkennung (leer = Admin-Standard,
      *                      "auto" = automatisch erkennen). Aus demselben Grund
      *                      schon hier waehlbar - ein mit falscher Sprache
@@ -236,6 +239,8 @@ public class RecordingController {
                                      @RequestParam(value = "diarize", defaultValue = "false") boolean diarize,
                                      @RequestParam(value = "summaryPrompt", required = false) String summaryPrompt,
                                      @RequestParam(value = "summaryTemplateName", required = false) String summaryTemplateName,
+                                     @RequestParam(value = "summaryModel", required = false) String summaryModel,
+                                     @RequestParam(value = "summaryTemperature", required = false) Double summaryTemperature,
                                      @RequestParam(value = "sttLanguage", required = false) String sttLanguage) {
         AppUser user = CurrentUser.get();
         if (file == null || file.isEmpty()) {
@@ -247,12 +252,14 @@ public class RecordingController {
                 && settings.getBool(bbbbot.settings.SettingsService.WHISPER_DIARIZE);
         String prompt = requireSummaryPrompt(summaryPrompt);
         String templateName = checkTemplateName(summaryTemplateName);
+        String model = PromptTemplateController.checkModel(summaryModel);
+        Double temperature = PromptTemplateController.checkTemperature(summaryTemperature);
         String language = requireSttLanguage(sttLanguage);
         try (InputStream in = file.getInputStream()) {
             var recording = recordingService.createUploadedRecording(user.getId(),
                     bbbbot.recording.RecordingService.UploadOptions.forUpload(
                             title, aiAnalysis, processNow, diarizeEffective, prompt, templateName,
-                            language),
+                            model, temperature, language),
                     original, in);
             return toView(recording, user);
         } catch (IOException e) {
@@ -584,6 +591,10 @@ public class RecordingController {
 
         recording.setSummaryPrompt(prompt);
         recording.setSummaryTemplateName(checkTemplateName(request.templateName()));
+        // Modell und Temperatur werden wie in einer Vorlage geprueft - dieselben
+        // Grenzen, dieselben Meldungen.
+        recording.setSummaryModel(PromptTemplateController.checkModel(request.model()));
+        recording.setSummaryTemperature(PromptTemplateController.checkTemperature(request.temperature()));
         recording.setSummaryMaxWords(maxWords);
         recording.setSummaryLanguage(language);
         recording.setSttLanguage(requireSttLanguage(request.sttLanguage()));
@@ -596,9 +607,12 @@ public class RecordingController {
                 recording.getSummaryPrompt(), recording.getSummaryTemplateName(),
                 recording.getSummaryMaxWords(), recording.getSummaryLanguage(),
                 recording.getSttLanguage(),
+                recording.getSummaryModel(), recording.getSummaryTemperature(),
                 settings.get(bbbbot.settings.SettingsService.SUMMARY_SYSTEM_PROMPT),
                 settings.get(bbbbot.settings.SettingsService.SUMMARY_LANGUAGE),
-                settings.get(bbbbot.settings.SettingsService.WHISPER_LANGUAGE));
+                settings.get(bbbbot.settings.SettingsService.WHISPER_LANGUAGE),
+                settings.get(bbbbot.settings.SettingsService.LLM_MODEL),
+                settings.getDouble(bbbbot.settings.SettingsService.LLM_TEMPERATURE));
     }
 
     /**

@@ -185,6 +185,13 @@ export interface UploadRecordingOptions {
    */
   summaryTemplateName?: string | null;
   /**
+   * Modell und Temperatur der gewählten Vorlage; leer/undefined = Vorgabe des
+   * Administrators. Sie werden an der Aufnahme gespeichert und gelten damit
+   * schon bei einer sofortigen Auswertung.
+   */
+  summaryModel?: string | null;
+  summaryTemperature?: number | null;
+  /**
    * Sprache der Spracherkennung; leer/undefined = Admin-Standard, `auto` =
    * Whisper erkennt sie selbst. Muss beim Hochladen feststehen: Ein mit
    * falscher Sprache erzeugtes Transkript ist nachträglich nicht zu retten.
@@ -265,6 +272,10 @@ export function uploadRecording(
     if (options.summaryPrompt?.trim()) form.append('summaryPrompt', options.summaryPrompt.trim());
     if (options.summaryTemplateName?.trim()) {
       form.append('summaryTemplateName', options.summaryTemplateName.trim());
+    }
+    if (options.summaryModel?.trim()) form.append('summaryModel', options.summaryModel.trim());
+    if (options.summaryTemperature != null) {
+      form.append('summaryTemperature', String(options.summaryTemperature));
     }
     if (options.sttLanguage?.trim()) form.append('sttLanguage', options.sttLanguage.trim());
     xhr.send(form);

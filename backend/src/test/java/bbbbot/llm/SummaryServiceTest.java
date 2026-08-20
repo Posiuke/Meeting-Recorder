@@ -8,6 +8,7 @@ import bbbbot.settings.SettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,7 +21,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -36,12 +39,15 @@ class SummaryServiceTest {
     private final List<Summary> stored = new ArrayList<>();
     private SummaryService service;
     private Recording recording;
+    private LlmClient llm;
+    private SettingsService settings;
 
     @BeforeEach
     void setUp() {
         SummaryRepo repo = mock(SummaryRepo.class);
-        service = new SummaryService(mock(LlmClient.class), mock(SettingsService.class), repo,
-                mock(ParticipantService.class));
+        llm = mock(LlmClient.class);
+        settings = mock(SettingsService.class);
+        service = new SummaryService(llm, settings, repo, mock(ParticipantService.class));
         recording = Recording.start(null, UUID.randomUUID(), null, dir.toString(), false, true, false);
 
         when(repo.save(any(Summary.class))).thenAnswer(inv -> {
@@ -166,6 +172,55 @@ class SummaryServiceTest {
         service.syncCurrent(recording);
 
         assertThat(summaryFile()).isEqualTo("# Von Hand ueberarbeitet\n");
+    }
+
+    /**
+     * Modell und Temperatur der Aufnahme (in der Regel aus der gewaehlten
+     * Vorlage) gehen vor den Admin-Vorgaben - und stehen anschliessend an der
+     * Fassung, damit zwei Fassungen desselben Transkripts vergleichbar sind.
+     */
+    @Test
+    void modellUndTemperaturDerAufnahmeGehenVorUndStehenAnDerFassung() {
+        when(settings.get(SettingsService.SUMMARY_SYSTEM_PROMPT)).thenReturn("Fasse zusammen.");
+        when(settings.get(SettingsService.SUMMARY_LANGUAGE)).thenReturn("de");
+        when(settings.getInt(SettingsService.SUMMARY_CHUNK_CHARS)).thenReturn(12_000);
+        when(settings.get(SettingsService.LLM_MODEL)).thenReturn("standard-modell");
+        when(settings.getDouble(SettingsService.LLM_TEMPERATURE)).thenReturn(0.3);
+        when(llm.chat(anyString(), anyString(), any(LlmClient.Overrides.class)))
+                .thenReturn(new LlmClient.LlmResult(true, "# Ergebnis\n- Punkt", null));
+        recording.setSummaryModel("vergleichs-modell");
+        recording.setSummaryTemperature(0.9);
+
+        Summary summary = service.summarize(recording, List.of());
+
+        assertThat(summary.getStatus()).isEqualTo(Summary.Status.DONE);
+        assertThat(summary.getModel()).isEqualTo("vergleichs-modell");
+        assertThat(summary.getTemperature()).isEqualTo(0.9);
+        assertThat(summary.getSystemPrompt()).isEqualTo("Fasse zusammen.");
+        assertThat(summary.isCurrent()).isTrue();
+
+        ArgumentCaptor<LlmClient.Overrides> overrides =
+                ArgumentCaptor.forClass(LlmClient.Overrides.class);
+        verify(llm).chat(anyString(), anyString(), overrides.capture());
+        assertThat(overrides.getValue().model()).isEqualTo("vergleichs-modell");
+        assertThat(overrides.getValue().temperature()).isEqualTo(0.9);
+    }
+
+    /** Ohne eigene Angabe an der Aufnahme gilt die Vorgabe des Admins. */
+    @Test
+    void ohneAngabeAnDerAufnahmeGiltDieAdminVorgabe() {
+        when(settings.get(SettingsService.SUMMARY_SYSTEM_PROMPT)).thenReturn("Fasse zusammen.");
+        when(settings.get(SettingsService.SUMMARY_LANGUAGE)).thenReturn("de");
+        when(settings.getInt(SettingsService.SUMMARY_CHUNK_CHARS)).thenReturn(12_000);
+        when(settings.get(SettingsService.LLM_MODEL)).thenReturn("standard-modell");
+        when(settings.getDouble(SettingsService.LLM_TEMPERATURE)).thenReturn(0.3);
+        when(llm.chat(anyString(), anyString(), any(LlmClient.Overrides.class)))
+                .thenReturn(new LlmClient.LlmResult(true, "# Ergebnis", null));
+
+        Summary summary = service.summarize(recording, List.of());
+
+        assertThat(summary.getModel()).isEqualTo("standard-modell");
+        assertThat(summary.getTemperature()).isEqualTo(0.3);
     }
 
     /** Eine gescheiterte Fassung darf die aktuelle nicht verdraengen. */

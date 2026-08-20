@@ -3,7 +3,11 @@ import { Link } from 'react-router-dom';
 import Modal from './Modal';
 import Alert from './Alert';
 import HelpTip from './HelpTip';
-import PromptPresetSelect, { presetLabel, resolvePresetPrompt } from './PromptPresetSelect';
+import PromptPresetSelect, {
+  findOwnTemplate,
+  presetLabel,
+  resolvePresetPrompt,
+} from './PromptPresetSelect';
 import SttLanguageSelect from './SttLanguageSelect';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchPromptTemplates } from '../store/promptTemplatesSlice';
@@ -70,6 +74,11 @@ export default function UploadRecordingDialog({ onClose, onUploaded }: UploadRec
   const summaryPrompt = resolvePresetPrompt(preset, templates);
   // Der Name benennt später die erzeugte Fassung in der Fassungsliste
   const summaryTemplateName = presetLabel(preset, templates);
+  // Eine eigene Vorlage bringt ihr Modell und ihre Temperatur mit; sonst gilt
+  // die Vorgabe des Administrators.
+  const ownTemplate = findOwnTemplate(preset, templates);
+  const summaryModel = ownTemplate?.model ?? null;
+  const summaryTemperature = ownTemplate?.temperature ?? null;
 
   const handleUpload = async () => {
     if (!file || uploading || tooLarge) return;
@@ -78,7 +87,17 @@ export default function UploadRecordingDialog({ onClose, onUploaded }: UploadRec
     try {
       await uploadRecording(
         file,
-        { title, aiAnalysis, processNow, diarize, summaryPrompt, summaryTemplateName, sttLanguage },
+        {
+          title,
+          aiAnalysis,
+          processNow,
+          diarize,
+          summaryPrompt,
+          summaryTemplateName,
+          summaryModel,
+          summaryTemperature,
+          sttLanguage,
+        },
         setProgress,
       );
       onUploaded();

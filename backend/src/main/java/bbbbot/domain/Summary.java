@@ -42,6 +42,12 @@ public class Summary {
 
     private String model;
 
+    /**
+     * Temperatur dieser Fassung. Gehoert zum Modell: Zwei Fassungen desselben
+     * Modells sind sonst nicht auseinanderzuhalten.
+     */
+    private Double temperature;
+
     /** Name der Vorlage, mit der diese Fassung erzeugt wurde (null = keine benannte Vorlage). */
     @Column(length = 200)
     private String templateName;
@@ -86,6 +92,8 @@ public class Summary {
     public void setMarkdown(String markdown) { this.markdown = markdown; }
     public String getModel() { return model; }
     public void setModel(String model) { this.model = model; }
+    public Double getTemperature() { return temperature; }
+    public void setTemperature(Double temperature) { this.temperature = temperature; }
     public String getTemplateName() { return templateName; }
     public void setTemplateName(String templateName) { this.templateName = templateName; }
     public String getSystemPrompt() { return systemPrompt; }

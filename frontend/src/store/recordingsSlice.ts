@@ -217,16 +217,19 @@ export const updateSummaryOptions = createAsyncThunk<
     maxWords: number | null;
     language: string | null;
     sttLanguage: string | null;
+    /** Modell und Temperatur dieser Aufnahme; null = Vorgabe des Administrators. */
+    model: string | null;
+    temperature: number | null;
   },
   { rejectValue: string }
 >('recordings/updateSummaryOptions', async (
-  { id, prompt, templateName, maxWords, language, sttLanguage },
+  { id, prompt, templateName, maxWords, language, sttLanguage, model, temperature },
   { rejectWithValue },
 ) => {
   try {
     return await api<SummaryOptionsView>(`/api/recordings/${id}/summary-options`, {
       method: 'POST',
-      body: { prompt, templateName, maxWords, language, sttLanguage },
+      body: { prompt, templateName, maxWords, language, sttLanguage, model, temperature },
     });
   } catch (e) {
     return rejectWithValue(errorMessage(e));

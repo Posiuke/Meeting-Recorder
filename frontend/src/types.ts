@@ -246,6 +246,8 @@ export interface SummaryView {
   status: ProcessStatus;
   markdown: string | null;
   model: string | null;
+  /** Temperatur dieser Fassung; gehört zum Modell (null = unbekannt/älter). */
+  temperature: number | null;
   /** Vorlage, mit der die Fassung erzeugt wurde (null = keine benannte). */
   templateName: string | null;
   /** Auswertungs-Prompt dieser Fassung – damit sich zwei Fassungen erklären lassen. */
@@ -283,11 +285,17 @@ export interface SummaryOptionsView {
   language: string | null;
   /** Sprache der Spracherkennung; `auto` = Whisper erkennt sie selbst. */
   sttLanguage: string | null;
+  /** Modell für diese Aufnahme (null = Admin-Vorgabe). */
+  model: string | null;
+  /** Temperatur für diese Aufnahme (null = Admin-Vorgabe). */
+  temperature: number | null;
   /** Admin-Standardwerte, damit die UI zeigen kann, was "Standard" bedeutet. */
   defaultPrompt: string;
   defaultLanguage: string;
   /** Admin-Standard der Spracherkennung; leer bedeutet "automatisch erkennen". */
   defaultSttLanguage: string;
+  defaultModel: string;
+  defaultTemperature: number;
 }
 
 /** Teilnehmer einer Aufnahme: aus der Diarisierung erkannter Sprecher mit editierbarem Namen. */
@@ -309,11 +317,16 @@ export interface RecordingDetail {
   summaryOptions: SummaryOptionsView;
 }
 
-/** Persönliche Promptvorlage des angemeldeten Nutzers. */
+/**
+ * Persönliche Promptvorlage des angemeldeten Nutzers – optional mit eigenem
+ * Modell und eigener Temperatur (null = Admin-Vorgabe verwenden).
+ */
 export interface PromptTemplateView {
   id: string;
   name: string;
   prompt: string;
+  model: string | null;
+  temperature: number | null;
   createdAt: string;
   updatedAt: string | null;
 }

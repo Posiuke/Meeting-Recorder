@@ -291,6 +291,15 @@ export const en: typeof de = {
       'The instruction for the AI: it determines how the content is interpreted and what structure and focus the summary gets (e.g. decisions and tasks for meetings, key points for talks). The summary is rendered as Markdown – you can explicitly ask for tables and Mermaid diagrams (```mermaid block) here.',
     promptPlaceholder:
       'Describe how the AI should analyse the content – e.g. the sections you want, the focus and the tone.',
+    modelLabel: 'Model (optional)',
+    modelHelp:
+      'The model this template uses – for example a larger one for detailed minutes. Empty = the administrator default (llm.model). This is what lets you compare two templates with different models on the same recording.',
+    modelPlaceholder: 'Administrator default',
+    temperatureLabel: 'Temperature',
+    temperatureHelp:
+      'How freely the model phrases things: low values (0–0.3) stay close to what was said, higher ones phrase more freely. For minutes, low values are the better choice. Empty = the administrator default (llm.temperature).',
+    temperaturePlaceholder: 'Default',
+    temperatureInvalid: 'Please enter a number between 0 and {{max}}.',
     charCount: '{{count}} of {{max}} characters',
     saveShortcutHint: 'Ctrl+S or ⌘+S saves as well',
     unsaved: 'Unsaved',
@@ -557,6 +566,15 @@ export const en: typeof de = {
       'Limits the length of the finished summary. Small values (e.g. 150) give a compact overview, large values (e.g. 1500) a detailed summary. Empty = the AI picks a length that fits the content.',
     maxWordsPlaceholder: 'automatic',
     maxWordsInvalid: 'Please enter a whole number between 10 and 10000.',
+    modelLabel: 'Model',
+    modelHelp:
+      'The model used to analyse this recording. A selected template brings its own model along; empty = the administrator default. To compare two models: change it here, "Analyse again" – the versions then sit side by side.',
+    modelPlaceholder: 'Default ({{model}})',
+    temperatureLabel: 'Temperature',
+    temperatureHelp:
+      'How freely the model phrases things: low values (0–0.3) stay close to what was said, higher ones phrase more freely. Empty = the administrator default.',
+    temperaturePlaceholder: 'Default ({{temperature}})',
+    temperatureInvalid: 'Please enter a number between 0 and {{max}}.',
     languageLabel: 'Language',
     languageHelp:
       'The language the summary is written in – independent of the language of the recording (e.g. a German summary of an English talk).',
@@ -825,7 +843,7 @@ export const en: typeof de = {
       llmDisableThinking:
         'Turns off the internal "thinking" of reasoning models (Qwen3 and relatives). Thinking runs on the same token budget as the answer: with it enabled, the model spends its budget while smoothing transcripts and returns an empty answer. It adds nothing for smoothing or summarising. Servers that do not know the switch ignore it.',
       llmModel:
-        'Model name at the provider, e.g. gpt-4o-mini (OpenAI), claude-sonnet-5 (Anthropic) or the name of the locally loaded model.',
+        'Model name at the provider, e.g. gpt-4o-mini (OpenAI), claude-sonnet-5 (Anthropic) or the name of the locally loaded model. This is the default: templates and individual recordings may pick a different model (same for the temperature).',
       correctionEnabled:
         'Enables AI smoothing of the transcript. Off = only the Whisper original is stored and analysed. Already smoothed recordings keep their version.',
       correctionSystemPrompt:

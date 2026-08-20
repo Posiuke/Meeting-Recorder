@@ -64,26 +64,58 @@ public class LlmClient {
 
     public record LlmResult(boolean success, String content, String error) {}
 
-    public LlmResult chat(String systemPrompt, String userPrompt) {
-        return chat(systemPrompt, userPrompt, null);
+    /**
+     * Abweichungen von den Admin-Vorgaben fuer EINE Anfrage. Jedes Feld
+     * {@code null} heisst "Vorgabe verwenden" - so bleibt am Aufrufer sichtbar,
+     * was er bewusst festlegt.
+     *
+     * @param model       Modell dieser Anfrage; {@code null} = {@code llm.model}.
+     *                    Auswertungen duerfen ein anderes Modell nutzen als die
+     *                    Glaettung, damit zwei Modelle an derselben Aufnahme
+     *                    vergleichbar sind.
+     * @param temperature Temperatur dieser Anfrage; {@code null} = {@code llm.temperature}
+     * @param maxTokens   Token-Budget dieser Anfrage; {@code null} = Standard des
+     *                    Admins ({@code llm.maxTokens}). Die Transkript-Glaettung
+     *                    rechnet sich ihr Budget selbst aus, weil ihre Antwort etwa
+     *                    so lang ist wie die Eingabe: Der Admin-Standard wuerde sie
+     *                    abschneiden, wenn er kleiner ist - und das Modell zu
+     *                    unnoetig langer Ausgabe verleiten, wenn er groesser ist.
+     *                    Der Wert gilt daher genau so, wie er hier ankommt.
+     */
+    public record Overrides(String model, Double temperature, Integer maxTokens) {
+
+        /** Nichts abweichend - alles nach Admin-Vorgabe. */
+        public static Overrides none() {
+            return new Overrides(null, null, null);
+        }
+
+        /** Nur ein eigenes Token-Budget (Transkript-Glaettung). */
+        public static Overrides maxTokens(Integer maxTokens) {
+            return new Overrides(null, null, maxTokens);
+        }
+
+        /** Modell und Temperatur einer Auswertung. */
+        public static Overrides modelAndTemperature(String model, Double temperature) {
+            return new Overrides(model, temperature, null);
+        }
     }
 
-    /**
-     * @param maxTokensOverride Token-Budget dieser Anfrage; {@code null} = Standard
-     *        des Admins ({@code llm.maxTokens}). Die Transkript-Glaettung rechnet
-     *        sich ihr Budget selbst aus, weil ihre Antwort etwa so lang ist wie die
-     *        Eingabe: Der Admin-Standard wuerde sie abschneiden, wenn er kleiner ist -
-     *        und das Modell zu unnoetig langer Ausgabe verleiten, wenn er groesser
-     *        ist. Der Wert gilt daher genau so, wie er hier ankommt.
-     */
-    public LlmResult chat(String systemPrompt, String userPrompt, Integer maxTokensOverride) {
+    public LlmResult chat(String systemPrompt, String userPrompt) {
+        return chat(systemPrompt, userPrompt, Overrides.none());
+    }
+
+    public LlmResult chat(String systemPrompt, String userPrompt, Overrides overrides) {
         String baseUrl = settings.get(SettingsService.LLM_BASE_URL);
-        String model = settings.get(SettingsService.LLM_MODEL);
+        String model = overrides.model() == null || overrides.model().isBlank()
+                ? settings.get(SettingsService.LLM_MODEL)
+                : overrides.model().trim();
         String apiKey = settings.get(SettingsService.LLM_API_KEY);
-        double temperature = settings.getDouble(SettingsService.LLM_TEMPERATURE);
-        int maxTokens = maxTokensOverride == null
+        double temperature = overrides.temperature() == null
+                ? settings.getDouble(SettingsService.LLM_TEMPERATURE)
+                : overrides.temperature();
+        int maxTokens = overrides.maxTokens() == null
                 ? settings.getInt(SettingsService.LLM_MAX_TOKENS)
-                : maxTokensOverride;
+                : overrides.maxTokens();
         int timeoutSec = settings.getInt(SettingsService.LLM_TIMEOUT_SEC);
         int retryAttempts = Math.max(1, settings.getInt(SettingsService.LLM_RETRY_ATTEMPTS));
         long retryBaseMs = settings.getLong(SettingsService.LLM_RETRY_BASE_MS);
@@ -141,8 +173,8 @@ public class LlmClient {
                         + (System.nanoTime() - begin) / 1_000_000_000 + " s: "
                         + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
             }
-            log.warn("LLM-Versuch {}/{} fehlgeschlagen (max_tokens={}, Timeout {} s): {}",
-                    attempt, retryAttempts, maxTokens, timeoutSec, lastError);
+            log.warn("LLM-Versuch {}/{} fehlgeschlagen (Modell {}, max_tokens={}, Timeout {} s): {}",
+                    attempt, retryAttempts, model, maxTokens, timeoutSec, lastError);
             if (attempt < retryAttempts) {
                 try {
                     Thread.sleep(retryBaseMs * (1L << (attempt - 1)));

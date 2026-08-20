@@ -121,12 +121,12 @@ public final class Dtos {
      * @param editedAt     Zeitpunkt der letzten haendischen Bearbeitung (null = unberuehrt)
      */
     public record SummaryView(UUID id, String status, String markdown, String model,
-                              String templateName, String systemPrompt, boolean current,
-                              String error, Instant createdAt, Instant finishedAt,
-                              Instant editedAt) {
+                              Double temperature, String templateName, String systemPrompt,
+                              boolean current, String error, Instant createdAt,
+                              Instant finishedAt, Instant editedAt) {
         public static SummaryView of(Summary s) {
             return new SummaryView(s.getId(), s.getStatus().name(), s.getMarkdown(), s.getModel(),
-                    s.getTemplateName(), s.getSystemPrompt(), s.isCurrent(),
+                    s.getTemperature(), s.getTemplateName(), s.getSystemPrompt(), s.isCurrent(),
                     s.getError(), s.getCreatedAt(), s.getFinishedAt(), s.getEditedAt());
         }
     }
@@ -192,26 +192,39 @@ public final class Dtos {
      *
      * @param language           Sprache der Zusammenfassung
      * @param sttLanguage        Sprache der Spracherkennung ("auto" = automatisch erkennen)
+     * @param model              Modell dieser Aufnahme (null = Admin-Vorgabe)
+     * @param temperature        Temperatur dieser Aufnahme (null = Admin-Vorgabe)
      * @param defaultSttLanguage Admin-Standard der Spracherkennung (whisper.language);
      *                           leer bedeutet dort ebenfalls "automatisch erkennen"
+     * @param defaultModel       Admin-Vorgabe {@code llm.model}
+     * @param defaultTemperature Admin-Vorgabe {@code llm.temperature}
      */
     public record SummaryOptionsView(String prompt, String templateName, Integer maxWords,
-                                     String language, String sttLanguage, String defaultPrompt,
-                                     String defaultLanguage, String defaultSttLanguage) {}
+                                     String language, String sttLanguage, String model,
+                                     Double temperature, String defaultPrompt,
+                                     String defaultLanguage, String defaultSttLanguage,
+                                     String defaultModel, double defaultTemperature) {}
 
     public record SummaryOptionsRequest(String prompt, String templateName, Integer maxWords,
-                                        String language, String sttLanguage) {}
+                                        String language, String sttLanguage, String model,
+                                        Double temperature) {}
 
-    /** Persoenliche Promptvorlage des angemeldeten Nutzers. */
-    public record PromptTemplateView(UUID id, String name, String prompt,
-                                     Instant createdAt, Instant updatedAt) {
+    /**
+     * Persoenliche Promptvorlage des angemeldeten Nutzers.
+     *
+     * @param model       Modell dieser Vorlage (null = Admin-Vorgabe {@code llm.model})
+     * @param temperature Temperatur dieser Vorlage (null = Admin-Vorgabe)
+     */
+    public record PromptTemplateView(UUID id, String name, String prompt, String model,
+                                     Double temperature, Instant createdAt, Instant updatedAt) {
         public static PromptTemplateView of(PromptTemplate t) {
-            return new PromptTemplateView(t.getId(), t.getName(), t.getPrompt(),
-                    t.getCreatedAt(), t.getUpdatedAt());
+            return new PromptTemplateView(t.getId(), t.getName(), t.getPrompt(), t.getModel(),
+                    t.getTemperature(), t.getCreatedAt(), t.getUpdatedAt());
         }
     }
 
-    public record PromptTemplateRequest(String name, String prompt) {}
+    public record PromptTemplateRequest(String name, String prompt, String model,
+                                        Double temperature) {}
 
     /**
      * Standardvorgabe des Administrators fuer die Auswertung. Sie dient auf der
