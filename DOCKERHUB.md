@@ -1,77 +1,80 @@
 # Meeting Recorder
 
-Aufnahme-Bot für **BigBlueButton / Nextcloud-Meetings**: Ein Bot tritt einem Raum
-über die fertige Raum-URL bei (keine BBB-API/Checksums nötig), zeichnet das
-Meeting auf und stellt Wiedergabe, Transkript und KI-Zusammenfassung im Web-UI
-bereit. Bestehende Audio-/Videodateien lassen sich auch ohne Bot per Upload
-auswerten.
+Recording bot for **BigBlueButton** meetings — including rooms fronted by the
+**Nextcloud BBB integration**: the bot joins through the ready-made room URL (no
+BBB API or checksums needed), records the meeting and offers playback, a
+transcript and an AI summary in the web UI. Existing audio/video files can be
+analysed by upload, without a bot.
 
-Frontend (React) und Backend (Spring Boot, Java 21, Playwright) laufen zusammen
-in **einem** Container; PostgreSQL läuft separat.
+Frontend (React) and backend (Spring Boot, Java 21, Playwright) run together in
+**one** container; PostgreSQL runs separately.
 
-## Funktionen
+## Features
 
-- 🎙️ **Audio-Aufnahme** des Meetings (gemischte Teilnehmer-Streams), segmentiert nach MP3
-- 🎬 **Optionale Video-Aufnahme** der Meeting-Ansicht als MP4 (Wiedergabe & Download im UI)
-- 📤 **Datei-Upload**: vorhandene Audio-/Videodateien (MP3, WAV, M4A, MP4, MKV …) als Aufnahme übernehmen und auswerten — die Auswertungs-Vorlage ist schon im Upload-Dialog wählbar
-- 🖥️ **Bildschirmaufnahme im Browser**: Bildschirm/Fenster/Tab samt Systemton und optionalem Mikrofon direkt im Tool aufnehmen — für Termine ohne Bot (Teams/Zoom/WebEx, Präsenz). **Erfordert HTTPS** und Chrome/Edge, siehe [docs/SCREEN_CAPTURE.md](docs/SCREEN_CAPTURE.md)
-- 📝 **Transkription** wahlweise über einen **eigenen Whisper-Server** (optional mit Sprechertrennung/WhisperX) oder eine **OpenAI-kompatible Cloud-API** — mit fortlaufenden Zeitstempeln über die ganze Aufnahme und strukturierter Anzeige im UI
-- ✨ **KI-Glättung des Transkripts** vor der Auswertung (Füllwörter, Satzzeichen, Erkennungsfehler) — Original bleibt erhalten, im Transkript-Tab umschaltbar; dazu ein **persönliches und ein gemeinsames Glossar** für Abkürzungen und Fachbegriffe
-- 🤖 **KI-Zusammenfassung** über jeden **OpenAI-kompatiblen** Chat-Endpoint — lokal (vLLM, Ollama) oder Cloud (OpenAI, Anthropic, Google Gemini, Groq, Mistral …)
-- 📎 **Beigefügte Unterlagen**: Tagesordnung, Folien oder Papiere zu einer Aufnahme hochladen — ihr Text geht in die Zusammenfassung ein (PDF/Office/OCR über einen Apache-Tika-Server)
-- 🏷️ **Schlagworte & Suche**: Aufnahmen verschlagworten, nach Schlagwort filtern und in Titel, Meeting-URL, Schlagworten sowie auf Wunsch in **Transkript und Zusammenfassung** suchen
-- 🎛️ **Auswertung pro Aufnahme anpassbar**: eigener Auswertungs-Prompt (mit Vorlagen für Vortrag, Interview, Sprachnotiz), maximale Länge, Sprache der Zusammenfassung — und die Sprache der Spracherkennung (auch „automatisch erkennen")
-- 📄 **Herunterladen als Markdown oder Word**: Transkript (geglättet oder Original) und Zusammenfassung als `.md` oder als `.doc`, das Word und LibreOffice direkt öffnen — von dort als DOCX oder PDF speicherbar
-- ▶️ **Vom Transkript in die Aufnahme springen**: Klick auf eine Transkriptzeile setzt die Abspielposition, die laufende Zeile wird hervorgehoben — dazu ein durchgehender Player und der Download der kompletten Aufnahme als eine MP3
-- 🔁 **Erneut auswerten** (nur Zusammenfassung) und **Transkription neu erstellen** (Spracherkennung + Zusammenfassung) per Klick — jede Auswertung legt eine weitere **Fassung** an, zwischen denen sich umschalten lässt
-- ⏱️ **Verarbeitungs-Zeitfenster** (STT/LLM z. B. nachts) plus „Jetzt auswerten"
-- 🧪 **Verbindungstests** für Whisper und LLM direkt im Admin-Bereich
-- 👥 **Teilen & Gruppen**, Admin-Bereich für Einstellungen und Benutzer
-- 🔗 **Freigabe-Link**: Aufnahme per Adresse weitergeben — entweder **kontogebunden** (Empfänger meldet sich an und bekommt die Freigabe automatisch, Standard) oder **ohne Anmeldung** für Externe; mit optionaler Laufzeit, jederzeit widerrufbar, per Admin-Schalter installationsweit auf „nur mit Anmeldung" begrenzbar
-- 🌐 **Oberfläche auf Deutsch und Englisch** – jeder Nutzer wählt seine Sprache selbst, gespeichert am Konto (gilt auf jedem Gerät)
-- 🔐 **Anmeldung** per lokalem Konto **oder** LDAP/Active Directory — vollständig im Admin-Bereich konfigurier- und testbar
-- 🧹 **Aufräumen**: Aufbewahrungsfrist für alte Aufnahmen, Bereinigung hängengebliebener Aufnahmen
+- 🎙️ **Audio recording** of the meeting (mixed participant streams), segmented into MP3
+- 🎬 **Optional video recording** of the meeting view as MP4 (playback & download in the UI)
+- 🤖 **Bot templates**: save a room you record regularly once — URL, bot name and settings — then it is just "Start bot". Templates are per user and visible to nobody else
+- 📤 **File upload**: take existing audio/video files (MP3, WAV, M4A, MP4, MKV …) in as a recording and analyse them — the analysis template can be picked right in the upload dialog
+- 🖥️ **Screen recording in the browser**: capture a screen, window or tab including system audio and an optional microphone, straight from the tool — for meetings without a bot (Teams/Zoom/WebEx, in-person). **Requires HTTPS** and Chrome/Edge, see [docs/SCREEN_CAPTURE.md](https://github.com/Posiuke/Meeting-Recorder/blob/master/docs/SCREEN_CAPTURE.md)
+- 📝 **Transcription** either through **your own Whisper server** (optionally with speaker separation via WhisperX) or an **OpenAI-compatible cloud API** — with continuous timestamps across the whole recording and a structured view in the UI
+- ✨ **AI smoothing of the transcript** before the analysis (filler words, punctuation, recognition errors) — the original is kept and can be toggled in the transcript tab; plus a **personal and a shared glossary** for abbreviations and domain terms
+- 🧠 **AI summary** through any **OpenAI-compatible** chat endpoint — local (vLLM, Ollama) or cloud (OpenAI, Anthropic, Google Gemini, Groq, Mistral …)
+- 📎 **Attached documents**: upload the agenda, slides or papers for a recording — their text feeds into the summary (PDF/Office/OCR through an Apache Tika server)
+- 🏷️ **Tags & search**: tag recordings, filter by tag, and search titles, meeting URLs, tags and — on request — **transcript and summary**
+- 📚 **Paged list with filters**: the recordings list loads page by page and filters by period, source (bot, upload, screen) and owner, sorted by date or title
+- 🎛️ **Analysis adjustable per recording**: your own analysis prompt (with templates for talks, interviews, voice notes), maximum length, summary language — and the language of the speech recognition (including "detect automatically")
+- 📄 **Download as Markdown or Word**: transcript (smoothed or original) and summary as `.md` or as `.doc`, which Word and LibreOffice open directly — and can save as DOCX or PDF from there
+- ▶️ **Jump from the transcript into the recording**: clicking a transcript line sets the playback position and the current line is highlighted — plus a continuous player and a download of the whole recording as a single MP3
+- 🔁 **Analyse again** (summary only) and **recreate the transcript** (speech recognition + summary) with one click — every analysis adds another **version** you can switch between
+- ⏱️ **Processing time window** (STT/LLM at night, for example) plus "Analyse now"
+- 📊 **Queue overview for admins**: the **Processing** tab shows what is waiting, what is running, recent failures with their reason, the duration of each step, and whether the time window is open — failed jobs can be retried from there
+- 🧪 **Connection tests** for Whisper and the LLM right in the admin area
+- 👥 **Sharing & groups**, admin area for settings and users
+- 🔗 **Share link**: pass a recording on by URL — either **account-bound** (the recipient signs in and is granted access automatically, the default) or **without sign-in** for external people; with an optional lifetime, revocable at any time, and installation-wide restrictable to "sign-in required" by an admin switch
+- 🌐 **Interface in German and English** – each user picks their own language, stored with the account (so it applies on every device)
+- 🔐 **Sign-in** with a local account **or** LDAP/Active Directory — fully configurable and testable in the admin area
+- 🧹 **Housekeeping**: retention period for old recordings, cleanup of recordings that got stuck
 
 ## Tags
 
-- `latest` — aktueller Stand
-- `<git-hash>` — konkreter Commit (reproduzierbare Deployments)
-- ggf. Versions-Tags wie `v3.0.0`
+- `latest` — current state
+- `<git-hash>` — a specific commit (reproducible deployments)
+- version tags such as `v3.0.0` where applicable
 
-## Ports & Volumes
+## Ports & volumes
 
 - Port **8080** — UI + API
-- Volume **`/data/recordings`** — Aufnahmen, Transkripte, Zusammenfassungen, MP4s, beigefügte Unterlagen
+- Volume **`/data/recordings`** — recordings, transcripts, summaries, MP4s, attached documents
 
-## Wichtige Umgebungsvariablen
+## Important environment variables
 
-| Variable | Bedeutung |
+| Variable | Meaning |
 |---|---|
-| `DB_URL`, `DB_USER`, `DB_PASSWORD` | PostgreSQL-Verbindung (Pflicht) |
-| `JWT_SECRET` | Signaturschlüssel für Sessions (min. 32 Zeichen, zufällig) |
-| `JWT_TTL_HOURS` | Login-Session-Dauer in Stunden (Default 168 = 7 Tage) |
-| `ADMIN_USERNAME`, `ADMIN_INITIAL_PASSWORD` | Lokales Admin-Konto beim ersten Start (Passwortwechsel wird erzwungen) |
-| `STORAGE_DIR` | Aufnahme-Verzeichnis (Default `/data/recordings`) |
-| `MAX_UPLOAD_SIZE` | Maximale Größe für Datei-Uploads (Default `4GB`) |
-| `MAX_CONCURRENT_BOTS` | Max. gleichzeitige Bots (Default 5) |
-| `INSECURE_TLS` | Self-Signed-Zertifikate im Intranet akzeptieren |
-| `SERVER_PORT` | HTTP-Port im Container (Default 8080) |
+| `DB_URL`, `DB_USER`, `DB_PASSWORD` | PostgreSQL connection (required) |
+| `JWT_SECRET` | Signing key for sessions (at least 32 random characters) |
+| `JWT_TTL_HOURS` | Sign-in session lifetime in hours (default 168 = 7 days) |
+| `ADMIN_USERNAME`, `ADMIN_INITIAL_PASSWORD` | Local admin account on first start (a password change is enforced) |
+| `STORAGE_DIR` | Recording directory (default `/data/recordings`) |
+| `MAX_UPLOAD_SIZE` | Maximum size for file uploads (default `4GB`) |
+| `MAX_CONCURRENT_BOTS` | Maximum concurrent bots (default 5) |
+| `INSECURE_TLS` | Accept self-signed certificates on an intranet |
+| `SERVER_PORT` | HTTP port inside the container (default 8080) |
 
-> Alles Weitere (Whisper, LLM, Zeitfenster, Bot-Verhalten, Bildschirmaufnahme,
-> Aufbewahrung, LDAP) wird **zur Laufzeit im Admin-Bereich** konfiguriert und in
-> der Datenbank gespeichert — keine Container-Neustarts nötig.
+> Everything else (Whisper, LLM, time window, bot behaviour, screen recording,
+> retention, LDAP) is configured **at runtime in the admin area** and stored in
+> the database — no container restarts needed.
 
-## Reverse Proxy / HTTPS
+## Reverse proxy / HTTPS
 
-Der Container spricht HTTP; die TLS-Terminierung übernimmt üblicherweise ein
-Reverse Proxy davor. Für die **Bildschirmaufnahme ist HTTPS Pflicht** — ohne
-sicheren Kontext stellt der Browser `getDisplayMedia` gar nicht bereit. Der
-Proxy sollte `X-Forwarded-Proto`/`-Host` setzen (die App wertet sie aus) und
-den Anfragekörper nicht zwischenpuffern (`proxy_request_buffering off`), damit
-die stückweise übertragene Aufnahme direkt durchläuft. Fertige nginx- und
-Apache-Konfigurationen: [docs/SCREEN_CAPTURE.md](docs/SCREEN_CAPTURE.md).
+The container speaks HTTP; TLS termination is usually handled by a reverse proxy
+in front of it. **HTTPS is mandatory for screen recording** — without a secure
+context the browser does not expose `getDisplayMedia` at all. The proxy should
+set `X-Forwarded-Proto`/`-Host` (the app evaluates them) and must not buffer the
+request body (`proxy_request_buffering off`), so that the incrementally uploaded
+recording passes straight through. Ready-made nginx and Apache configurations:
+[docs/SCREEN_CAPTURE.md](https://github.com/Posiuke/Meeting-Recorder/blob/master/docs/SCREEN_CAPTURE.md).
 
-## Schnellstart (docker compose)
+## Quick start (docker compose)
 
 ```yaml
 services:
@@ -80,7 +83,7 @@ services:
     environment:
       POSTGRES_DB: bbbbot
       POSTGRES_USER: bbbbot
-      POSTGRES_PASSWORD: bitte-aendern
+      POSTGRES_PASSWORD: please-change-me
     volumes:
       - pgdata:/var/lib/postgresql/data
 
@@ -91,10 +94,10 @@ services:
     environment:
       DB_URL: jdbc:postgresql://db:5432/bbbbot
       DB_USER: bbbbot
-      DB_PASSWORD: bitte-aendern
-      JWT_SECRET: bitte-einen-langen-zufaelligen-wert-eintragen
+      DB_PASSWORD: please-change-me
+      JWT_SECRET: please-enter-a-long-random-value
       ADMIN_USERNAME: admin
-      ADMIN_INITIAL_PASSWORD: bitte-aendern
+      ADMIN_INITIAL_PASSWORD: please-change-me
       STORAGE_DIR: /data/recordings
     ports:
       - "8090:8080"
@@ -106,45 +109,44 @@ volumes:
   pgdata:
 ```
 
-## Erster Login
+## First sign-in
 
-Mit `ADMIN_USERNAME` / `ADMIN_INITIAL_PASSWORD` anmelden. Beim ersten Login muss
-ein neues Passwort vergeben werden. Danach optional unter
-**Administration → Authentifizierung** LDAP/AD aktivieren und testen.
+Sign in with `ADMIN_USERNAME` / `ADMIN_INITIAL_PASSWORD`. A new password has to
+be set on the first sign-in. After that you can optionally enable and test
+LDAP/AD under **Admin → Authentication**.
 
-## Spracherkennung & KI einrichten
+## Setting up speech recognition and AI
 
-Ohne konfigurierte Dienste laufen Aufnahme und Wiedergabe trotzdem — nur
-Transkript und Zusammenfassung brauchen Whisper bzw. ein LLM. Beide Dienste
-werden unter **Administration → Einstellungen** konfiguriert; ein Klick auf
-**„Verbindung testen"** prüft die gespeicherte Konfiguration sofort
-(Erreichbarkeit, API-Key und Modellname).
+Recording and playback work even without these services configured — only the
+transcript and the summary need Whisper and an LLM. Both are configured under
+**Admin → Settings**; a click on **"Test connection"** checks the stored
+configuration right away (reachability, API key and model name).
 
-### Variante A: Eigene Server (Intranet, Standard)
+### Option A: your own servers (intranet, the default)
 
-| Einstellung | Wert |
+| Setting | Value |
 |---|---|
 | `whisper.provider` | `local` |
-| `whisper.url` | z. B. `http://whisper:9000/asr` ([onerahmet/openai-whisper-asr-webservice](https://hub.docker.com/r/onerahmet/openai-whisper-asr-webservice); mit `ASR_ENGINE=whisperx` ist Sprechertrennung möglich, dann `whisper.diarize` freischalten) |
-| `llm.baseUrl` | z. B. `http://vllm:8000/v1` (vLLM, Ollama oder anderer OpenAI-kompatibler Server) |
-| `llm.model` | Name des geladenen Modells |
+| `whisper.url` | e.g. `http://whisper:9000/asr` ([onerahmet/openai-whisper-asr-webservice](https://hub.docker.com/r/onerahmet/openai-whisper-asr-webservice); with `ASR_ENGINE=whisperx` speaker separation is possible, then enable `whisper.diarize`) |
+| `llm.baseUrl` | e.g. `http://vllm:8000/v1` (vLLM, Ollama or any other OpenAI-compatible server) |
+| `llm.model` | Name of the loaded model |
 
-Die Daten bleiben komplett im eigenen Netz.
+The data stays entirely inside your own network.
 
-### Variante B: Öffentliche Cloud-APIs
+### Option B: public cloud APIs
 
-**Transkription** (OpenAI-Audio-API-Format):
+**Transcription** (OpenAI audio API format):
 
-| Einstellung | Wert |
+| Setting | Value |
 |---|---|
 | `whisper.provider` | `openai` |
-| `whisper.openaiUrl` | `https://api.openai.com/v1/audio/transcriptions` (kompatible Anbieter wie Groq analog) |
-| `whisper.openaiApiKey` | API-Schlüssel des Anbieters |
-| `whisper.openaiModel` | z. B. `whisper-1` (mit Zeitstempeln) oder `gpt-4o-mini-transcribe` |
+| `whisper.openaiUrl` | `https://api.openai.com/v1/audio/transcriptions` (compatible providers such as Groq work the same way) |
+| `whisper.openaiApiKey` | The provider's API key |
+| `whisper.openaiModel` | e.g. `whisper-1` (with timestamps) or `gpt-4o-mini-transcribe` |
 
-**Zusammenfassung** (jeder OpenAI-kompatible Chat-Endpoint):
+**Summary** (any OpenAI-compatible chat endpoint):
 
-| Anbieter | `llm.baseUrl` | `llm.model` (Beispiel) |
+| Provider | `llm.baseUrl` | `llm.model` (example) |
 |---|---|---|
 | OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` |
 | Anthropic | `https://api.anthropic.com/v1` | `claude-sonnet-5` |
@@ -152,164 +154,183 @@ Die Daten bleiben komplett im eigenen Netz.
 | Groq | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` |
 | Mistral | `https://api.mistral.ai/v1` | `mistral-large-latest` |
 
-Dazu jeweils `llm.apiKey` setzen.
+Set `llm.apiKey` alongside each of them.
 
-> ⚠️ **Datenschutz:** Bei Cloud-APIs verlassen Audiodaten (Whisper) bzw.
-> Transkript und Chat-Protokoll (LLM) das eigene Netz. Sprechertrennung
-> (Diarisierung) wird von der OpenAI-Audio-API nicht unterstützt und steht nur
-> mit eigenem WhisperX-Server zur Verfügung.
+> ⚠️ **Data protection:** with cloud APIs, audio data (Whisper) and the
+> transcript plus chat log (LLM) leave your own network. Speaker separation
+> (diarisation) is not supported by the OpenAI audio API and is only available
+> with your own WhisperX server.
 
-## Transkript-Glättung und Glossar
+## Transcript smoothing and glossary
 
-Zwischen Spracherkennung und Auswertung glättet das LLM das Rohtranskript. Die
-Zusammenfassung nutzt die geglättete Fassung, das Whisper-Original bleibt
-gespeichert und ist im Transkript-Tab über *Korrigiert / Original* einsehbar
-(`transcript.md` bzw. `transcript_original.md`).
+Between speech recognition and analysis, the LLM smooths the raw transcript. The
+summary uses the smoothed version; the Whisper original stays stored and can be
+viewed in the transcript tab via *Corrected / Original* (`transcript.md` and
+`transcript_original.md`).
 
-Geglättet wird **satzweise und in mehreren Schritten**: Whisper-Zeilen enden oft
-mitten im Satz, deshalb werden sie zu ganzen Sätzen zusammengefasst; ein Satz wird
-nie über zwei Schritte zerschnitten, ein Sprecherwechsel beendet immer einen Satz.
-Zeitstempel und Sprecher-Labels werden nicht dem Modell überlassen: Es bekommt nur
-die nummerierten Sätze, die Struktur setzt das Backend selbst wieder davor. Fällt
-die Glättung aus, läuft die Auswertung unbeeinträchtigt mit dem Original weiter.
+Smoothing works **sentence by sentence and in several steps**: Whisper lines
+often end mid-sentence, so they are joined into whole sentences; a sentence is
+never cut across two steps, and a change of speaker always ends a sentence.
+Timestamps and speaker labels are not left to the model: it only receives the
+numbered sentences, and the backend puts the structure back in front of them. If
+smoothing fails, the analysis carries on unaffected with the original.
 
-Unter **Glossar** stehen zwei Listen: das eigene und ein **gemeinsames Glossar
-der Installation**, das Admins pflegen und alle lesen dürfen. Bei einer Aufnahme
-gehen beide in den Glättungs-Prompt ein — das gemeinsame und das persönliche ihres
-Besitzers; steht ein Begriff in beiden, gewinnt der persönliche Eintrag.
+Under **Glossary** there are two lists: your own and a **shared glossary for the
+installation**, maintained by admins and readable by everyone. For a recording
+both feed into the smoothing prompt — the shared one and the personal one of its
+owner; if a term appears in both, the personal entry wins.
 
-| Einstellung | Standard | Bedeutung |
+| Setting | Default | Meaning |
 |---|---|---|
-| `correction.enabled` | `true` | Glättung ein/aus |
-| `correction.systemPrompt` | (deutscher Standardprompt) | Anweisung an das LLM; Antwortformat `Nummer \| Satz` beibehalten |
-| `correction.chunkChars` | `3000` | Zeichen je Glättungsschritt (bestimmt auch das Antwort-Token-Budget) |
-| `correction.maxSentenceChars` | `500` | Trennung, wenn das Transkript keine Satzzeichen enthält |
-| `correction.glossaryMaxChars` | `12000` | Wie viel Glossar in den Prompt geht (0 = unbegrenzt) |
+| `correction.enabled` | `true` | Smoothing on/off |
+| `correction.systemPrompt` | (built-in default prompt) | Instruction to the LLM; keep the `number \| sentence` response format |
+| `correction.chunkChars` | `3000` | Characters per smoothing step (also determines the response token budget) |
+| `correction.maxSentenceChars` | `500` | Where to split when the transcript contains no punctuation |
+| `correction.glossaryMaxChars` | `12000` | How much glossary goes into the prompt (0 = unlimited) |
 
-## Schlagworte und Suche
+## Tags, search and filters
 
-Der Besitzer vergibt auf der Detailseite Schlagworte (max. 40 Zeichen, 20 je
-Aufnahme; Schreibweisen werden zusammengefasst); alle mit Leseberechtigung sehen
-und filtern danach. Über der Liste durchsucht ein Suchfeld Titel/Raumname,
-Meeting-URL und Schlagworte — mit der Checkbox **„Auch in Transkript und
-Zusammenfassung suchen"** zusätzlich die Inhalte. Es gibt nichts zu
-konfigurieren; die Suche liefert stets nur eigene und geteilte Aufnahmen.
+The owner assigns tags on the detail page (max. 40 characters, 20 per recording;
+different spellings are merged); everyone with read access sees and filters by
+them. Above the list, a search field covers title/room name, meeting URL and
+tags — with the checkbox **"Also search transcript and summary"** the contents as
+well. There is nothing to configure; the search only ever returns your own and
+shared recordings.
 
-Die Inhaltssuche arbeitet mit `LIKE` ohne Volltextindex — für einige Tausend
-Aufnahmen unproblematisch, bei sehr großen Beständen wäre ein Postgres-
-Volltextindex der nächste Schritt.
+The list loads **page by page** ("Load more") and can be narrowed by **period**,
+**source** (bot in the meeting, upload, screen recording) and **owner**, sorted
+by date or title. Slicing, filtering and sorting happen in the database, so the
+browser only ever holds what it displays.
 
-## Bildschirmaufnahme
+The content search uses `LIKE` without a full-text index — unproblematic for a
+few thousand recordings; for very large holdings a Postgres full-text index
+would be the next step.
 
-Nutzer nehmen ihren Bildschirm über **Aufnahmen → Bildschirm aufnehmen** direkt
-im Browser auf; die laufende Aufnahme wird stückweise übertragen, sodass ein
-Absturz höchstens die letzten Sekunden kostet. Voraussetzung sind HTTPS und
-Chrome/Edge (Firefox schneidet keinen Systemton mit).
+## Screen recording
 
-| Einstellung | Standard | Bedeutung |
+Users record their screen via **Recordings → Record screen** directly in the
+browser; the running recording is uploaded in chunks, so a crash costs at most
+the last few seconds. HTTPS and Chrome/Edge are required (Firefox does not
+capture system audio).
+
+| Setting | Default | Meaning |
 |---|---|---|
-| `capture.enabled` | `true` | Funktion für Nutzer freigeschaltet |
-| `capture.maxMegabytes` | `8192` | Obergrenze pro Aufnahme (Richtwert: 0,5 GB pro Stunde in Standardqualität, ohne Bild ca. 60 MB) |
-| `capture.staleMinutes` | `5` | So lange ohne Daten gilt eine Aufnahme als abgebrochen; der Server schließt sie dann mit den vorhandenen Daten ab |
+| `capture.enabled` | `true` | Feature available to users |
+| `capture.maxMegabytes` | `8192` | Upper limit per recording (rule of thumb: 0.5 GB per hour at standard quality, about 60 MB without video) |
+| `capture.staleMinutes` | `5` | After this long without data a recording counts as aborted; the server then finalises it with the data it has |
 
-Einrichtung, Reverse-Proxy-Konfiguration und Fehlersuche:
-[docs/SCREEN_CAPTURE.md](docs/SCREEN_CAPTURE.md).
+Setup, reverse proxy configuration and troubleshooting:
+[docs/SCREEN_CAPTURE.md](https://github.com/Posiuke/Meeting-Recorder/blob/master/docs/SCREEN_CAPTURE.md).
 
-## Beigefügte Unterlagen
+## Attached documents
 
-Im Reiter **Unterlagen** einer Aufnahme lässt sich beifügen, was in der
-Besprechung durchgesprochen wurde — Tagesordnung, Folien, Angebote. Ihr Text geht
-in die nächste KI-Auswertung ein, damit die Zusammenfassung das Thema kennt und
-nicht nur das Gesprochene.
+In a recording's **Documents** tab you can attach whatever was discussed in the
+meeting — the agenda, slides, an offer. Their text feeds into the next AI
+analysis, so the summary knows the subject and not just what was said.
 
-Text- und Markdown-Dateien liest die App selbst. **PDF, Office-Dateien und Scans
-brauchen einen Apache-Tika-Server**; die OCR gescannter Seiten macht Tika mit
-tesseract. Dafür in `docker-compose.yml` den auskommentierten `tika`-Service
-aktivieren (`apache/tika:latest-full` bringt tesseract mit) und im Admin-Bereich
-unter *Beigefügte Unterlagen* `tikaUrl` auf `http://tika:9998` setzen. Wer schon
-einen Tika-Server betreibt, trägt dort einfach dessen Adresse ein. Ohne ihn
-scheitern PDFs mit klarer Meldung — der Reiter sagt das vorher.
+Text and Markdown files are read by the app itself. **PDF, Office files and
+scans need an Apache Tika server**; OCR of scanned pages is done by Tika using
+tesseract. To set that up, enable the commented-out `tika` service in
+[`docker-compose.yml`](https://github.com/Posiuke/Meeting-Recorder/blob/master/docker-compose.yml) (`apache/tika:latest-full` ships with tesseract) and set
+`tikaUrl` to `http://tika:9998` in the admin area under *Attached documents*. If
+you already run a Tika server, just enter its address there. Without it, PDFs
+fail with a clear message — and the tab says so beforehand.
 
-Der Unterlagen-Abschnitt geht in **jeden** Auswertungsschritt ein; wie viel davon,
-begrenzen `documents.maxCharsPerDocument` (je Datei) und `documents.promptMaxChars`
-(gesamt). Bei einer Cloud-API verlassen die Unterlagen damit das eigene Netz. In
-der Freigabe-Ansicht erscheinen sie nicht.
+The documents section feeds into **every** analysis step; how much of it is
+limited by `documents.maxCharsPerDocument` (per file) and
+`documents.promptMaxChars` (in total). With a cloud API the documents therefore
+leave your own network as well. They do not appear in a share view.
 
-## Auswertung pro Aufnahme anpassen
+## Adjusting the analysis per recording
 
-Auf der Aufnahme-Detailseite kann der Besitzer über **„Auswertung anpassen"**
-eigenen Auswertungs-Prompt (mit Vorlagen für Vortrag, Interview, Sprachnotiz),
-maximale Länge und Sprache der Zusammenfassung setzen — praktisch für
-hochgeladene Dateien, die kein Meeting sind. Dort steht auch die **Sprache der
-Aufnahme** für die Spracherkennung (inkl. „automatisch erkennen"); sie ist
-außerdem schon im Upload-Dialog, im Bot-Formular und beim Start einer
-Bildschirmaufnahme wählbar, weil ein falscher Sprach-Hinweis das Transkript von
-Anfang an beschädigt. Die Einstellungen wirken
-bei der nächsten Auswertung („Jetzt auswerten", „Erneut auswerten" oder
-„Transkription neu erstellen"). Die Standardvorgabe des Administrators lässt sich über
-**„Standard übernehmen"** in das Feld holen und dort anpassen, statt sie
-vollständig ersetzen zu müssen.
+On the recording detail page the owner can use **"Customise analysis"** to set
+their own analysis prompt (with templates for talks, interviews and voice notes),
+a maximum length and the summary language — handy for uploaded files that are not
+meetings. The **language of the recording** for speech recognition (including
+"detect automatically") lives there too; it can also be picked in the upload
+dialog, in the bot form and when starting a screen recording, because a wrong
+language hint damages the transcript from the very beginning. The settings take
+effect on the next analysis ("Analyse now", "Analyse again" or "Recreate
+transcript"). The administrator's default can be pulled into the field with
+**"Load default"** and edited there, instead of having to replace it entirely.
 
-Modell und Temperatur lassen sich **je Vorlage und je Aufnahme** überschreiben
-(`llm.model`/`llm.temperature` bleiben die Vorgabe). Damit lassen sich zwei
-Modelle an derselben Aufnahme vergleichen: umstellen, „Erneut auswerten", beide
-Fassungen nebeneinander lesen.
+Model and temperature can be overridden **per template and per recording**
+(`llm.model`/`llm.temperature` remain the default). That makes it possible to
+compare two models on the same recording: switch, "Analyse again", read both
+versions side by side.
 
-Eine erneute Auswertung **ersetzt die Zusammenfassung nicht**, sondern legt eine
-weitere **Fassung** daneben — beschriftet mit Vorlage, Modell und Zeitpunkt, samt
-dem Prompt, mit dem sie entstanden ist. Im Reiter **Zusammenfassung** lässt sich
-zwischen den Fassungen umschalten; genau eine ist die aktuelle und steht in
-Download, API, Freigabe-Ansicht und `summary.md`. Eine ältere Fassung lässt sich
-über **„Als aktuelle Fassung"** wieder nach vorn holen, ältere einzeln löschen.
-Automatisch aufgeräumt wird nichts — von Hand überarbeitete Fassungen bleiben.
+A repeated analysis **does not replace the summary**; it adds another **version**
+next to it — labelled with template, model and timestamp, along with the prompt
+it was created from. In the **Summary** tab you can switch between versions;
+exactly one is the current one and is used in the download, the API, the share
+view and `summary.md`. An older version can be brought back with **"Make
+current"**, and older ones can be deleted individually. Nothing is cleaned up
+automatically — hand-edited versions stay.
 
-Zusammenfassung und geglättetes Transkript werden als GitHub-Markdown angezeigt
-— Tabellen und Aufgabenlisten erscheinen als solche. Codeblöcke mit der Sprache
-`mermaid` werden als Diagramm gezeichnet; anfordern lässt sich das über den
-Auswertungs-Prompt („… zusätzlich als Mermaid-Flussdiagramm").
+Summary and smoothed transcript are rendered as GitHub Markdown — tables and task
+lists appear as such. Code blocks with the language `mermaid` are drawn as a
+diagram; you can ask for that in the analysis prompt ("… additionally as a
+Mermaid flowchart").
 
-Beides lässt sich **herunterladen**: das Transkript im Transkript-Tab (immer die
-gerade angezeigte Fassung — korrigiert oder Original), die Zusammenfassung über
-den Knopf im Kopf der Aufnahme. Neben Markdown gibt es je eine **Word-Fassung**
-(`.doc`), die Word und LibreOffice direkt öffnen und aus der sich DOCX oder PDF
-speichern lässt.
+Both can be **downloaded**: the transcript in the transcript tab (always the
+version currently shown — corrected or original), the summary via the button in
+the recording header. Besides Markdown there is a **Word version** (`.doc`) of
+each, which Word and LibreOffice open directly and from which DOCX or PDF can be
+saved.
 
-## Freigabe-Link
+## Queue overview for admins
 
-Über **Teilen → Link zum Teilen** erzeugt der Besitzer einer Aufnahme eine
-Adresse (`https://<host>/share/<token>`) und wählt dabei den **Zugriff**:
+With one GPU, a nightly time window and several bots, the queue is where it is
+decided whether everything is finished by morning. The **Admin → Processing** tab
+is the page to open in the morning:
 
-- **Nur mit Anmeldung** (Standard): Der Empfänger wird beim Öffnen zur Anmeldung
-  geführt; danach ist die Aufnahme mit seinem Konto geteilt und erscheint in
-  seiner Aufnahmen-Liste. Jeder Zugriff bleibt einer Person zuordenbar.
-- **Ohne Anmeldung**: Wer die Adresse kennt, sieht **Video, Audio, Transkript und
-  Zusammenfassung** ohne Konto — für Empfänger ohne Zugang zum System.
+- the **time window** at the top: open or closed, with the configured times — and
+  how many jobs are only waiting for it,
+- **counters**: waiting / running / failed / finished,
+- the **queue** with recording, task, attempt ("2 of 3") and waiting time,
+- **recent failures** with their reason and a **Retry** button. It resets the
+  attempt counter and starts the job immediately, regardless of the time window,
+- **step durations**: median and maximum of the last 50 finished jobs, broken
+  down into speech recognition, smoothing and summary — so an outlier stands out
+  against the normal case.
 
-Chat- und Sitzungsprotokoll bleiben der angemeldeten Ansicht vorbehalten. Die
-Laufzeit ist wahlweise unbegrenzt (bis zum Widerruf) oder 7/30/90 Tage; ein
-Widerruf wirkt sofort. Der Dialog zeigt zu jedem Link die Art, die Zahl der
-Aufrufe und den letzten Zugriff. Wird die Aufnahme gelöscht, verschwinden ihre
-Links mit ihr.
+Also available through the API: `GET /api/admin/processing` and
+`POST /api/admin/processing/jobs/{jobId}/retry` (both admin only).
 
-Wer Zugriffe grundsätzlich zuordenbar halten muss, schaltet die Admin-Einstellung
-`sharing.publicLinks` aus: Dann verlangen **alle** Freigabe-Links eine Anmeldung,
-auch bereits erzeugte.
+## Share link
 
-Hinweis zu Downloads: Ob der Browser beim Herunterladen nach einem Zielordner
-fragt, ist eine Browser-Einstellung (Chrome/Edge: *Einstellungen → Downloads →
-„Vor jedem Download fragen, wo Dateien gespeichert werden sollen"*). Die
-Anwendung kann das nicht erzwingen.
+Via **Share → Link for sharing** the owner of a recording creates a URL
+(`https://<host>/share/<token>`) and chooses the **access**:
 
-## Quellcode, Fehler und Feature-Wünsche
+- **Sign-in required** (default): opening the link takes the recipient to the
+  sign-in page; afterwards the recording is shared with their account and appears
+  in their recordings list. Every access stays attributable to a person.
+- **Without sign-in**: anyone who knows the URL sees **video, audio, transcript
+  and summary** without an account — for recipients who have no access to the
+  system.
 
-Der Quellcode liegt öffentlich auf GitHub:
+The chat log and session log remain reserved for the signed-in view. The lifetime
+is either unlimited (until revoked) or 7/30/90 days; a revocation takes effect
+immediately. The dialog shows the kind, the number of views and the last access
+for each link. If the recording is deleted, its links go with it.
+
+If accesses must stay attributable as a matter of policy, switch off the admin
+setting `sharing.publicLinks`: then **all** share links require a sign-in, including
+ones created earlier.
+
+A note on downloads: whether the browser asks for a target folder when
+downloading is a browser setting (Chrome/Edge: *Settings → Downloads → "Ask where
+to save each file before downloading"*). The application cannot force it.
+
+## Source code, bugs and feature requests
+
+The source code is public on GitHub:
 [Posiuke/Meeting-Recorder](https://github.com/Posiuke/Meeting-Recorder).
 
-Fehlermeldungen und Feature-Wünsche sind willkommen — von jedem, direkt als
-Issue:
-[Bug melden](https://github.com/Posiuke/Meeting-Recorder/issues/new?template=bug_report.yml)
-· [Feature wünschen](https://github.com/Posiuke/Meeting-Recorder/issues/new?template=feature_request.yml)
-· [alle Issues](https://github.com/Posiuke/Meeting-Recorder/issues).
+Bug reports and feature requests are welcome — from anyone, straight as an issue:
+[report a bug](https://github.com/Posiuke/Meeting-Recorder/issues/new?template=bug_report.yml)
+· [request a feature](https://github.com/Posiuke/Meeting-Recorder/issues/new?template=feature_request.yml)
+· [all issues](https://github.com/Posiuke/Meeting-Recorder/issues).
 
-Bitte in Logs vorher Zugangsdaten, API-Keys, interne Hostnamen und
-Meeting-Inhalte entfernen — Issues sind öffentlich lesbar.
+Please strip credentials, API keys, internal host names and meeting content from
+logs first — issues are publicly readable.
