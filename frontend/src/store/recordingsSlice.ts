@@ -6,6 +6,8 @@ import type {
   ParticipantView,
   RecordingDetail,
   RecordingDocumentView,
+  RecordingPageView,
+  RecordingSource,
   RecordingView,
   ShareLinkView,
   ShareView,
@@ -13,7 +15,15 @@ import type {
   SummaryView,
   TagCountView,
   TranscriptView,
+  UserView,
 } from '../types';
+
+/** Besitzerfilter: alles, nur eigene, nur geteilte – oder ein bestimmter Nutzer. */
+export type OwnerFilter = 'all' | 'mine' | 'shared' | (string & {});
+
+/** Sortierung der Aufnahmenliste. */
+export type RecordingSortKey = 'date' | 'title';
+export type SortDirection = 'asc' | 'desc';
 
 /** Filter der Aufnahmenliste (leer = alles). */
 export interface RecordingFilter {
@@ -23,11 +33,41 @@ export interface RecordingFilter {
   tag?: string;
   /** Zusätzlich in Transkript und Zusammenfassung suchen. */
   content?: boolean;
+  /** Nur Aufnahmen ab diesem Tag (JJJJ-MM-TT). */
+  from?: string;
+  /** Nur Aufnahmen bis zu diesem Tag einschließlich (JJJJ-MM-TT). */
+  to?: string;
+  /** Nur diese Quelle. */
+  source?: RecordingSource;
+  /** `all`, `mine`, `shared` oder die Kennung eines Besitzers. */
+  owner?: OwnerFilter;
+  sort?: RecordingSortKey;
+  dir?: SortDirection;
+}
+
+/** Treffer pro Seite – gleiche Vorgabe wie serverseitig. */
+export const PAGE_SIZE = 25;
+
+/** Filter als Query-Parameter; nicht gesetzte Werte bleiben weg. */
+function filterParams(filter: RecordingFilter | undefined): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filter?.q?.trim()) params.set('q', filter.q.trim());
+  if (filter?.tag) params.set('tag', filter.tag);
+  if (filter?.content) params.set('content', 'true');
+  if (filter?.from) params.set('from', filter.from);
+  if (filter?.to) params.set('to', filter.to);
+  if (filter?.source) params.set('source', filter.source);
+  if (filter?.owner && filter.owner !== 'all') params.set('owner', filter.owner);
+  if (filter?.sort) params.set('sort', filter.sort);
+  if (filter?.dir) params.set('dir', filter.dir);
+  return params;
 }
 
 interface RecordingsState {
   items: RecordingView[];
   loading: boolean;
+  /** Nachladen weiterer Seiten – die vorhandene Liste bleibt dabei stehen. */
+  loadingMore: boolean;
   error: string | null;
   /**
    * Kennung der jüngsten Listenabfrage. Bei getippter Suche laufen mehrere
@@ -35,6 +75,18 @@ interface RecordingsState {
    * ältere Antwort das neuere Ergebnis überschreiben.
    */
   listRequestId: string | null;
+  /** Zuletzt geladene Seite (bei 0 beginnend). */
+  page: number;
+  /** Treffer insgesamt – nicht nur die geladenen. */
+  total: number;
+  hasMore: boolean;
+  /** Nutzer, die Aufnahmen freigegeben haben – Auswahlliste des Besitzerfilters. */
+  owners: UserView[];
+  /**
+   * Wie viele eigene Aufnahmen das Aufräumen löschen würde. Kommt vom Server,
+   * weil die Liste nur eine Seite kennt.
+   */
+  cleanupCandidates: number;
   tags: TagCountView[];
   detail: RecordingDetail | null;
   detailLoading: boolean;
@@ -54,8 +106,14 @@ interface RecordingsState {
 const initialState: RecordingsState = {
   items: [],
   loading: false,
+  loadingMore: false,
   error: null,
   listRequestId: null,
+  page: 0,
+  total: 0,
+  hasMore: false,
+  owners: [],
+  cleanupCandidates: 0,
   tags: [],
   detail: null,
   detailLoading: false,
@@ -71,22 +129,66 @@ const initialState: RecordingsState = {
   shareLinksError: null,
 };
 
+/** Argument von {@link fetchRecordings}: Filter, gewünschte Seite, anhängen oder ersetzen. */
+export interface FetchRecordingsArg {
+  filter?: RecordingFilter;
+  /** Seitennummer, bei 0 beginnend. */
+  page?: number;
+  /** true = an die vorhandene Liste anhängen („mehr laden"), false = ersetzen. */
+  append?: boolean;
+}
+
+/**
+ * Eine Seite der Aufnahmenliste. Der Server schneidet, sortiert und filtert –
+ * das Frontend hält nur, was es anzeigt, und weiß über `total`, wie viel noch
+ * dahinter liegt.
+ */
 export const fetchRecordings = createAsyncThunk<
-  RecordingView[],
-  RecordingFilter | undefined,
+  RecordingPageView,
+  FetchRecordingsArg | undefined,
   { rejectValue: string }
->('recordings/fetch', async (filter, { rejectWithValue }) => {
+>('recordings/fetch', async (arg, { rejectWithValue }) => {
   try {
-    const params = new URLSearchParams();
-    if (filter?.q?.trim()) params.set('q', filter.q.trim());
-    if (filter?.tag) params.set('tag', filter.tag);
-    if (filter?.content) params.set('content', 'true');
-    const query = params.toString();
-    return await api<RecordingView[]>(`/api/recordings${query ? `?${query}` : ''}`);
+    const params = filterParams(arg?.filter);
+    params.set('page', String(arg?.page ?? 0));
+    params.set('size', String(PAGE_SIZE));
+    return await api<RecordingPageView>(`/api/recordings/page?${params.toString()}`);
   } catch (e) {
     return rejectWithValue(errorMessage(e));
   }
 });
+
+/**
+ * Nutzer, die dem angemeldeten Nutzer Aufnahmen freigegeben haben. Leer, solange
+ * nichts geteilt wurde – dann zeigt die Filterleiste die Auswahl gar nicht.
+ */
+export const fetchRecordingOwners = createAsyncThunk<UserView[], void, { rejectValue: string }>(
+  'recordings/fetchOwners',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await api<UserView[]>('/api/recordings/owners');
+    } catch (e) {
+      return rejectWithValue(errorMessage(e));
+    }
+  },
+);
+
+/**
+ * Wie viele eigene Aufnahmen hängengeblieben sind. Serverseitig gezählt, weil
+ * die Liste seitenweise lädt und eine hängende Aufnahme weiter hinten stehen
+ * kann.
+ */
+export const fetchCleanupCandidates = createAsyncThunk<number, void, { rejectValue: string }>(
+  'recordings/fetchCleanupCandidates',
+  async (_, { rejectWithValue }) => {
+    try {
+      const result = await api<{ candidates: number }>('/api/recordings/cleanup-corrupt');
+      return result.candidates ?? 0;
+    } catch (e) {
+      return rejectWithValue(errorMessage(e));
+    }
+  },
+);
 
 /** Alle sichtbaren Schlagworte mit Häufigkeit – für Filterleiste und Vorschläge. */
 export const fetchTagCounts = createAsyncThunk<TagCountView[], void, { rejectValue: string }>(
@@ -500,20 +602,37 @@ const recordingsSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchRecordings.pending, (state, action) => {
-        state.loading = true;
+        // Beim Nachladen bleibt die Liste stehen; nur der eigene Spinner läuft.
+        if (action.meta.arg?.append) {
+          state.loadingMore = true;
+        } else {
+          state.loading = true;
+        }
         state.error = null;
         state.listRequestId = action.meta.requestId;
       })
       .addCase(fetchRecordings.fulfilled, (state, action) => {
         // Überholte Antwort einer älteren Sucheingabe verwerfen
         if (state.listRequestId !== action.meta.requestId) return;
-        state.items = action.payload;
+        const page = action.payload;
+        state.items = action.meta.arg?.append ? [...state.items, ...page.items] : page.items;
+        state.page = page.page;
+        state.total = page.total;
+        state.hasMore = page.hasMore;
         state.loading = false;
+        state.loadingMore = false;
       })
       .addCase(fetchRecordings.rejected, (state, action) => {
         if (state.listRequestId !== action.meta.requestId) return;
         state.loading = false;
+        state.loadingMore = false;
         state.error = action.payload ?? translate('errors.recordingsLoad');
+      })
+      .addCase(fetchRecordingOwners.fulfilled, (state, action) => {
+        state.owners = action.payload;
+      })
+      .addCase(fetchCleanupCandidates.fulfilled, (state, action) => {
+        state.cleanupCandidates = action.payload;
       })
       .addCase(fetchTagCounts.fulfilled, (state, action) => {
         state.tags = action.payload;
@@ -539,7 +658,11 @@ const recordingsSlice = createSlice({
         state.detailError = action.payload ?? translate('errors.recordingLoad');
       })
       .addCase(deleteRecording.fulfilled, (state, action) => {
+        const before = state.items.length;
         state.items = state.items.filter((r) => r.id !== action.payload);
+        // Die Gesamtzahl mitzählen, sonst behauptet die Liste weiter
+        // "25 von 340", nachdem eine Aufnahme verschwunden ist.
+        if (state.items.length < before) state.total = Math.max(0, state.total - 1);
       })
       .addCase(processRecording.fulfilled, (state, action) => {
         upsertJob(state, action.payload);

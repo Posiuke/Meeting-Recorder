@@ -286,6 +286,28 @@ export const de = {
       'Datei hochgeladen. Die Aufnahme wird im Hintergrund umgewandelt und erscheint gleich in der Liste.',
     captureDone:
       'Aufnahme abgeschlossen. Sie wird im Hintergrund umgewandelt und erscheint gleich in der Liste.',
+    // Filterleiste, Sortierung und seitenweises Laden
+    filters: 'Weitere Filter',
+    filtersOn: 'aktiv',
+    filtersReset: 'Filter zurücksetzen',
+    filterFrom: 'Von',
+    filterTo: 'Bis',
+    filterSource: 'Quelle',
+    filterOwner: 'Besitzer',
+    source: {
+      BOT: 'Bot im Meeting',
+      UPLOAD: 'Upload',
+      CAPTURE: 'Bildschirmaufnahme',
+    },
+    sortLabel: 'Sortierung',
+    sortDateDesc: 'Datum, neueste zuerst',
+    sortDateAsc: 'Datum, älteste zuerst',
+    sortTitleAsc: 'Titel, A–Z',
+    sortTitleDesc: 'Titel, Z–A',
+    shownOf: '{{shown}} von {{total}} angezeigt',
+    loadMore: 'Mehr laden',
+    loadingMore: 'Wird geladen…',
+    cleanupCandidates: '{{count}} hängengebliebene Aufnahme(n) gefunden',
   },
 
   tags: {

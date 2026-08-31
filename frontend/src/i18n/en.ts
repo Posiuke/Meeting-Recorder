@@ -281,6 +281,27 @@ export const en: typeof de = {
       'File uploaded. The recording is being converted in the background and will appear in the list shortly.',
     captureDone:
       'Recording finished. It is being converted in the background and will appear in the list shortly.',
+    filters: 'More filters',
+    filtersOn: 'active',
+    filtersReset: 'Reset filters',
+    filterFrom: 'From',
+    filterTo: 'To',
+    filterSource: 'Source',
+    filterOwner: 'Owner',
+    source: {
+      BOT: 'Bot in the meeting',
+      UPLOAD: 'Upload',
+      CAPTURE: 'Screen recording',
+    },
+    sortLabel: 'Sort by',
+    sortDateDesc: 'Date, newest first',
+    sortDateAsc: 'Date, oldest first',
+    sortTitleAsc: 'Title, A–Z',
+    sortTitleDesc: 'Title, Z–A',
+    shownOf: 'Showing {{shown}} of {{total}}',
+    loadMore: 'Load more',
+    loadingMore: 'Loading…',
+    cleanupCandidates: '{{count}} stuck recording(s) found',
   },
 
   tags: {

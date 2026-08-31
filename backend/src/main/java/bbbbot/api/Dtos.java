@@ -207,6 +207,20 @@ public final class Dtos {
         }
     }
 
+    /**
+     * Eine Seite der Aufnahmenliste. Die Gesamtzahl gehoert dazu, sonst weiss die
+     * Oberflaeche nicht, ob es hinter der Seite noch etwas gibt - und kann weder
+     * "mehr laden" anbieten noch "25 von 340" anzeigen.
+     *
+     * @param page       Seitennummer, bei 0 beginnend
+     * @param size       angeforderte Seitengroesse
+     * @param total      Treffer insgesamt (ueber alle Seiten)
+     * @param totalPages Anzahl der Seiten
+     * @param hasMore    Gibt es hinter dieser Seite weitere Treffer?
+     */
+    public record RecordingPageView(List<RecordingView> items, int page, int size,
+                                    long total, int totalPages, boolean hasMore) {}
+
     public record RecordingDetail(RecordingView recording, List<SegmentView> segments,
                                   List<SummaryView> summaries, List<JobView> jobs,
                                   List<ParticipantView> participants,

@@ -42,11 +42,18 @@ curl -s -H "X-API-Key: $KEY" -F file=@note.m4a \\
         {
           method: 'GET',
           path: '/api/recordings',
-          summary: 'List and search recordings.',
+          summary:
+            'List and search recordings. Returns ALL matches as an array – for long lists /api/recordings/page is the gentler form.',
           params: [
-            { name: 'q', description: 'search term for title, room name, meeting URL and tags' },
+            { name: 'q', description: 'Search term for title, room name, meeting URL and tags' },
             { name: 'tag', description: 'only recordings carrying this tag' },
             { name: 'content', description: 'true = also search transcript and summary' },
+            { name: 'from', description: 'only recordings from this day (YYYY-MM-DD) or ISO instant onwards' },
+            { name: 'to', description: 'only recordings up to and including this day (YYYY-MM-DD) or ISO instant' },
+            { name: 'source', description: 'BOT, UPLOAD or CAPTURE' },
+            { name: 'owner', description: 'mine, shared or the id of an owner (see /api/recordings/owners)' },
+            { name: 'sort', description: 'date (default) or title' },
+            { name: 'dir', description: 'asc or desc' },
           ],
           example: `curl -s -H "X-API-Key: $KEY" \\
   "$BBB/api/recordings?q=technik&content=true"`,
@@ -62,6 +69,29 @@ curl -s -H "X-API-Key: $KEY" -F file=@note.m4a \\
     "mine": true
   }
 ]`,
+        },
+        {
+          method: 'GET',
+          path: '/api/recordings/page',
+          summary:
+            'One page of the recordings list including the total count – same filters as above plus page and size. The sort order carries the recording id as its last key, so paging stays stable even when dates are equal.',
+          params: [
+            { name: 'page', description: 'page number, starting at 0 (default 0)' },
+            { name: 'size', description: 'matches per page, 1 to 200 (default 25)' },
+          ],
+          example: `curl -s -H "X-API-Key: $KEY" \\
+  "$BBB/api/recordings/page?page=0&size=25&source=BOT&from=2026-08-01&sort=title&dir=asc"`,
+          response: `{
+  "items": [ { "id": "8f14e45f-...", "title": "Project North vote", ... } ],
+  "page": 0, "size": 25, "total": 137, "totalPages": 6, "hasMore": true
+}`,
+        },
+        {
+          method: 'GET',
+          path: '/api/recordings/owners',
+          summary:
+            'The users who shared recordings with you – the option list of the owner filter. Empty as long as nothing was shared.',
+          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/recordings/owners"`,
         },
         {
           method: 'GET',

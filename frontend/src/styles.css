@@ -636,6 +636,32 @@ tbody tr:hover {
   margin-top: auto;
 }
 
+/* ===== Filterleiste und Fussbereich der Aufnahmenliste ===== */
+.recordings-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.recordings-filters .form-field {
+  margin-bottom: 0;
+}
+
+.recordings-filters .btn {
+  align-self: flex-start;
+}
+
+/* Zaehler links, "Mehr laden" rechts */
+.list-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
 /* ===== Bot-Vorlagen ===== */
 /* Kopfzeile eines Abschnitts mit Aktion rechts (wie .page-head, nur fuer h2). */
 .section-head {

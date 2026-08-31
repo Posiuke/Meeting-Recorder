@@ -27,6 +27,9 @@ import bbbbot.sharing.AccessService;
 import bbbbot.sharing.ShareLinkService;
 import bbbbot.stt.TranscriptAssembler;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -286,20 +289,119 @@ public class RecordingController {
         }
     }
 
+    /** Vorgabe der Seitengroesse, wenn die Oberflaeche keine nennt. */
+    private static final int DEFAULT_PAGE_SIZE = 25;
+
+    /**
+     * Obergrenze der Seitengroesse. Wer mehr will, blaettert - eine einzelne
+     * Antwort mit tausenden Aufnahmen waere genau das, was die Seitenaufteilung
+     * abstellen soll.
+     */
+    private static final int MAX_PAGE_SIZE = 200;
+
     /**
      * Aufnahmen, die der Nutzer sehen darf - optional gefiltert.
+     *
+     * <p>Diese Form liefert weiterhin die <b>vollstaendige</b> Liste als
+     * JSON-Feld, damit bestehende Skripte unveraendert weiterlaufen. Fuer
+     * seitenweises Laden samt Gesamtzahl gibt es {@link #page}.
      *
      * @param q       Suchbegriff fuer Titel/Raumname, Meeting-URL und Schlagworte
      * @param tag     nur Aufnahmen mit diesem Schlagwort
      * @param content zusaetzlich in Transkript und Zusammenfassung suchen
+     * @param from    nur Aufnahmen ab diesem Zeitpunkt/Datum
+     * @param to      nur Aufnahmen bis zu diesem Zeitpunkt/Datum (Datum = ganzer Tag)
+     * @param source  nur diese Quelle (BOT, UPLOAD, CAPTURE)
+     * @param owner   {@code mine}, {@code shared} oder die Kennung eines Besitzers
+     * @param sort    {@code date} oder {@code title}
+     * @param dir     {@code asc} oder {@code desc}
      */
     @GetMapping
     public List<Dtos.RecordingView> list(@RequestParam(required = false) String q,
                                          @RequestParam(required = false) String tag,
-                                         @RequestParam(defaultValue = "false") boolean content) {
+                                         @RequestParam(defaultValue = "false") boolean content,
+                                         @RequestParam(required = false) String from,
+                                         @RequestParam(required = false) String to,
+                                         @RequestParam(required = false) String source,
+                                         @RequestParam(required = false) String owner,
+                                         @RequestParam(required = false) String sort,
+                                         @RequestParam(required = false) String dir) {
         AppUser user = CurrentUser.get();
-        List<Recording> recordings = recordingSearch.search(user.getId(), q, tag, content);
-        // Schlagworte aller Treffer in einer Abfrage, nicht pro Zeile
+        Page<Recording> found = recordingSearch.search(user.getId(),
+                requireFilter(q, tag, content, from, to, source, owner),
+                requireSort(sort, dir), Pageable.unpaged());
+        return toViews(found.getContent(), user);
+    }
+
+    /**
+     * Eine Seite der Aufnahmenliste mit Gesamtzahl - die Form, die die
+     * Oberflaeche benutzt.
+     *
+     * @param page Seitennummer, bei 0 beginnend
+     * @param size Treffer pro Seite (1 bis {@value #MAX_PAGE_SIZE})
+     */
+    @GetMapping("/page")
+    public Dtos.RecordingPageView page(@RequestParam(required = false) String q,
+                                       @RequestParam(required = false) String tag,
+                                       @RequestParam(defaultValue = "false") boolean content,
+                                       @RequestParam(required = false) String from,
+                                       @RequestParam(required = false) String to,
+                                       @RequestParam(required = false) String source,
+                                       @RequestParam(required = false) String owner,
+                                       @RequestParam(required = false) String sort,
+                                       @RequestParam(required = false) String dir,
+                                       @RequestParam(defaultValue = "0") int page,
+                                       @RequestParam(defaultValue = "0") int size) {
+        AppUser user = CurrentUser.get();
+        if (page < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Seitennummer darf nicht negativ sein");
+        }
+        if (size > MAX_PAGE_SIZE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Seitengroesse ist zu gross (max. " + MAX_PAGE_SIZE + ")");
+        }
+        int pageSize = size <= 0 ? DEFAULT_PAGE_SIZE : size;
+        Page<Recording> found = recordingSearch.search(user.getId(),
+                requireFilter(q, tag, content, from, to, source, owner),
+                requireSort(sort, dir), PageRequest.of(page, pageSize));
+        return new Dtos.RecordingPageView(toViews(found.getContent(), user), found.getNumber(),
+                pageSize, found.getTotalElements(), found.getTotalPages(), found.hasNext());
+    }
+
+    /**
+     * Die Nutzer, die dem angemeldeten Nutzer Aufnahmen freigegeben haben - die
+     * Auswahlliste des Besitzerfilters. Leer, solange nichts geteilt wurde.
+     */
+    @GetMapping("/owners")
+    public List<Dtos.UserView> owners() {
+        AppUser user = CurrentUser.get();
+        return userRepo.findAllById(recordingSearch.sharingOwnerIds(user.getId())).stream()
+                .map(Dtos.UserView::of)
+                .sorted(Comparator.comparing(u -> u.displayName() == null ? u.username() : u.displayName(),
+                        String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    /** Filterbild aus den Rohwerten; eine unverstaendliche Angabe ist ein 400. */
+    private static bbbbot.recording.RecordingFilter requireFilter(
+            String q, String tag, boolean content, String from, String to, String source, String owner) {
+        try {
+            return bbbbot.recording.RecordingFilter.of(q, tag, content, from, to, source, owner);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+    }
+
+    private static bbbbot.recording.RecordingSort requireSort(String sort, String dir) {
+        try {
+            return bbbbot.recording.RecordingSort.of(sort, dir);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+    }
+
+    /** Schlagworte aller Treffer in einer Abfrage, nicht pro Zeile. */
+    private List<Dtos.RecordingView> toViews(List<Recording> recordings, AppUser user) {
         Map<UUID, List<String>> tags = tagService.tagsOf(recordings);
         return recordings.stream()
                 .map(r -> toView(r, user, tags.getOrDefault(r.getId(), List.of())))
@@ -383,15 +485,44 @@ public class RecordingController {
         AppUser user = CurrentUser.get();
         int deleted = 0;
         for (Recording recording : recordingRepo.findByOwnerIdOrderByStartedAtDesc(user.getId())) {
-            boolean stuck = recording.getStatus() == Recording.Status.RECORDING
-                    || recording.getStatus() == Recording.Status.FINALIZING;
-            if (stuck && !isCapturing(recording.getId())) {
+            if (isStuck(recording)) {
                 deleteDirectory(Path.of(recording.getDirectory()));
                 recordingRepo.delete(recording);
                 deleted++;
             }
         }
         return Map.of("deleted", deleted);
+    }
+
+    /**
+     * Wie viele eigene Aufnahmen das Aufraeumen gerade loeschen wuerde - damit
+     * die Oberflaeche den Knopf nur dann anbietet, wenn es etwas zu tun gibt.
+     *
+     * <p>Eigener Endpunkt, seit die Liste seitenweise laedt: Vorher hat das
+     * Frontend die vollstaendige Liste durchsucht. Auf einer Seite von 25
+     * Treffern waere eine haengende Aufnahme weiter hinten unsichtbar - und der
+     * Knopf fehlte genau dann, wenn er gebraucht wird. Geprueft wird hier
+     * dasselbe Kriterium wie beim Aufraeumen selbst.
+     */
+    @GetMapping("/cleanup-corrupt")
+    public Map<String, Integer> cleanupCorruptPreview() {
+        AppUser user = CurrentUser.get();
+        int candidates = 0;
+        for (Recording recording : recordingRepo.findByOwnerIdOrderByStartedAtDesc(user.getId())) {
+            if (isStuck(recording)) candidates++;
+        }
+        return Map.of("candidates", candidates);
+    }
+
+    /**
+     * Haengengeblieben: Der Status sagt "nimmt auf", aber es laeuft nichts mehr.
+     * Eine wirklich laufende Bildschirmaufnahme steht ebenfalls auf RECORDING -
+     * sie ist nicht korrupt, sondern nur in einem anderen Tab.
+     */
+    private boolean isStuck(Recording recording) {
+        boolean stuck = recording.getStatus() == Recording.Status.RECORDING
+                || recording.getStatus() == Recording.Status.FINALIZING;
+        return stuck && !isCapturing(recording.getId());
     }
 
     // ------------------------------------------------------------ Audio/Text

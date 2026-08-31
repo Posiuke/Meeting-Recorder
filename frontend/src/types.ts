@@ -399,6 +399,19 @@ export interface PromptTemplateView {
   updatedAt: string | null;
 }
 
+/** Eine Seite der Aufnahmenliste samt Gesamtzahl. */
+export interface RecordingPageView {
+  items: RecordingView[];
+  /** Seitennummer, bei 0 beginnend. */
+  page: number;
+  size: number;
+  /** Treffer insgesamt über alle Seiten. */
+  total: number;
+  totalPages: number;
+  /** Gibt es hinter dieser Seite weitere Treffer? */
+  hasMore: boolean;
+}
+
 export interface GroupView {
   id: string;
   name: string;

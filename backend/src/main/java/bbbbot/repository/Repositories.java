@@ -99,16 +99,6 @@ public interface Repositories {
 
     interface RecordingSegmentRepo extends JpaRepository<RecordingSegment, UUID> {
         List<RecordingSegment> findByRecordingIdOrderBySeq(UUID recordingId);
-
-        /**
-         * Aufnahmen, deren Transkript den Suchbegriff enthaelt (Kleinschreibung, %...%).
-         * Das Fluchtzeichen '!' muss zu RecordingSearch passen.
-         */
-        @Query("""
-            select distinct s.recordingId from RecordingSegment s
-              where s.transcriptText is not null and lower(s.transcriptText) like :pattern escape '!'
-            """)
-        List<UUID> findRecordingIdsByTranscriptLike(@Param("pattern") String pattern);
     }
 
     interface RecordingTagRepo extends JpaRepository<RecordingTag, UUID> {
@@ -116,14 +106,6 @@ public interface Repositories {
         List<RecordingTag> findByRecordingIdIn(List<UUID> recordingIds);
         Optional<RecordingTag> findByRecordingIdAndNameKey(UUID recordingId, String nameKey);
         long countByRecordingId(UUID recordingId);
-
-        /** Aufnahmen mit genau diesem Schlagwort. */
-        @Query("select t.recordingId from RecordingTag t where t.nameKey = :nameKey")
-        List<UUID> findRecordingIdsByNameKey(@Param("nameKey") String nameKey);
-
-        /** Aufnahmen, deren Schlagwort den Suchbegriff enthaelt (%...%, Fluchtzeichen '!'). */
-        @Query("select distinct t.recordingId from RecordingTag t where t.nameKey like :pattern escape '!'")
-        List<UUID> findRecordingIdsByNameKeyLike(@Param("pattern") String pattern);
     }
 
     interface ParticipantRepo extends JpaRepository<Participant, UUID> {
@@ -143,18 +125,6 @@ public interface Repositories {
 
         /** Die aktuelle Fassung; der Teil-Index uq_summary_current haelt sie eindeutig. */
         Optional<Summary> findByRecordingIdAndCurrentIsTrue(UUID recordingId);
-
-        /**
-         * Aufnahmen, deren Zusammenfassung den Suchbegriff enthaelt (Kleinschreibung,
-         * %...%). Gesucht wird nur in der aktuellen Fassung - ein Treffer soll in dem
-         * Text stehen, den die Aufnahme auch anzeigt, nicht in einer verworfenen Fassung.
-         */
-        @Query("""
-            select distinct s.recordingId from Summary s
-              where s.current = true and s.markdown is not null
-                and lower(s.markdown) like :pattern escape '!'
-            """)
-        List<UUID> findRecordingIdsByMarkdownLike(@Param("pattern") String pattern);
     }
 
     interface ShareGrantRepo extends JpaRepository<ShareGrant, UUID> {

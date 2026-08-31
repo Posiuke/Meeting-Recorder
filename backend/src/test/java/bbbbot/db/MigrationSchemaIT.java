@@ -17,12 +17,16 @@ import bbbbot.repository.Repositories.RecordingSegmentRepo;
 import bbbbot.repository.Repositories.RecordingTagRepo;
 import bbbbot.repository.Repositories.ShareLinkRepo;
 import bbbbot.repository.Repositories.SummaryRepo;
+import bbbbot.recording.RecordingFilter;
+import bbbbot.recording.RecordingSearch;
+import bbbbot.recording.RecordingSort;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.UUID;
@@ -112,8 +116,9 @@ class MigrationSchemaIT {
                 .extracting(Recording::getId)
                 .contains(recording.getId());
 
-        List<UUID> hits = tagRepo.findRecordingIdsByNameKeyLike("%nord%");
-        assertThat(hits).contains(recording.getId());
+        // Die Suchabfrage der Aufnahmenliste gegen Postgres: Schlagwort-Treffer.
+        // Sie steckt in RecordingSearch und wird sonst nur gegen H2 geprueft.
+        assertThat(searchIds("nord", false)).contains(recording.getId());
         assertThat(tagRepo.findByRecordingIdOrderByNameKeyAsc(recording.getId()))
                 .extracting(RecordingTag::getName)
                 .containsExactly("Projekt Nord");
@@ -186,14 +191,37 @@ class MigrationSchemaIT {
                 .satisfies(sum -> assertThat(sum.getTemperature()).isEqualTo(0.9));
         assertThat(summaryRepo.findByRecordingIdOrderByCreatedAtDesc(recording.getId())).hasSize(2);
         // Die Suche in Zusammenfassungen findet nur die aktuelle Fassung
-        assertThat(summaryRepo.findRecordingIdsByMarkdownLike("%aktuelle fassung%"))
-                .contains(recording.getId());
-        assertThat(summaryRepo.findRecordingIdsByMarkdownLike("%alte fassung%")).isEmpty();
+        assertThat(searchIds("aktuelle fassung", true)).contains(recording.getId());
+        assertThat(searchIds("alte fassung", true)).isEmpty();
 
         // Der Teil-Index uq_summary_current laesst nur eine aktuelle Fassung zu
         alt.setCurrent(true);
         assertThatThrownBy(() -> summaryRepo.saveAndFlush(alt))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    /**
+     * Kennungen der Aufnahmen, die die Listensuche zu diesem Begriff findet -
+     * hier gegen echtes PostgreSQL statt gegen H2 wie im Unit-Test.
+     */
+    private List<UUID> searchIds(String text, boolean content) {
+        return new RecordingSearch(em)
+                .search(ownerOfEverything(), RecordingFilter.of(text, null, content,
+                        null, null, null, null), RecordingSort.DEFAULT, Pageable.unpaged())
+                .getContent().stream()
+                .map(Recording::getId)
+                .toList();
+    }
+
+    /**
+     * Der Nutzer, dem die Aufnahmen dieses Tests gehoeren. Die Suche filtert nach
+     * Sichtbarkeit; ohne den richtigen Besitzer kaeme nichts zurueck.
+     */
+    private UUID ownerOfEverything() {
+        return recordingRepo.findAll().stream()
+                .map(Recording::getOwnerId)
+                .findFirst()
+                .orElseThrow();
     }
 
     /** Fertige Fassung mit Inhalt, direkt gespeichert. */

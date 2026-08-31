@@ -662,10 +662,41 @@ Zusammenfassung suchen"** nimmt die Inhalte dazu. Die Suche läuft serverseitig
 und liefert nur, was der angemeldete Nutzer sehen darf (eigene und mit ihm
 geteilte Aufnahmen).
 
+### Seitenweise laden, Filter und Sortierung
+
+Die Liste lädt **seitenweise** (25 Treffer, „Mehr laden" hängt die nächste Seite
+an) und zeigt darunter „x von y angezeigt". Geschnitten, gefiltert und sortiert
+wird in der Datenbank — das Frontend hält nur, was es anzeigt. Vorher kam bei
+jedem Tastendruck der komplette Bestand über die Leitung.
+
+Unter **Weitere Filter** stehen:
+
+- **Zeitraum** (von/bis, tagesgenau; „bis" schließt den genannten Tag ein),
+- **Quelle**: Bot im Meeting, Upload, Bildschirmaufnahme,
+- **Besitzer**: alle, nur eigene, nur geteilte — oder gezielt eine Person, die
+  etwas freigegeben hat (`GET /api/recordings/owners` liefert genau diese Liste),
+- **Sortierung**: Datum oder Titel, je auf- und absteigend.
+
+Nach Titel wird über das sortiert, was in der Spalte *steht*: Fehlt der Titel
+(Bot-Aufnahme ohne erkannten Raumnamen), zählt die Meeting-URL. Verglichen wird
+kleingeschrieben, damit die Reihenfolge nicht von der Kollation der Datenbank
+abhängt. An jede Sortierung hängt die Aufnahme-Kennung als letztes Kriterium —
+ohne dieses eindeutige Kriterium kann bei gleichem Datum dieselbe Aufnahme auf
+zwei Seiten erscheinen oder auf keiner.
+
+Für die API:
+
+- `GET /api/recordings/page?page=0&size=25&…` liefert eine Seite samt
+  `total`, `totalPages` und `hasMore`.
+- `GET /api/recordings` bleibt **unverändert** ein JSON-Array mit *allen*
+  Treffern, damit bestehende Skripte weiterlaufen; die neuen Filter- und
+  Sortierparameter versteht es ebenfalls.
+
 > Hinweis zur Inhaltssuche: Sie durchsucht die Transkript- und
 > Zusammenfassungstexte per `LIKE` ohne Volltextindex. Für einige Hundert bis
 > Tausend Aufnahmen ist das unauffällig; bei deutlich größeren Beständen wäre ein
-> Volltextindex (Postgres `pg_trgm` oder `tsvector`) der nächste Schritt.
+> Volltextindex (Postgres `pg_trgm` oder `tsvector`) der nächste Schritt — dann
+> eine Migration plus eine geänderte Bedingung in `RecordingSearch`.
 
 ## API und API-Schlüssel
 
