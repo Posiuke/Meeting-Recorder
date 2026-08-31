@@ -364,9 +364,21 @@ export interface JobView {
   /** true = nur Transkription (Schritt 1 der Zwei-Schritt-Auswertung) */
   transcribeOnly: boolean;
   attempts: number;
+  /** Nach so vielen Versuchen gibt die Verarbeitung auf. */
+  maxAttempts: number;
   lastError: string | null;
   createdAt: string;
+  /** Beginn des laufenden bzw. letzten Versuchs – Grundlage für „läuft seit …". */
+  startedAt: string | null;
   finishedAt: string | null;
+}
+
+/** Wann die Verarbeitung läuft – für jeden angemeldeten Nutzer lesbar. */
+export interface ProcessingInfoView {
+  /** Beginn des Zeitfensters (HH:mm). */
+  windowStart: string;
+  windowEnd: string;
+  windowOpen: boolean;
 }
 
 /**

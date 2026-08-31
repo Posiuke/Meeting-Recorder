@@ -27,12 +27,17 @@ import ShareDialog from '../components/ShareDialog';
 import TranscriptList from '../components/TranscriptList';
 import SummaryOptionsDialog from '../components/SummaryOptionsDialog';
 import TagEditor from '../components/TagEditor';
+import RecordingProgress from '../components/RecordingProgress';
+import NextStepCard from '../components/NextStepCard';
+import { resolveProgress } from './recordingProgress';
+import type { NextAction, ProcessingInfo } from './recordingProgress';
 import {
   audioUrl,
   documentDownloadUrl,
   documentTextUrl,
   errorMessage,
   fetchDocumentConfig,
+  fetchProcessingInfo,
   fullAudioDownloadUrl,
   fullAudioUrl,
   summaryDownloadUrl,
@@ -113,6 +118,10 @@ export default function RecordingDetailPage() {
   const [confirmRetranscribe, setConfirmRetranscribe] = useState(false);
   const [retranscribeBusy, setRetranscribeBusy] = useState(false);
   const [summaryOptionsOpen, setSummaryOptionsOpen] = useState(false);
+  /** Zeitfenster der Verarbeitung; null = noch nicht geladen. */
+  const [processingInfo, setProcessingInfo] = useState<ProcessingInfo | null>(null);
+  /** Segmentliste: technisches Detail, standardmäßig zu (siehe unten). */
+  const [segmentsOpen, setSegmentsOpen] = useState<boolean | null>(null);
   /** Transkript-Tab: geglättete Fassung (Standard) oder Whisper-Original. */
   const [showOriginal, setShowOriginal] = useState(false);
   // Wiedergabe der Gesamt-Tonspur: Element für den Sprung, Zeile für die Anzeige
@@ -144,16 +153,6 @@ export default function RecordingDetailPage() {
   const hasActiveJob = detail?.jobs?.some(
     (j) => j.status === 'PENDING' || j.status === 'RUNNING',
   ) ?? false;
-  // Ein nur WARTENDER Job (z.B. der beim Upload automatisch angelegte, der aufs
-  // Nachtfenster wartet) blockiert die manuellen Aktionen nicht: Das Backend
-  // stuft ihn beim Klick auf Sofort-Auswertung bzw. Nur-Transkription um.
-  const hasRunningJob = detail?.jobs?.some((j) => j.status === 'RUNNING') ?? false;
-  // Eine bereits angeforderte volle Sofort-Auswertung darf nicht zur
-  // Nur-Transkription herabgestuft werden (das Backend lehnt das ab) -
-  // der Button wird dann gar nicht erst angeboten.
-  const hasPendingFullImmediate = detail?.jobs?.some(
-    (j) => j.status === 'PENDING' && j.immediate && !j.transcribeOnly,
-  ) ?? false;
   useEffect(() => {
     // Eine Unterlage in der Textextraktion (bei OCR dauert das Minuten) ist der
     // dritte Grund weiterzufragen - sonst bliebe "wird gelesen…" stehen.
@@ -166,6 +165,14 @@ export default function RecordingDetailPage() {
     }, 4000);
     return () => clearInterval(timer);
   }, [dispatch, id, status, hasActiveJob, videoProcessing, detail?.documents]);
+
+  // Zeitfenster einmal laden. Fehlt es, bleibt der Hinweis ohne Uhrzeit -
+  // deshalb ist ein Fehlschlag hier bewusst still.
+  useEffect(() => {
+    fetchProcessingInfo()
+      .then(setProcessingInfo)
+      .catch(() => setProcessingInfo(null));
+  }, []);
 
   // Transkript erst laden, wenn der Tab geöffnet wird.
   useEffect(() => {
@@ -306,6 +313,23 @@ export default function RecordingDetailPage() {
     }
   };
 
+  const progress = resolveProgress(detail, processingInfo);
+  const anyActionBusy = processBusy || transcribeBusy;
+  /**
+   * Vorgabe der Segmentliste: offen, solange es kein Transkript gibt (dann ist
+   * sie der einzige Weg zum Ton), sonst zu. Ein Klick des Nutzers gewinnt.
+   */
+  const hasTranscriptSegments = detail.segments.some((seg) => seg.hasTranscript);
+  const segmentsExpanded = segmentsOpen ?? !hasTranscriptSegments;
+
+  /** Die Box kennt nur drei Aktionen; alle drei genügen mit Leserecht. */
+  const handleNextStep = (action: NextAction) => {
+    if (action === 'transcribe') void handleTranscribe();
+    // 'process' und 'startAi' sind derselbe Endpunkt - der eine startet die
+    // volle Auswertung, der andere Schritt 2 auf einem fertigen Transkript.
+    else void handleProcess();
+  };
+
   const handleDelete = async () => {
     setActionError(null);
     setDeleteBusy(true);
@@ -334,6 +358,8 @@ export default function RecordingDetailPage() {
           </h1>
           <StatusBadge status={rec.status} />
         </div>
+        <RecordingProgress steps={progress.steps} />
+
         <div className="detail-meta">
           <div className="meta-row">
             <span className="meta-label">{t('recordingDetail.period')}</span>
@@ -376,41 +402,10 @@ export default function RecordingDetailPage() {
 
         {actionError && <Alert kind="error">{actionError}</Alert>}
 
+        {/* Der nächste Schritt steht nicht mehr in der Aktionsleiste, sondern in
+            der Box darunter: Dort ist genau ein Angebot das primäre, statt sechs
+            gleichrangige Knöpfe nebeneinander. */}
         <div className="detail-actions">
-          {(rec.status === 'RECORDED' || rec.status === 'FAILED') && (
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleProcess}
-              disabled={processBusy}
-            >
-              {processBusy ? t('recordingDetail.starting') : t('recordingDetail.processNow')}
-            </button>
-          )}
-          {(rec.status === 'RECORDED' || rec.status === 'FAILED') &&
-            !hasRunningJob &&
-            !hasPendingFullImmediate && (
-              <button
-                type="button"
-                className="btn"
-                onClick={handleTranscribe}
-                disabled={transcribeBusy}
-                title={t('recordingDetail.transcribeOnlyHint')}
-              >
-                {transcribeBusy ? t('recordingDetail.starting') : t('recordingDetail.transcribeOnly')}
-              </button>
-            )}
-          {rec.status === 'TRANSCRIBED' && !hasActiveJob && (
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleProcess}
-              disabled={processBusy}
-              title={t('recordingDetail.startAiHint')}
-            >
-              {processBusy ? t('recordingDetail.starting') : t('recordingDetail.startAi')}
-            </button>
-          )}
           {rec.mine && rec.status === 'DONE' && detail.summaries.length > 0 && !hasActiveJob && (
             <button
               type="button"
@@ -481,6 +476,10 @@ export default function RecordingDetailPage() {
         </div>
       </div>
 
+      {progress.next && (
+        <NextStepCard next={progress.next} busy={anyActionBusy} onAction={handleNextStep} />
+      )}
+
       {rec.recordVideo && (
         <section className="card">
           <h2>{t('recordingDetail.videoHeading')}</h2>
@@ -502,11 +501,26 @@ export default function RecordingDetailPage() {
       )}
 
       <section className="card">
-        <h2>{t('recordingDetail.segmentsHeading')}</h2>
-        {detail.segments.length === 0 && (
+        {/* Technisches Detail - eingeklappt, sobald es einen anderen Weg zum Ton
+            gibt. Ohne Transkript ist die Segmentliste die EINZIGE Möglichkeit,
+            die Aufnahme anzuhören; dann steht sie offen. */}
+        <button
+          type="button"
+          className="collapse-toggle"
+          aria-expanded={segmentsExpanded}
+          onClick={() => setSegmentsOpen(!segmentsExpanded)}
+        >
+          <span className={`chevron${segmentsExpanded ? ' open' : ''}`}>▸</span>{' '}
+          {t('recordingDetail.segmentsHeading')}
+          <span className="muted">
+            {' '}
+            {t('recordingDetail.segmentsCount', { count: detail.segments.length })}
+          </span>
+        </button>
+        {segmentsExpanded && detail.segments.length === 0 && (
           <p className="muted">{t('recordingDetail.segmentsEmpty')}</p>
         )}
-        <ul className="segment-list">
+        <ul className="segment-list" hidden={!segmentsExpanded}>
           {detail.segments.map((seg, idx) => (
             <li key={seg.id} className="segment-item">
               <div className="segment-info">
@@ -549,13 +563,7 @@ export default function RecordingDetailPage() {
         {/* Der Zusammenfassungs-Tab bleibt gemountet (nur versteckt), damit eine
             laufende Bearbeitung beim Tab-Wechsel nicht verloren geht. */}
         <div hidden={tab !== 'summary'}>
-          <SummaryTab
-            recordingId={id}
-            onProcess={handleProcess}
-            processBusy={processBusy}
-            onTranscribe={handleTranscribe}
-            transcribeBusy={transcribeBusy}
-          />
+          <SummaryTab recordingId={id} />
         </div>
 
         {tab === 'transcript' && (
@@ -1100,19 +1108,7 @@ function DocumentsTab({ recordingId, canEdit }: { recordingId: string; canEdit: 
   );
 }
 
-function SummaryTab({
-  recordingId,
-  onProcess,
-  processBusy,
-  onTranscribe,
-  transcribeBusy,
-}: {
-  recordingId: string;
-  onProcess: () => void;
-  processBusy: boolean;
-  onTranscribe: () => void;
-  transcribeBusy: boolean;
-}) {
+function SummaryTab({ recordingId }: { recordingId: string }) {
   const dispatch = useAppDispatch();
   const detail = useAppSelector((s) => s.recordings.detail);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -1241,81 +1237,12 @@ function SummaryTab({
   const waitingForWindow = !!activeJob && activeJob.status === 'PENDING' && !activeJob.immediate;
 
   if (summaries.length === 0) {
+    // Zustand und nächster Schritt stehen in der Box "Wie geht es weiter?" oben
+    // auf der Seite. Hier noch einmal zu erklären, was zu tun ist, hiesse zwei
+    // konkurrierende Wegbeschreibungen zu pflegen - vorher stand die eine
+    // ausserdem unter Video, Segmentliste und Tab-Leiste, also unter der Falz.
     if (rec.status === 'PROCESSING' || (activeJob && !waitingForWindow)) {
       return <Spinner label={jobProgressLabel ?? t('recordingDetail.analysisRunning')} />;
-    }
-    if (waitingForWindow) {
-      return (
-        <div className="summary-hint">
-          <p className="muted">{t('recordingDetail.waitingWindowHint')}</p>
-          <div className="summary-hint-actions">
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={onProcess}
-              disabled={processBusy || transcribeBusy}
-            >
-              {processBusy ? t('recordingDetail.starting') : t('recordingDetail.processNow')}
-            </button>
-            <button
-              type="button"
-              className="btn"
-              onClick={onTranscribe}
-              disabled={processBusy || transcribeBusy}
-              title={t('recordingDetail.transcribeOnlyHint')}
-            >
-              {transcribeBusy ? t('recordingDetail.starting') : t('recordingDetail.transcribeOnly')}
-            </button>
-          </div>
-        </div>
-      );
-    }
-    if (rec.status === 'TRANSCRIBED') {
-      return (
-        <div className="summary-hint">
-          <p className="muted">{t('recordingDetail.transcribedHint')}</p>
-          {detail.participants.length > 0 && (
-            <p className="muted">{t('recordingDetail.transcribedTip')}</p>
-          )}
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={onProcess}
-            disabled={processBusy}
-          >
-            {processBusy ? t('recordingDetail.starting') : t('recordingDetail.startAi')}
-          </button>
-        </div>
-      );
-    }
-    if (rec.status === 'RECORDED' || rec.status === 'FAILED') {
-      return (
-        <div className="summary-hint">
-          <p className="muted">{t('recordingDetail.noSummaryHint')}</p>
-          <div className="summary-hint-actions">
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={onProcess}
-              disabled={processBusy || transcribeBusy}
-            >
-              {processBusy ? t('recordingDetail.starting') : t('recordingDetail.processNow')}
-            </button>
-            <button
-              type="button"
-              className="btn"
-              onClick={onTranscribe}
-              disabled={processBusy || transcribeBusy}
-              title={t('recordingDetail.transcribeOnlyHint')}
-            >
-              {transcribeBusy ? t('recordingDetail.starting') : t('recordingDetail.transcribeOnly')}
-            </button>
-          </div>
-        </div>
-      );
-    }
-    if (rec.status === 'RECORDING' || rec.status === 'FINALIZING') {
-      return <p className="muted">{t('recordingDetail.stillRecording')}</p>;
     }
     return <p className="muted">{t('recordingDetail.noSummary')}</p>;
   }

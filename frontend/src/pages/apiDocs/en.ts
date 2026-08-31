@@ -88,6 +88,14 @@ curl -s -H "X-API-Key: $KEY" -F file=@note.m4a \\
         },
         {
           method: 'GET',
+          path: '/api/recordings/processing-info',
+          summary:
+            'When processing runs – readable by every signed-in user. It lets the recording detail page name a time instead of "sometime at night". Queue lengths and failure rates stay in the admin area (/api/admin/processing).',
+          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/recordings/processing-info"`,
+          response: `{ "windowStart": "20:00", "windowEnd": "06:00", "windowOpen": false }`,
+        },
+        {
+          method: 'GET',
           path: '/api/recordings/owners',
           summary:
             'The users who shared recordings with you – the option list of the owner filter. Empty as long as nothing was shared.',

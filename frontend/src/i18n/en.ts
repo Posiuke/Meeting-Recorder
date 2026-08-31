@@ -304,6 +304,47 @@ export const en: typeof de = {
     cleanupCandidates: '{{count}} stuck recording(s) found',
   },
 
+  recordingProgress: {
+    heading: 'What happens next?',
+    stepRecording: 'Recording',
+    stepTranscript: 'Transcript',
+    stepSummary: 'Summary',
+    stateDone: 'done',
+    stateRunning: 'running',
+    stateWaiting: 'scheduled',
+    stateFailed: 'failed',
+    stateSkipped: 'not applicable',
+    stateOpen: 'open',
+    stillRecording:
+      'The recording is still running. Transcript and summary are created automatically once it has finished.',
+    discarded: 'This recording was discarded. No analysis will be created.',
+    runningTranscript: 'Speech recognition is running. The AI summary follows afterwards.',
+    runningAnalysis: 'The analysis is running.',
+    runningSince: 'for {{minutes}} min',
+    runningSinceShort: 'for less than a minute',
+    attemptNote: 'Attempt {{attempt}} of {{max}} – the previous one failed.',
+    waitingWindowAt:
+      'The analysis is scheduled and starts automatically in the nightly time window ({{start}}–{{end}}). You do not have to do anything – or you start it now.',
+    waitingWindow:
+      'The analysis is scheduled and starts automatically in the nightly time window. You do not have to do anything – or you start it now.',
+    queued:
+      'Requested and queued – it starts on its own shortly. If another analysis is running, it waits until that one has finished (only one runs at a time).',
+    notPlanned:
+      'No analysis is scheduled for this recording yet. Start it completely or in two steps.',
+    transcribed:
+      'Step 1 is done: the transcript is in the "Transcript" tab. Step 2 – the AI summary – has not been started yet.',
+    failed: 'Speech recognition failed. After {{attempts}} of {{max}} attempts the processing gave up.',
+    failedAfterTranscript:
+      'The transcript is there, the summary failed. After {{attempts}} of {{max}} attempts the processing gave up.',
+    aiOff:
+      'AI analysis was switched off for this recording – there is therefore neither a transcript nor a summary. You can start it now after the fact.',
+    noContent:
+      'The recording has finished but contained too little content for a summary. That was a deliberate decision by the processing, not an error.',
+    orLabel: 'or',
+    reasonLabel: 'Reason:',
+    anywayLabel: 'analyse anyway',
+  },
+
   tags: {
     none: 'No tags',
     addPlaceholder: 'Add a tag…',
@@ -693,10 +734,7 @@ export const en: typeof de = {
     starting: 'Starting…',
     processNow: 'Analyse now',
     transcribeOnly: 'Transcribe only',
-    transcribeOnlyHint:
-      'Step 1 of 2: creates the transcript only, the AI analysis is started separately afterwards',
     startAi: 'Start AI analysis',
-    startAiHint: 'Step 2 of 2: creates the AI summary from the existing transcript',
     reprocess: 'Analyse again',
     retranscribe: 'Recreate transcript',
     summaryOptions: 'Customise analysis',
@@ -711,6 +749,7 @@ export const en: typeof de = {
     videoProcessing: 'The video is being processed and will be available here afterwards.',
     segmentsHeading: 'Segments',
     segmentsEmpty: 'No segments available.',
+    segmentsCount: '({{count}})',
     segment: 'Segment {{index}}',
     tagTranscript: 'Transcript',
     download: 'Download',
@@ -770,15 +809,8 @@ export const en: typeof de = {
     adoptEdit: 'Apply to the current version',
     discardDraft: 'Discard draft',
     analysisRunning: 'Analysis running…',
-    waitingWindowHint:
-      'The analysis is scheduled for the nightly time window. You can also start it right away – completely or in two steps (transcript first, then AI analysis).',
-    transcribedHint:
-      'The transcript has been created (see the "Transcript" tab). The AI summary has not been started yet – that is step 2 of the two-step analysis.',
     transcribedTip:
       'Tip: name the recognised speakers in the "Participants" tab first – those names are then used in the summary.',
-    noSummaryHint:
-      'No summary yet. You can start the analysis completely or in two steps (transcript first, then AI analysis).',
-    stillRecording: 'The recording is still running – a summary is created once it finishes.',
     noSummary: 'No summary available.',
     summaryEditHint:
       'Markdown format. Your edit is kept: "Analyse again" adds another version instead of overwriting this one.',

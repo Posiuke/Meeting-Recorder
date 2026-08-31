@@ -227,6 +227,54 @@ Zeitfenster, Segmentlänge, Chat-Befehle, Reconnect-Verhalten, …) werden zur
 Laufzeit im Frontend unter **Admin → Einstellungen** gepflegt und in der
 Datenbank gespeichert.
 
+## Nutzerführung einer noch nicht ausgewerteten Aufnahme
+
+Bei einer Aufnahme, die noch kein Transkript und keine Zusammenfassung hat, stand
+der Zustand früher an vier Stellen verteilt: Status-Badge im Kopf, Knöpfe in der
+Aktionsleiste, ein Hinweistext im Tab „Zusammenfassung" und die Job-Tabelle im
+letzten Tab. Was als **Nächstes** passiert, stand nirgends zusammenhängend.
+
+Zwei Bausteine beantworten das jetzt:
+
+**Die Fortschrittskette** im Kopf der Aufnahme: **Aufnahme → Transkript →
+Zusammenfassung**, je Stufe erledigt / läuft / eingeplant / gescheitert /
+entfällt / offen. Drei Stufen und nicht vier — die Transkript-Glättung ist ein
+Zwischenschritt, den der Nutzer nicht steuert und dessen Ausfall die Auswertung
+nicht stoppt. Der Zustand steht als Zeichen **und** als Wort an jeder Stufe;
+Farbe allein wäre für Farbfehlsichtige keine Information.
+
+**Die Box „Wie geht es weiter?"** direkt darunter: Sie sagt in Klartext, was der
+Zustand ist und was als Nächstes geschieht — von allein oder auf Klick — und
+bietet **genau einen** primären Knopf. Ein zweiter Weg steht als Textlink
+daneben, nicht als gleichrangiger Knopf. Läuft gerade etwas, gibt es keinen
+Knopf, sondern den Zustand und die Laufzeit („läuft seit 4 Min.").
+
+Bewusst **keine Restzeitschätzung**: Die Verarbeitungsdauer skaliert mit der
+Audiolänge, und der Median über alle Aufnahmen mischt die Sprachnotiz mit der
+Vorstandssitzung. Eine falsche Zusage wäre schlechter als keine.
+
+Die Box deckt zehn Zustände ab, darunter drei, die vorher in eine Sackgasse
+liefen:
+
+- **Wartet auf das Zeitfenster** — mit **Uhrzeit**. Vorher stand dort nur
+  „nächtliches Zeitfenster"; die Zeiten waren ausschließlich für Admins lesbar.
+  Dafür gibt es jetzt `GET /api/recordings/processing-info` (für jeden
+  angemeldeten Nutzer: `windowStart`, `windowEnd`, `windowOpen`).
+- **Fertig, aber KI-Analyse war abgewählt** — die Aufnahme springt in diesem Fall
+  direkt auf `DONE`, es gibt nie einen Auftrag. Vorher stand dort nur „Keine
+  Zusammenfassung vorhanden."; jetzt der Grund und der Weg, sie nachzuholen.
+- **Fertig, aber zu wenig Inhalt** — der Auftrag war *erfolgreich* und hat
+  bewusst nichts erzeugt. Der Grund stand nur in der Job-Tabelle.
+
+Die Zuordnung Zustand → Text → Knopf liegt als reine Funktion in
+`frontend/src/pages/recordingProgress.ts`, getrennt von der Darstellung. Zehn
+Zustände über JSX verteilt wären nicht prüfbar; so lässt sich die Tabelle lesen
+und ändern, ohne durch Komponenten zu suchen.
+
+Nebenbei: Die **Segmentliste** ist eingeklappt, sobald ein Transkript existiert.
+Ohne Transkript bleibt sie offen — dann ist sie der einzige Weg, die Aufnahme
+anzuhören.
+
 ## Verarbeitungs-Warteschlange im Blick (Admin-Tab „Verarbeitung")
 
 Bei einer GPU, einem nächtlichen Zeitfenster und mehreren Bots entscheidet sich

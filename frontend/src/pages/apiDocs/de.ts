@@ -88,6 +88,14 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
         },
         {
           method: 'GET',
+          path: '/api/recordings/processing-info',
+          summary:
+            'Wann die Verarbeitung läuft – für jeden angemeldeten Nutzer lesbar. Die Aufnahme-Detailseite nennt damit eine Uhrzeit statt „irgendwann nachts". Warteschlangenlängen und Fehlerquoten bleiben dem Admin-Bereich (/api/admin/processing).',
+          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/recordings/processing-info"`,
+          response: `{ "windowStart": "20:00", "windowEnd": "06:00", "windowOpen": false }`,
+        },
+        {
+          method: 'GET',
           path: '/api/recordings/owners',
           summary:
             'Die Nutzer, die Ihnen Aufnahmen freigegeben haben – die Auswahlliste des Besitzerfilters. Leer, solange nichts geteilt wurde.',

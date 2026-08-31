@@ -87,6 +87,7 @@ public class RecordingController {
     private final ShareLinkService shareLinkService;
     private final bbbbot.recording.RecordingMediaService media;
     private final bbbbot.docs.RecordingDocumentService documentService;
+    private final bbbbot.processing.ProcessingQueueService processingQueue;
 
     public RecordingController(AccessService access, RecordingRepo recordingRepo,
                                RecordingSegmentRepo segmentRepo, SummaryRepo summaryRepo,
@@ -102,7 +103,8 @@ public class RecordingController {
                                bbbbot.settings.SettingsService settings,
                                ShareLinkService shareLinkService,
                                bbbbot.recording.RecordingMediaService media,
-                               bbbbot.docs.RecordingDocumentService documentService) {
+                               bbbbot.docs.RecordingDocumentService documentService,
+                               bbbbot.processing.ProcessingQueueService processingQueue) {
         this.access = access;
         this.recordingRepo = recordingRepo;
         this.segmentRepo = segmentRepo;
@@ -124,6 +126,7 @@ public class RecordingController {
         this.shareLinkService = shareLinkService;
         this.media = media;
         this.documentService = documentService;
+        this.processingQueue = processingQueue;
     }
 
     // ---------------------------------------------------------------- Upload
@@ -213,6 +216,21 @@ public class RecordingController {
                 "maxFileSizeBytes", maxUploadSize.toBytes(),
                 "diarizeAllowed", settings.getBool(bbbbot.settings.SettingsService.WHISPER_DIARIZE),
                 "sttLanguage", settings.get(bbbbot.settings.SettingsService.WHISPER_LANGUAGE));
+    }
+
+    /**
+     * Wann die Verarbeitung laeuft - fuer jeden angemeldeten Nutzer lesbar.
+     *
+     * <p>Eigener Endpunkt und nicht in {@code upload-config}: Der beantwortet
+     * "was darf ich hochladen", hier geht es um "wann passiert es". Zwei Fragen,
+     * zwei Endpunkte.
+     */
+    @GetMapping("/processing-info")
+    public Dtos.ProcessingInfoView processingInfo() {
+        return new Dtos.ProcessingInfoView(
+                settings.get(bbbbot.settings.SettingsService.PROCESSING_WINDOW_START),
+                settings.get(bbbbot.settings.SettingsService.PROCESSING_WINDOW_END),
+                processingQueue.isWindowOpen());
     }
 
     /**

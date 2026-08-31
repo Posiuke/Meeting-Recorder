@@ -179,13 +179,36 @@ public final class Dtos {
 
     public record SummaryUpdateRequest(String markdown) {}
 
+    /**
+     * Ein Verarbeitungsauftrag an einer Aufnahme.
+     *
+     * @param startedAt   Beginn des laufenden bzw. letzten Versuchs - die
+     *                    Oberflaeche zeigt daraus "laeuft seit 4 Minuten"
+     * @param maxAttempts nach so vielen Versuchen gibt die Verarbeitung auf;
+     *                    gehoert zur Anzeige "Versuch 3 von 3"
+     */
     public record JobView(UUID id, String status, boolean immediate, boolean transcribeOnly,
-                          int attempts, String lastError, Instant createdAt, Instant finishedAt) {
+                          int attempts, int maxAttempts, String lastError, Instant createdAt,
+                          Instant startedAt, Instant finishedAt) {
         public static JobView of(ProcessingJob j) {
             return new JobView(j.getId(), j.getStatus().name(), j.isImmediate(), j.isTranscribeOnly(),
-                    j.getAttempts(), j.getLastError(), j.getCreatedAt(), j.getFinishedAt());
+                    j.getAttempts(), bbbbot.processing.ProcessingService.MAX_JOB_ATTEMPTS,
+                    j.getLastError(), j.getCreatedAt(), j.getStartedAt(), j.getFinishedAt());
         }
     }
+
+    /**
+     * Rahmenbedingungen der Verarbeitung fuer JEDEN angemeldeten Nutzer - nicht
+     * nur fuer Admins.
+     *
+     * <p>Grund: Die Aufnahme-Detailseite sagte bisher "ist fuer das naechtliche
+     * Zeitfenster eingeplant", ohne die Uhrzeit zu nennen; die stand nur in den
+     * Admin-Einstellungen. Der Unterschied zwischen "irgendwann nachts" und
+     * "ab 20:00" entscheidet, ob jemand in 20 Minuten oder morgen wieder
+     * nachsieht. Bewusst nur diese drei Angaben - Warteschlangenlaengen und
+     * Fehlerquoten bleiben dem Admin-Bereich.
+     */
+    public record ProcessingInfoView(String windowStart, String windowEnd, boolean windowOpen) {}
 
     /**
      * Ein Verarbeitungsauftrag in der Admin-Uebersicht: der Auftrag selbst plus

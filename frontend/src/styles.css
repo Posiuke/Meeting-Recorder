@@ -636,6 +636,140 @@ tbody tr:hover {
   margin-top: auto;
 }
 
+/* ===== Fortschrittskette und "Wie geht es weiter?" ===== */
+.progress-chain {
+  list-style: none;
+  margin: 0.35rem 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.2rem;
+  align-items: center;
+}
+
+/* Trennzeichen zwischen den Stufen - reine Dekoration, deshalb nicht im DOM. */
+.progress-step + .progress-step::before {
+  content: '→';
+  color: var(--text-muted);
+  margin-right: 1.2rem;
+}
+
+.progress-step {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.progress-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.progress-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.progress-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.progress-state {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* Zustandsfarben. Sie ergaenzen Zeichen und Wort, tragen die Aussage aber
+   nicht allein - sonst waere die Kette fuer Farbfehlsichtige leer. */
+.progress-done .progress-mark {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
+}
+
+.progress-running .progress-mark {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.progress-failed .progress-mark {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.progress-failed .progress-state {
+  color: var(--danger);
+}
+
+.progress-skipped {
+  opacity: 0.6;
+}
+
+.next-step {
+  border-left: 3px solid var(--accent);
+}
+
+.next-step-heading {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.next-step-text {
+  margin: 0 0 0.5rem;
+  max-width: 70ch;
+}
+
+.next-step-detail {
+  margin: 0 0 0.5rem;
+  max-width: 70ch;
+  font-size: 0.9rem;
+}
+
+/* Der Grund kommt vom Server (Whisper-/LLM-Meldung) und kann lang und ohne
+   Leerzeichen sein - er darf die Karte nicht auseinanderziehen. */
+.next-step-reason {
+  overflow-wrap: anywhere;
+}
+
+.next-step-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.next-step-secondary {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* Nebenweg als Textlink: sichtbar, aber nicht gleichrangig zum Hauptknopf. */
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link-button:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
 /* ===== Kennzahlen-Kacheln (Admin-Tab "Verarbeitung") ===== */
 .stat-row {
   display: flex;

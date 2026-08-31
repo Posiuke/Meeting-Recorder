@@ -3,6 +3,7 @@ import type {
   DocumentConfigView,
   GlossaryImportResult,
   GlossaryScope,
+  ProcessingInfoView,
   PublicShareView,
   RecordingDocumentView,
   RecordingView,
@@ -402,6 +403,14 @@ export function glossaryPath(scope: GlossaryScope): string {
 export function glossaryExportUrl(scope: GlossaryScope): string {
   const token = getToken() ?? '';
   return `${glossaryPath(scope)}/export?token=${encodeURIComponent(token)}`;
+}
+
+/**
+ * Wann die Verarbeitung läuft. Beantwortet auf der Detailseite die Frage „warum
+ * passiert nichts?" mit einer Uhrzeit statt mit „irgendwann nachts".
+ */
+export function fetchProcessingInfo(): Promise<ProcessingInfoView> {
+  return api<ProcessingInfoView>('/api/recordings/processing-info');
 }
 
 /** Rahmenbedingungen für beigefügte Unterlagen (an/aus, Größe, Endungen, Tika). */

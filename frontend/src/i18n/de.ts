@@ -310,6 +310,56 @@ export const de = {
     cleanupCandidates: '{{count}} hängengebliebene Aufnahme(n) gefunden',
   },
 
+  /**
+   * Nutzerführung auf der Aufnahme-Detailseite: Fortschrittskette und die Box
+   * „Wie geht es weiter?". Die Texte sagen Zustand UND nächsten Schritt – nicht
+   * nur, dass etwas fehlt.
+   */
+  recordingProgress: {
+    heading: 'Wie geht es weiter?',
+    // Stufen der Fortschrittskette
+    stepRecording: 'Aufnahme',
+    stepTranscript: 'Transkript',
+    stepSummary: 'Zusammenfassung',
+    // Zustand einer Stufe (auch als Vorlesetext)
+    stateDone: 'erledigt',
+    stateRunning: 'läuft',
+    stateWaiting: 'eingeplant',
+    stateFailed: 'gescheitert',
+    stateSkipped: 'entfällt',
+    stateOpen: 'offen',
+    // Erklärtexte je Zustand
+    stillRecording:
+      'Die Aufnahme läuft noch. Transkript und Zusammenfassung entstehen automatisch, sobald sie beendet ist.',
+    discarded: 'Diese Aufnahme wurde verworfen. Es entsteht keine Auswertung.',
+    runningTranscript: 'Die Spracherkennung läuft. Danach folgt die KI-Zusammenfassung.',
+    runningAnalysis: 'Die Auswertung läuft.',
+    runningSince: 'seit {{minutes}} Min.',
+    runningSinceShort: 'seit weniger als einer Minute',
+    attemptNote: 'Versuch {{attempt}} von {{max}} – der vorherige ist gescheitert.',
+    waitingWindowAt:
+      'Die Auswertung ist eingeplant und startet automatisch im nächtlichen Zeitfenster ({{start}}–{{end}}). Du musst nichts tun – oder du startest sie jetzt.',
+    waitingWindow:
+      'Die Auswertung ist eingeplant und startet automatisch im nächtlichen Zeitfenster. Du musst nichts tun – oder du startest sie jetzt.',
+    queued:
+      'Angefordert und in der Warteschlange – sie startet in Kürze von selbst. Läuft gerade eine andere Auswertung, wartet sie, bis diese fertig ist (es läuft immer nur eine).',
+    notPlanned:
+      'Für diese Aufnahme ist noch keine Auswertung eingeplant. Starte sie komplett oder in zwei Schritten.',
+    transcribed:
+      'Schritt 1 ist erledigt: Das Transkript steht im Tab „Transkript". Schritt 2 – die KI-Zusammenfassung – wurde noch nicht gestartet.',
+    failed: 'Die Spracherkennung ist gescheitert. Nach {{attempts}} von {{max}} Versuchen hat die Verarbeitung aufgegeben.',
+    failedAfterTranscript:
+      'Das Transkript steht, die Zusammenfassung ist gescheitert. Nach {{attempts}} von {{max}} Versuchen hat die Verarbeitung aufgegeben.',
+    aiOff:
+      'Für diese Aufnahme war die KI-Analyse abgewählt – es gibt deshalb weder Transkript noch Zusammenfassung. Du kannst sie jetzt nachträglich starten.',
+    noContent:
+      'Die Aufnahme ist abgeschlossen, enthielt aber zu wenig Inhalt für eine Zusammenfassung. Das war eine bewusste Entscheidung der Verarbeitung, kein Fehler.',
+    // Nebenwege und Zusatzangaben
+    orLabel: 'oder',
+    reasonLabel: 'Grund:',
+    anywayLabel: 'trotzdem auswerten',
+  },
+
   tags: {
     none: 'Keine Schlagworte',
     addPlaceholder: 'Schlagwort hinzufügen…',
@@ -705,10 +755,7 @@ export const de = {
     starting: 'Wird gestartet…',
     processNow: 'Jetzt auswerten',
     transcribeOnly: 'Nur transkribieren',
-    transcribeOnlyHint:
-      'Schritt 1 von 2: erstellt nur das Transkript, die KI-Auswertung wird danach separat gestartet',
     startAi: 'KI-Auswertung starten',
-    startAiHint: 'Schritt 2 von 2: erstellt die KI-Zusammenfassung aus dem vorhandenen Transkript',
     reprocess: 'Erneut auswerten',
     retranscribe: 'Transkription neu erstellen',
     summaryOptions: 'Auswertung anpassen',
@@ -723,6 +770,7 @@ export const de = {
     videoProcessing: 'Das Video wird verarbeitet und steht anschließend hier zur Verfügung.',
     segmentsHeading: 'Segmente',
     segmentsEmpty: 'Keine Segmente vorhanden.',
+    segmentsCount: '({{count}})',
     segment: 'Segment {{index}}',
     tagTranscript: 'Transkript',
     download: 'Herunterladen',
@@ -784,15 +832,8 @@ export const de = {
     adoptEdit: 'In aktuelle Fassung übernehmen',
     discardDraft: 'Entwurf verwerfen',
     analysisRunning: 'Auswertung läuft…',
-    waitingWindowHint:
-      'Die Auswertung ist für das nächtliche Zeitfenster eingeplant. Du kannst sie auch sofort starten – komplett oder in zwei Schritten (erst Transkript, dann KI-Auswertung).',
-    transcribedHint:
-      'Das Transkript wurde erstellt (siehe Tab „Transkript"). Die KI-Zusammenfassung wurde noch nicht gestartet – das ist Schritt 2 der Zwei-Schritt-Auswertung.',
     transcribedTip:
       'Tipp: Benenne zuerst die erkannten Sprecher im Tab „Teilnehmer" – die Namen werden dann in der Zusammenfassung verwendet.',
-    noSummaryHint:
-      'Noch keine Zusammenfassung vorhanden. Du kannst die Auswertung komplett starten oder in zwei Schritten (erst Transkript, dann KI-Auswertung).',
-    stillRecording: 'Die Aufnahme läuft noch – eine Zusammenfassung entsteht nach Abschluss.',
     noSummary: 'Keine Zusammenfassung vorhanden.',
     summaryEditHint:
       'Markdown-Format. Die Bearbeitung bleibt erhalten: „Erneut auswerten" legt eine weitere Fassung daneben, statt diese zu überschreiben.',
