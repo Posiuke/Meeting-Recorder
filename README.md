@@ -63,6 +63,10 @@ docs/       Anleitungen (u.a. Whisper-Diarisierung), Alt-Dokumentation
   Freigabe automatisch) oder ohne Anmeldung (siehe unten). Admins pflegen
   Einstellungen (Whisper-/LLM-Parameter, Zeitfenster, Bot-Verhalten) und
   Admin-Rollen im Frontend.
+- **Läuft die Verarbeitung?**: Der Admin-Tab **Verarbeitung** zeigt die
+  Warteschlange — was wartet, was läuft, die letzten Fehlschläge mit Grund, die
+  Dauer der einzelnen Schritte und ob das nächtliche Zeitfenster gerade offen
+  ist. Gescheiterte Aufträge lassen sich von dort erneut anstoßen.
 - **Wer ist aktiv?**: Der Admin-Tab **Benutzer** zeigt je Konto, ob es gerade
   angemeldet ist und ob dafür eine **Aufnahme läuft** (mit Quelle und Laufzeit);
   laufende Aufnahmen stehen zusätzlich als Warnung über der Liste. So lässt sich
@@ -222,6 +226,47 @@ Alle fachlichen Parameter (Whisper-URL und -Parameter, LLM-Endpunkt/Modell,
 Zeitfenster, Segmentlänge, Chat-Befehle, Reconnect-Verhalten, …) werden zur
 Laufzeit im Frontend unter **Admin → Einstellungen** gepflegt und in der
 Datenbank gespeichert.
+
+## Verarbeitungs-Warteschlange im Blick (Admin-Tab „Verarbeitung")
+
+Bei einer GPU, einem nächtlichen Zeitfenster und mehreren Bots entscheidet sich
+in der Warteschlange, ob morgens alles fertig ist. Bisher waren Jobs nur pro
+Aufnahme sichtbar (Detailseite → Verarbeitung) — bleibt die Schlange stehen,
+weil Whisper nicht erreichbar ist, merkte es niemand.
+
+Der Tab **Admin → Verarbeitung** ist die Seite, die man morgens aufschlägt:
+
+- **Zeitfenster** ganz oben: offen oder geschlossen, mit den konfigurierten
+  Zeiten — und wie viele Aufträge nur darauf warten. Das ist die Antwort auf die
+  häufigste Rückfrage „warum läuft nichts?".
+- **Kennzahlen**: wartet / läuft / gescheitert / fertig.
+- **Warteschlange**: wartende und laufende Aufträge mit Aufnahme, Aufgabe
+  (volle Auswertung, nur Transkription, erneute Auswertung, erneute
+  Transkription), Versuch („2 von 3") und **Wartezeit**. Wartezeit heißt „bis
+  zum Start" — was danach kommt, ist Laufzeit.
+- **Letzte Fehlschläge** mit dem Grund aus `processing_job.last_error` und einem
+  Knopf **Erneut versuchen**. Er setzt den Versuchszähler zurück (sonst bliebe
+  ein Auftrag mit verbrauchten Versuchen dauerhaft stehen — genau dafür ist der
+  Knopf da) und stößt den Auftrag **sofort** an: Wer morgens drückt, hat die
+  Ursache behoben und will das Ergebnis heute.
+- **Dauer der Schritte**: Median und Maximum der letzten 50 fertigen Aufträge,
+  aufgeschlüsselt nach Spracherkennung, Glättung und Zusammenfassung. Der
+  Median statt des Mittelwerts, damit eine einzelne dreistündige Aufnahme das
+  Bild nicht verschiebt; das Maximum daneben, weil genau der Ausreißer
+  interessiert.
+
+Die Ansicht lädt sich alle 10 Sekunden nach, solange der Tab offen ist.
+
+Für die **Dauer je Schritt** waren die Daten noch nicht da: Bisher ließ sich nur
+die Gesamtdauer errechnen. Ob Whisper langsam war oder das LLM, sind aber zwei
+verschiedene Baustellen — ein anderes Whisper-Modell hilft nicht gegen ein
+überlastetes LLM. Die Verarbeitung misst die Schritte deshalb jetzt mit
+(`processing_job.stt_ms`, `correction_ms`, `summary_ms`, Migration V27). `NULL`
+heißt „dieser Schritt lief in diesem Auftrag nicht"; nach einem Fehlschlag
+gelten die Werte des laufenden Versuchs, nicht die des vorigen.
+
+Per API: `GET /api/admin/processing` und
+`POST /api/admin/processing/jobs/{jobId}/retry` (beide nur mit Admin-Recht).
 
 ## Bot-Vorlagen
 

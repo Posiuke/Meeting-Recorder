@@ -151,6 +151,23 @@ public interface Repositories {
         List<ProcessingJob> findByStatusOrderByCreatedAt(ProcessingJob.Status status);
         List<ProcessingJob> findByRecordingIdOrderByCreatedAtDesc(UUID recordingId);
         boolean existsByRecordingIdAndStatusIn(UUID recordingId, List<ProcessingJob.Status> statuses);
+
+        // --- Admin-Uebersicht der Warteschlange (Issue #5) ---
+
+        long countByStatus(ProcessingJob.Status status);
+
+        /** Die Schlange: wartende und laufende Auftraege, aelteste zuerst. */
+        List<ProcessingJob> findByStatusInOrderByCreatedAtAsc(List<ProcessingJob.Status> statuses);
+
+        /** Die letzten Fehlschlaege - der Grund steht im Auftrag. */
+        List<ProcessingJob> findTop20ByStatusOrderByFinishedAtDesc(ProcessingJob.Status status);
+
+        /**
+         * Die zuletzt fertig gewordenen Auftraege als Stichprobe fuer die
+         * Dauer-Kennzahlen. Bewusst begrenzt: Der Median der letzten Laeufe sagt
+         * mehr ueber den heutigen Zustand als der Schnitt ueber Jahre.
+         */
+        List<ProcessingJob> findTop50ByStatusOrderByFinishedAtDesc(ProcessingJob.Status status);
     }
 
     /** Persoenliche Bot-Vorlagen: nur der Besitzer sieht seine eigenen. */

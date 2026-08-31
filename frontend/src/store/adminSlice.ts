@@ -1,7 +1,7 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { api, errorMessage } from '../api/client';
 import { translate } from '../i18n';
-import type { AdminUserView, LdapTestResult } from '../types';
+import type { AdminUserView, LdapTestResult, ProcessingQueueView } from '../types';
 
 type SettingsMap = Record<string, string>;
 
@@ -16,6 +16,10 @@ interface AdminState {
   users: AdminUserView[];
   usersLoading: boolean;
   usersError: string | null;
+  /** Zustand der Verarbeitungs-Warteschlange; null = noch nicht geladen. */
+  processing: ProcessingQueueView | null;
+  processingLoading: boolean;
+  processingError: string | null;
 }
 
 const initialState: AdminState = {
@@ -29,6 +33,9 @@ const initialState: AdminState = {
   users: [],
   usersLoading: false,
   usersError: null,
+  processing: null,
+  processingLoading: false,
+  processingError: null,
 };
 
 export const fetchAuthConfig = createAsyncThunk<SettingsMap, void, { rejectValue: string }>(
@@ -118,6 +125,40 @@ export const setUserAdmin = createAsyncThunk<
   }
 });
 
+/**
+ * Zustand der Verarbeitungs-Warteschlange. Lädt sich nach, solange der Tab
+ * offen ist – ein Betriebsbild ist nur brauchbar, wenn es aktuell ist.
+ */
+export const fetchProcessingQueue = createAsyncThunk<
+  ProcessingQueueView,
+  void,
+  { rejectValue: string }
+>('admin/fetchProcessingQueue', async (_, { rejectWithValue }) => {
+  try {
+    return await api<ProcessingQueueView>('/api/admin/processing');
+  } catch (e) {
+    return rejectWithValue(errorMessage(e));
+  }
+});
+
+/**
+ * Einen gescheiterten Auftrag erneut anstoßen. Die Antwort ist die ganze
+ * Übersicht – die Tabelle stimmt damit ohne zweiten Aufruf.
+ */
+export const retryProcessingJob = createAsyncThunk<
+  ProcessingQueueView,
+  string,
+  { rejectValue: string }
+>('admin/retryProcessingJob', async (jobId, { rejectWithValue }) => {
+  try {
+    return await api<ProcessingQueueView>(`/api/admin/processing/jobs/${jobId}/retry`, {
+      method: 'POST',
+    });
+  } catch (e) {
+    return rejectWithValue(errorMessage(e));
+  }
+});
+
 const adminSlice = createSlice({
   name: 'admin',
   initialState,
@@ -166,6 +207,21 @@ const adminSlice = createSlice({
       .addCase(fetchAdminUsers.rejected, (state, action) => {
         state.usersLoading = false;
         state.usersError = action.payload ?? translate('errors.usersLoad');
+      })
+      .addCase(fetchProcessingQueue.pending, (state) => {
+        state.processingLoading = true;
+        state.processingError = null;
+      })
+      .addCase(fetchProcessingQueue.fulfilled, (state, action) => {
+        state.processing = action.payload;
+        state.processingLoading = false;
+      })
+      .addCase(fetchProcessingQueue.rejected, (state, action) => {
+        state.processingLoading = false;
+        state.processingError = action.payload ?? translate('errors.processingLoad');
+      })
+      .addCase(retryProcessingJob.fulfilled, (state, action) => {
+        state.processing = action.payload;
       })
       .addCase(setUserAdmin.fulfilled, (state, action) => {
         const idx = state.users.findIndex((u) => u.id === action.payload.id);

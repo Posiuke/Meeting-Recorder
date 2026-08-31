@@ -784,6 +784,34 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
    "activeRecordings": [{ "id": "5d34…", "status": "RECORDING",
                           "source": "CAPTURE", "startedAt": "2026-08-13T09:03:00Z" }] }]`,
         },
+        {
+          method: 'GET',
+          path: '/api/admin/processing',
+          summary:
+            'State of the processing queue – admin only. What is waiting, what is running, the recent failures with their reason, the step durations (median and maximum of the last 50 finished jobs) and whether the time window is currently open. waitsForWindow=true means the job is idle only because the window is closed.',
+          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/admin/processing"`,
+          response: `{
+  "windowOpen": false, "windowStart": "20:00", "windowEnd": "06:00",
+  "pending": 3, "running": 0, "failed": 1, "done": 128,
+  "queue": [ { "recordingTitle": "Board meeting", "status": "PENDING",
+               "mode": "FULL", "attempts": 0, "maxAttempts": 3,
+               "waitingMs": 42600000, "waitsForWindow": true } ],
+  "failures": [ { "recordingTitle": "Tech round", "status": "FAILED",
+                  "attempts": 3, "lastError": "STT partially failed: …",
+                  "sttMs": 1832000 } ],
+  "durations": { "sample": 50, "medianMs": 214000, "maxMs": 3980000,
+                 "medianSttMs": 168000, "medianCorrectionMs": 21000,
+                 "medianSummaryMs": 24000 }
+}`,
+        },
+        {
+          method: 'POST',
+          path: '/api/admin/processing/jobs/{jobId}/retry',
+          summary:
+            'Retry a failed job – admin only. The attempt counter starts over and the job runs immediately (regardless of the time window). The response is the full overview. 409 if the job has not failed.',
+          example: `curl -s -X POST -H "X-API-Key: $KEY" \\
+  "$BBB/api/admin/processing/jobs/$JOB/retry"`,
+        },
       ],
     },
   ],

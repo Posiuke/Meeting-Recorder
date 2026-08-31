@@ -64,6 +64,22 @@ public class ProcessingJob {
 
     private Instant finishedAt;
 
+    /**
+     * Dauer der einzelnen Schritte in Millisekunden; {@code null} = dieser
+     * Schritt lief in diesem Auftrag nicht (eine reine Transkription hat keine
+     * Zusammenfassung, eine erneute Auswertung keinen Whisper-Lauf, und die
+     * Glaettung kann abgeschaltet sein).
+     *
+     * <p>Die Gesamtdauer steht schon in {@code startedAt}/{@code finishedAt} -
+     * fuer die Betriebsfrage "war Whisper langsam oder das LLM?" reicht sie
+     * nicht.
+     */
+    private Long sttMs;
+
+    private Long correctionMs;
+
+    private Long summaryMs;
+
     public static ProcessingJob create(UUID recordingId, boolean immediate) {
         ProcessingJob j = new ProcessingJob();
         j.id = UUID.randomUUID();
@@ -97,4 +113,28 @@ public class ProcessingJob {
     public void setStartedAt(Instant startedAt) { this.startedAt = startedAt; }
     public Instant getFinishedAt() { return finishedAt; }
     public void setFinishedAt(Instant finishedAt) { this.finishedAt = finishedAt; }
+    public Long getSttMs() { return sttMs; }
+    public void setSttMs(Long sttMs) { this.sttMs = sttMs; }
+    public Long getCorrectionMs() { return correctionMs; }
+    public void setCorrectionMs(Long correctionMs) { this.correctionMs = correctionMs; }
+    public Long getSummaryMs() { return summaryMs; }
+    public void setSummaryMs(Long summaryMs) { this.summaryMs = summaryMs; }
+
+    /**
+     * Kurzform dessen, was dieser Auftrag tut - fuer die Admin-Uebersicht.
+     * Bewusst als ein Wert und nicht als drei Schalter: In einer Tabellenzeile
+     * will man einen Begriff lesen, nicht drei Haken deuten.
+     */
+    public String mode() {
+        if (redoTranscripts) return transcribeOnly ? "RETRANSCRIBE_ONLY" : "RETRANSCRIBE";
+        if (transcribeOnly) return "TRANSCRIBE_ONLY";
+        if (hadSummary) return "REPROCESS";
+        return "FULL";
+    }
+
+    /** Gesamtdauer des letzten Laufs; null, solange er nicht fertig ist. */
+    public Long durationMs() {
+        if (startedAt == null || finishedAt == null) return null;
+        return java.time.Duration.between(startedAt, finishedAt).toMillis();
+    }
 }

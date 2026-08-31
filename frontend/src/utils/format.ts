@@ -44,6 +44,18 @@ export function formatDuration(ms: number | null | undefined): string {
   return `${m}:${String(s).padStart(2, '0')} min`;
 }
 
+/**
+ * Kurzform für Verarbeitungsdauern und Wartezeiten. Sekunden bleiben Sekunden –
+ * „0:07 min" für sieben Sekunden liest sich in einer Tabelle schlechter als
+ * „7 s". Ab einer Minute übernimmt {@link formatDuration}.
+ */
+export function formatShortDuration(ms: number | null | undefined): string {
+  if (ms == null) return EMPTY;
+  if (ms < 1000) return '<1 s';
+  if (ms < 60_000) return `${Math.round(ms / 1000)} s`;
+  return formatDuration(ms);
+}
+
 /** Zeitmarke im Transkript: mm:ss unter einer Stunde, sonst h:mm:ss. */
 export function formatTimestamp(seconds: number): string {
   const h = Math.floor(seconds / 3600);

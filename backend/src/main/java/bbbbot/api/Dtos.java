@@ -187,6 +187,75 @@ public final class Dtos {
         }
     }
 
+    /**
+     * Ein Verarbeitungsauftrag in der Admin-Uebersicht: der Auftrag selbst plus
+     * die Angaben der Aufnahme, damit die Tabelle ohne zweiten Aufruf lesbar ist.
+     *
+     * @param mode            Kurzform der Aufgabe (FULL, TRANSCRIBE_ONLY, REPROCESS,
+     *                        RETRANSCRIBE, RETRANSCRIBE_ONLY)
+     * @param maxAttempts     nach so vielen Versuchen gibt die Verarbeitung auf
+     * @param waitingMs       wie lange der Auftrag auf seinen Start gewartet hat
+     * @param waitsForWindow  steht nur, weil das Zeitfenster zu ist
+     * @param sttMs           Dauer der Spracherkennung; null = lief in diesem Auftrag nicht
+     * @param correctionMs    Dauer der Transkript-Glaettung; null = lief nicht
+     * @param summaryMs       Dauer der Zusammenfassung; null = lief nicht
+     */
+    public record ProcessingJobView(UUID id, UUID recordingId, String recordingTitle,
+                                    String recordingStatus, String status, String mode,
+                                    boolean immediate, int attempts, int maxAttempts,
+                                    String lastError, Instant createdAt, Instant startedAt,
+                                    Instant finishedAt, Long waitingMs, Long durationMs,
+                                    Long sttMs, Long correctionMs, Long summaryMs,
+                                    boolean waitsForWindow) {
+
+        public static ProcessingJobView of(bbbbot.processing.ProcessingQueueService.JobDetail detail,
+                                           int maxAttempts) {
+            ProcessingJob job = detail.job();
+            Recording recording = detail.recording();
+            return new ProcessingJobView(
+                    job.getId(), job.getRecordingId(),
+                    recording == null ? null : recording.getTitle(),
+                    recording == null ? null : recording.getStatus().name(),
+                    job.getStatus().name(), job.mode(), job.isImmediate(),
+                    job.getAttempts(), maxAttempts, job.getLastError(),
+                    job.getCreatedAt(), job.getStartedAt(), job.getFinishedAt(),
+                    detail.waitingMs(), job.durationMs(),
+                    job.getSttMs(), job.getCorrectionMs(), job.getSummaryMs(),
+                    detail.waitsForWindow());
+        }
+    }
+
+    /**
+     * Dauer-Kennzahlen der letzten fertigen Auftraege.
+     *
+     * @param sample Anzahl der Auftraege, aus denen die Werte stammen
+     */
+    public record ProcessingDurationsView(int sample, Long medianMs, Long maxMs,
+                                          Long medianSttMs, Long medianCorrectionMs,
+                                          Long medianSummaryMs) {}
+
+    /**
+     * Der Admin-Tab "Verarbeitung": Zustand der Warteschlange, die letzten
+     * Fehlschlaege und ob das Zeitfenster gerade offen ist.
+     */
+    public record ProcessingQueueView(boolean windowOpen, String windowStart, String windowEnd,
+                                      long pending, long running, long failed, long done,
+                                      List<ProcessingJobView> queue,
+                                      List<ProcessingJobView> failures,
+                                      ProcessingDurationsView durations) {
+
+        public static ProcessingQueueView of(bbbbot.processing.ProcessingQueueService.Overview o,
+                                             int maxAttempts) {
+            return new ProcessingQueueView(o.windowOpen(), o.windowStart(), o.windowEnd(),
+                    o.pending(), o.running(), o.failed(), o.done(),
+                    o.queue().stream().map(d -> ProcessingJobView.of(d, maxAttempts)).toList(),
+                    o.failures().stream().map(d -> ProcessingJobView.of(d, maxAttempts)).toList(),
+                    new ProcessingDurationsView(o.durations().sample(), o.durations().medianMs(),
+                            o.durations().maxMs(), o.durations().medianSttMs(),
+                            o.durations().medianCorrectionMs(), o.durations().medianSummaryMs()));
+        }
+    }
+
     public record RecordingView(UUID id, String title, String status, String meetingUrl,
                                 Instant startedAt, Instant endedAt, Long durationMs,
                                 String discardReason, boolean recordVideo, boolean aiAnalysis,

@@ -788,6 +788,34 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
    "activeRecordings": [{ "id": "5d34…", "status": "RECORDING",
                           "source": "CAPTURE", "startedAt": "2026-08-13T09:03:00Z" }] }]`,
         },
+        {
+          method: 'GET',
+          path: '/api/admin/processing',
+          summary:
+            'Zustand der Verarbeitungs-Warteschlange – nur mit Admin-Recht. Was wartet, was läuft, die letzten Fehlschläge mit Grund, die Dauer der Schritte (Median und Maximum der letzten 50 fertigen Aufträge) und ob das Zeitfenster gerade offen ist. waitsForWindow=true heißt: Der Auftrag steht nur, weil das Fenster zu ist.',
+          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/admin/processing"`,
+          response: `{
+  "windowOpen": false, "windowStart": "20:00", "windowEnd": "06:00",
+  "pending": 3, "running": 0, "failed": 1, "done": 128,
+  "queue": [ { "recordingTitle": "Vorstandssitzung", "status": "PENDING",
+               "mode": "FULL", "attempts": 0, "maxAttempts": 3,
+               "waitingMs": 42600000, "waitsForWindow": true } ],
+  "failures": [ { "recordingTitle": "Technikrunde", "status": "FAILED",
+                  "attempts": 3, "lastError": "STT teilweise fehlgeschlagen: …",
+                  "sttMs": 1832000 } ],
+  "durations": { "sample": 50, "medianMs": 214000, "maxMs": 3980000,
+                 "medianSttMs": 168000, "medianCorrectionMs": 21000,
+                 "medianSummaryMs": 24000 }
+}`,
+        },
+        {
+          method: 'POST',
+          path: '/api/admin/processing/jobs/{jobId}/retry',
+          summary:
+            'Einen gescheiterten Auftrag erneut anstoßen – nur mit Admin-Recht. Der Versuchszähler beginnt neu, und der Auftrag läuft sofort (ohne Rücksicht auf das Zeitfenster). Antwort ist die vollständige Übersicht. 409, wenn der Auftrag nicht gescheitert ist.',
+          example: `curl -s -X POST -H "X-API-Key: $KEY" \\
+  "$BBB/api/admin/processing/jobs/$JOB/retry"`,
+        },
       ],
     },
   ],

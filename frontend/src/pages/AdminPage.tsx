@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
   fetchAdminUsers,
   fetchAuthConfig,
+  fetchProcessingQueue,
   fetchSettings,
+  retryProcessingJob,
   saveAuthConfig,
   saveSettings,
   setUserAdmin,
@@ -14,10 +16,16 @@ import Spinner from '../components/Spinner';
 import Alert from '../components/Alert';
 import HelpTip from '../components/HelpTip';
 import { api, errorMessage } from '../api/client';
-import { formatDateTime, formatTime } from '../utils/format';
+import StatusBadge from '../components/StatusBadge';
+import { formatDateTime, formatShortDuration, formatTime } from '../utils/format';
 import { useI18n } from '../i18n';
-import type { TranslationKey } from '../i18n';
-import type { ActiveRecordingView, ConnectionTestResult, LdapTestResult } from '../types';
+import type { TranslationKey, translate } from '../i18n';
+import type {
+  ActiveRecordingView,
+  ConnectionTestResult,
+  LdapTestResult,
+  ProcessingJobView,
+} from '../types';
 
 interface SettingsGroupDef {
   /** Übersetzungsschlüssel der Überschrift. */
@@ -101,7 +109,10 @@ const KEY_HELP: Record<string, TranslationKey> = {
   'sharing.publicLinks': 'admin.keyHelp.sharingPublicLinks',
 };
 
-type AdminTab = 'settings' | 'auth' | 'users';
+type AdminTab = 'settings' | 'auth' | 'users' | 'processing';
+
+/** Nachladeintervall des Betriebsbildes – kurz, weil sich die Schlange bewegt. */
+const PROCESSING_REFRESH_MS = 10_000;
 
 export default function AdminPage() {
   const { t } = useI18n();
@@ -137,10 +148,18 @@ export default function AdminPage() {
         >
           {t('admin.tabUsers')}
         </button>
+        <button
+          type="button"
+          className={`tab${tab === 'processing' ? ' active' : ''}`}
+          onClick={() => setTab('processing')}
+        >
+          {t('admin.tabProcessing')}
+        </button>
       </div>
       {tab === 'settings' && <SettingsTab />}
       {tab === 'auth' && <AuthTab />}
       {tab === 'users' && <UsersTab />}
+      {tab === 'processing' && <ProcessingTab />}
     </div>
   );
 }
@@ -739,4 +758,304 @@ function UsersTab() {
       </div>
     </>
   );
+}
+
+/**
+ * Admin-Tab „Verarbeitung" (Issue #5): das Betriebsbild der Warteschlange.
+ *
+ * Die Frage, die sich morgens stellt, ist „ist die Nacht durchgelaufen?".
+ * Deshalb steht oben, ob das Zeitfenster offen ist und was wartet, darunter die
+ * Schlange, dann die Fehlschläge mit Grund und zuletzt die Dauern – Ausreißer
+ * erkennt man erst, wenn man den Normalfall daneben sieht.
+ */
+function ProcessingTab() {
+  const { t } = useI18n();
+  const dispatch = useAppDispatch();
+  const { processing, processingLoading, processingError } = useAppSelector((s) => s.admin);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [busyJobId, setBusyJobId] = useState<string | null>(null);
+  const [refreshedAt, setRefreshedAt] = useState<string>(() => new Date().toISOString());
+
+  // Ein Betriebsbild ist nur brauchbar, wenn es aktuell ist.
+  useEffect(() => {
+    const load = () => {
+      void dispatch(fetchProcessingQueue());
+      setRefreshedAt(new Date().toISOString());
+    };
+    load();
+    const timer = window.setInterval(load, PROCESSING_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [dispatch]);
+
+  const handleRetry = async (jobId: string) => {
+    setActionError(null);
+    setBusyJobId(jobId);
+    try {
+      await dispatch(retryProcessingJob(jobId)).unwrap();
+    } catch (e) {
+      setActionError(errorMessage(e));
+    } finally {
+      setBusyJobId(null);
+    }
+  };
+
+  if (processingLoading && processing === null) {
+    return <Spinner label={t('admin.processingLoading')} />;
+  }
+  if (processingError && processing === null) {
+    return <Alert kind="error">{processingError}</Alert>;
+  }
+  if (processing === null) return null;
+
+  const { durations } = processing;
+  const waitingForWindow = processing.queue.filter((j) => j.waitsForWindow).length;
+
+  return (
+    <>
+      {/* Zeitfenster zuerst: Steht die Schlange, ist das die erste Erklärung. */}
+      {processing.windowOpen ? (
+        <Alert kind="info">
+          {t('admin.processingWindowOpen', {
+            start: processing.windowStart,
+            end: processing.windowEnd,
+          })}
+        </Alert>
+      ) : (
+        <Alert kind="info">
+          {t('admin.processingWindowClosed', {
+            start: processing.windowStart,
+            end: processing.windowEnd,
+          })}
+          {waitingForWindow > 0 && (
+            <> {t('admin.processingWaitingForWindow', { count: waitingForWindow })}</>
+          )}
+        </Alert>
+      )}
+
+      <div className="stat-row">
+        <Stat label={t('admin.processingPending')} value={processing.pending} />
+        <Stat label={t('admin.processingRunning')} value={processing.running} />
+        <Stat
+          label={t('admin.processingFailed')}
+          value={processing.failed}
+          warn={processing.failed > 0}
+        />
+        <Stat label={t('admin.processingDone')} value={processing.done} />
+      </div>
+
+      <div className="card">
+        <div className="admin-users-head">
+          <span className="muted">
+            {t('admin.processingRefreshed', { time: formatTime(refreshedAt) })}
+          </span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={processingLoading}
+            onClick={() => {
+              void dispatch(fetchProcessingQueue());
+              setRefreshedAt(new Date().toISOString());
+            }}
+          >
+            {t('admin.usersRefresh')}
+          </button>
+        </div>
+        {processingError && <Alert kind="error">{processingError}</Alert>}
+        {actionError && <Alert kind="error">{actionError}</Alert>}
+      </div>
+
+      <section>
+        <h2>{t('admin.processingQueueTitle')}</h2>
+        {processing.queue.length === 0 ? (
+          <p className="muted">{t('admin.processingQueueEmpty')}</p>
+        ) : (
+          <JobTable jobs={processing.queue} showWaiting />
+        )}
+      </section>
+
+      <section>
+        <h2>{t('admin.processingFailuresTitle')}</h2>
+        {processing.failures.length === 0 ? (
+          <p className="muted">{t('admin.processingFailuresEmpty')}</p>
+        ) : (
+          <JobTable
+            jobs={processing.failures}
+            showError
+            onRetry={handleRetry}
+            busyJobId={busyJobId}
+          />
+        )}
+      </section>
+
+      <section>
+        <h2>{t('admin.processingDurationsTitle')}</h2>
+        {durations.sample === 0 ? (
+          <p className="muted">{t('admin.processingDurationsEmpty')}</p>
+        ) : (
+          <div className="card">
+            <p className="muted">{t('admin.processingDurationsNote', { count: durations.sample })}</p>
+            <div className="stat-row">
+              <Stat
+                label={t('admin.processingMedianTotal')}
+                value={formatShortDuration(durations.medianMs)}
+              />
+              <Stat
+                label={t('admin.processingMaxTotal')}
+                value={formatShortDuration(durations.maxMs)}
+              />
+              <Stat
+                label={t('admin.processingMedianStt')}
+                value={formatShortDuration(durations.medianSttMs)}
+              />
+              <Stat
+                label={t('admin.processingMedianCorrection')}
+                value={formatShortDuration(durations.medianCorrectionMs)}
+              />
+              <Stat
+                label={t('admin.processingMedianSummary')}
+                value={formatShortDuration(durations.medianSummaryMs)}
+              />
+            </div>
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+
+/** Eine Kennzahl mit Beschriftung. */
+function Stat({
+  label,
+  value,
+  warn = false,
+}: {
+  label: string;
+  value: number | string;
+  warn?: boolean;
+}) {
+  return (
+    <div className={`stat${warn ? ' stat-warn' : ''}`}>
+      <span className="stat-value">{value}</span>
+      <span className="stat-label">{label}</span>
+    </div>
+  );
+}
+
+/**
+ * Auftragstabelle – einmal für die Schlange (mit Wartezeit), einmal für die
+ * Fehlschläge (mit Grund und Knopf). Die Spalten unterscheiden sich, der Rest
+ * nicht; zwei fast gleiche Tabellen wären nur doppelte Pflege.
+ */
+function JobTable({
+  jobs,
+  showWaiting = false,
+  showError = false,
+  onRetry,
+  busyJobId,
+}: {
+  jobs: ProcessingJobView[];
+  showWaiting?: boolean;
+  showError?: boolean;
+  onRetry?: (jobId: string) => void;
+  busyJobId?: string | null;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="card table-card">
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>{t('admin.processingColRecording')}</th>
+              <th>{t('admin.processingColMode')}</th>
+              <th>{t('common.status')}</th>
+              <th>{t('admin.processingColAttempt')}</th>
+              {showWaiting && <th>{t('admin.processingColWaiting')}</th>}
+              <th>{t('admin.processingColSteps')}</th>
+              {showError && <th>{t('admin.processingColError')}</th>}
+              {onRetry && <th></th>}
+            </tr>
+          </thead>
+          <tbody>
+            {jobs.map((job) => (
+              <tr key={job.id}>
+                <td className="cell-url">
+                  <Link to={`/recordings/${job.recordingId}`}>
+                    {job.recordingTitle ?? t('admin.processingUntitled')}
+                  </Link>
+                  {job.recordingStatus && (
+                    <>
+                      {' '}
+                      <StatusBadge status={job.recordingStatus} />
+                    </>
+                  )}
+                </td>
+                <td>
+                  {t(`admin.processingMode.${job.mode}` as TranslationKey)}
+                  {job.immediate && (
+                    <>
+                      {' '}
+                      <span className="badge badge-blue">{t('admin.processingImmediate')}</span>
+                    </>
+                  )}
+                </td>
+                <td>
+                  <StatusBadge status={job.status} />
+                  {job.waitsForWindow && (
+                    <>
+                      {' '}
+                      <span className="badge badge-orange">{t('admin.processingWaits')}</span>
+                    </>
+                  )}
+                </td>
+                <td>
+                  {t('admin.processingAttemptOf', {
+                    attempts: job.attempts,
+                    max: job.maxAttempts,
+                  })}
+                </td>
+                {showWaiting && <td>{formatShortDuration(job.waitingMs)}</td>}
+                <td className="cell-steps">{stepSummary(job, t)}</td>
+                {showError && <td className="cell-error">{job.lastError ?? '–'}</td>}
+                {onRetry && (
+                  <td>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      disabled={busyJobId !== null && busyJobId !== undefined}
+                      title={t('admin.processingRetryHint')}
+                      onClick={() => onRetry(job.id)}
+                    >
+                      {busyJobId === job.id
+                        ? t('common.pleaseWait')
+                        : t('admin.processingRetry')}
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Dauer der Schritte in einer Zelle. Nicht gelaufene Schritte bleiben weg –
+ * eine Spalte voller „–" sagt weniger als drei Werte, die wirklich anfielen.
+ */
+function stepSummary(job: ProcessingJobView, t: typeof translate): string {
+  const parts: string[] = [];
+  if (job.sttMs != null) parts.push(`${t('admin.processingStepStt')} ${formatShortDuration(job.sttMs)}`);
+  if (job.correctionMs != null) {
+    parts.push(`${t('admin.processingStepCorrection')} ${formatShortDuration(job.correctionMs)}`);
+  }
+  if (job.summaryMs != null) {
+    parts.push(`${t('admin.processingStepSummary')} ${formatShortDuration(job.summaryMs)}`);
+  }
+  if (job.durationMs != null) {
+    parts.push(`${t('admin.processingStepTotal')} ${formatShortDuration(job.durationMs)}`);
+  }
+  return parts.length === 0 ? '–' : parts.join(' · ');
 }

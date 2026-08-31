@@ -41,7 +41,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class ProcessingService {
 
     private static final Logger log = LoggerFactory.getLogger(ProcessingService.class);
-    private static final int MAX_JOB_ATTEMPTS = 3;
+    /** Nach so vielen Versuchen gibt die Verarbeitung auf (auch in der Admin-Uebersicht). */
+    public static final int MAX_JOB_ATTEMPTS = 3;
 
     private final ProcessingJobRepo jobRepo;
     private final RecordingRepo recordingRepo;
@@ -231,6 +232,12 @@ public class ProcessingService {
         job.setStatus(ProcessingJob.Status.RUNNING);
         job.setStartedAt(Instant.now());
         job.setAttempts(job.getAttempts() + 1);
+        // Schrittdauern gehoeren zum LAUFENDEN Versuch. Nach einem Fehlschlag
+        // stehen hier noch die Zeiten des vorigen; sie wuerden sonst einen
+        // Schritt ausweisen, der diesmal gar nicht laeuft.
+        job.setSttMs(null);
+        job.setCorrectionMs(null);
+        job.setSummaryMs(null);
         jobRepo.save(job);
 
         Recording recording = recordingRepo.findById(job.getRecordingId()).orElse(null);
@@ -254,6 +261,10 @@ public class ProcessingService {
             List<RecordingSegment> segments = segmentRepo.findByRecordingIdOrderBySeq(recording.getId());
             boolean sttFailed = false;
             String sttError = null;
+            // Dauer je Schritt festhalten (Admin-Uebersicht): Ob Whisper oder das
+            // LLM der Ausreisser war, sind zwei verschiedene Baustellen.
+            long sttStart = System.nanoTime();
+            int transcribed = 0;
             for (RecordingSegment segment : segments) {
                 if (segment.getStatus() != RecordingSegment.Status.READY) continue;
                 if (!redoTranscripts
@@ -263,6 +274,7 @@ public class ProcessingService {
                 if (result.success()) {
                     segment.setTranscriptText(result.text());
                     segmentRepo.save(segment);
+                    transcribed++;
                 } else {
                     sttFailed = true;
                     sttError = result.error();
@@ -271,6 +283,10 @@ public class ProcessingService {
                     log.error("STT fuer Segment {} fehlgeschlagen: {}", segment.getSeq(), result.error());
                 }
             }
+            // Auch bei einem Fehlschlag festhalten - eine Spracherkennung, die
+            // erst nach einer halben Stunde in den Timeout laeuft, ist genau die
+            // Information, die der Admin morgens braucht.
+            if (transcribed > 0 || sttFailed) job.setSttMs(millisSince(sttStart));
             if (sttFailed) {
                 retryOrFail(job, recording, "STT teilweise fehlgeschlagen: " + sttError);
                 return;
@@ -281,7 +297,9 @@ public class ProcessingService {
             // geglaettete Fassung. Ein Fehlschlag ist NICHT fatal - dann wird
             // weiter mit dem Original gearbeitet.
             segments = segmentRepo.findByRecordingIdOrderBySeq(recording.getId());
-            correctTranscripts(recording, segments, redoTranscripts);
+            long correctionStart = System.nanoTime();
+            boolean corrected = correctTranscripts(recording, segments, redoTranscripts);
+            if (corrected) job.setCorrectionMs(millisSince(correctionStart));
 
             // Transkript-Mindestlaenge pruefen (Teil der Lohnt-sich-Pruefung)
             segments = segmentRepo.findByRecordingIdOrderBySeq(recording.getId());
@@ -315,7 +333,9 @@ public class ProcessingService {
             }
 
             // Schritt 2: Zusammenfassung
+            long summaryStart = System.nanoTime();
             var summary = summaryService.summarize(recording, segments);
+            job.setSummaryMs(millisSince(summaryStart));
             if (summary.getStatus() == bbbbot.domain.Summary.Status.DONE) {
                 // Die neue Fassung ist ab jetzt die aktuelle (das erledigt der
                 // SummaryService). Die vorherigen bleiben zum Vergleich stehen -
@@ -344,9 +364,9 @@ public class ProcessingService {
      * @param redo bei erneuter Transkription: vorhandene Glaettungen sind
      *             veraltet (sie gehoeren zu einem anderen Original) und werden verworfen
      */
-    private void correctTranscripts(Recording recording, List<RecordingSegment> segments, boolean redo) {
+    private boolean correctTranscripts(Recording recording, List<RecordingSegment> segments, boolean redo) {
         boolean enabled = correctionService.isEnabled();
-        if (!enabled && !redo) return;
+        if (!enabled && !redo) return false;
 
         if (redo) {
             // Veraltete Glaettung entfernen - sie passt nicht mehr zum neuen Original.
@@ -357,7 +377,7 @@ public class ProcessingService {
                 }
             }
             saveCorrectionStatus(recording.getId(), Recording.CorrectionStatus.NONE);
-            if (!enabled) return;
+            if (!enabled) return false;
         }
 
         String glossary = correctionService.glossaryFor(recording.getOwnerId());
@@ -406,12 +426,18 @@ public class ProcessingService {
                     settings.getInt(SettingsService.LLM_TIMEOUT_SEC),
                     settings.getInt(SettingsService.CORRECTION_CHUNK_CHARS));
         }
-        if (corrected == 0 && failed == 0) return;
+        if (corrected == 0 && failed == 0) return false;
 
         saveCorrectionStatus(recording.getId(), corrected > 0
                 ? Recording.CorrectionStatus.READY : Recording.CorrectionStatus.FAILED);
         log.info("Glaettung fuer Aufnahme {}: {} Segment(e) geglaettet, {} fehlgeschlagen",
                 recording.getId(), corrected, failed);
+        return true;
+    }
+
+    /** Verstrichene Zeit seit einem {@code System.nanoTime()}-Messpunkt. */
+    private static long millisSince(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000;
     }
 
     private void retryOrFail(ProcessingJob job, Recording recording, String error) {

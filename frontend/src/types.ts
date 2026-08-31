@@ -35,6 +35,71 @@ export interface AdminUserView extends UserView {
   activeRecordings: ActiveRecordingView[];
 }
 
+/** Kurzform der Aufgabe eines Verarbeitungsauftrags. */
+export type ProcessingMode =
+  | 'FULL'
+  | 'TRANSCRIBE_ONLY'
+  | 'REPROCESS'
+  | 'RETRANSCRIBE'
+  | 'RETRANSCRIBE_ONLY';
+
+/** Ein Verarbeitungsauftrag in der Admin-Übersicht. */
+export interface ProcessingJobView {
+  id: string;
+  recordingId: string;
+  /** Titel der Aufnahme; null, wenn sie keinen hat oder gelöscht wurde. */
+  recordingTitle: string | null;
+  recordingStatus: RecordingStatus | null;
+  status: ProcessStatus;
+  mode: ProcessingMode;
+  /** true = läuft ohne Rücksicht auf das Zeitfenster. */
+  immediate: boolean;
+  attempts: number;
+  maxAttempts: number;
+  lastError: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  /** Wartezeit bis zum Start; null, solange unbekannt. */
+  waitingMs: number | null;
+  /** Gesamtdauer des Laufs; null, solange er nicht fertig ist. */
+  durationMs: number | null;
+  /** Dauer der Schritte; null = dieser Schritt lief in diesem Auftrag nicht. */
+  sttMs: number | null;
+  correctionMs: number | null;
+  summaryMs: number | null;
+  /** Steht nur, weil das Zeitfenster gerade zu ist. */
+  waitsForWindow: boolean;
+}
+
+/** Dauer-Kennzahlen der letzten fertigen Aufträge (Median, damit Ausreißer nicht verschieben). */
+export interface ProcessingDurationsView {
+  /** Anzahl der Aufträge, aus denen die Werte stammen. */
+  sample: number;
+  medianMs: number | null;
+  maxMs: number | null;
+  medianSttMs: number | null;
+  medianCorrectionMs: number | null;
+  medianSummaryMs: number | null;
+}
+
+/** Zustand der Verarbeitungs-Warteschlange für den Admin-Tab „Verarbeitung". */
+export interface ProcessingQueueView {
+  windowOpen: boolean;
+  /** Konfiguriertes Zeitfenster (HH:mm). */
+  windowStart: string;
+  windowEnd: string;
+  pending: number;
+  running: number;
+  failed: number;
+  done: number;
+  /** Wartende und laufende Aufträge, älteste zuerst. */
+  queue: ProcessingJobView[];
+  /** Die letzten Fehlschläge mit Grund. */
+  failures: ProcessingJobView[];
+  durations: ProcessingDurationsView;
+}
+
 export interface AuthConfig {
   'auth.ldapEnabled': string;
   'auth.ldapDomain': string;

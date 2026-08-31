@@ -46,7 +46,8 @@ class AdminUsersTest {
         controller = new AdminController(mock(SettingsService.class), mock(AuthSettingsService.class),
                 mock(LdapAuthenticator.class), userRepo, recordingRepo,
                 mock(LlmClient.class), mock(WhisperClient.class), mock(FfmpegService.class),
-                mock(bbbbot.docs.TikaClient.class));
+                mock(bbbbot.docs.TikaClient.class),
+                mock(bbbbot.processing.ProcessingQueueService.class));
 
         aktiv = AppUser.create("zzz.aktiv", "Aktiv", null);
         aktiv.setLastSeenAt(Instant.now().minusSeconds(30));

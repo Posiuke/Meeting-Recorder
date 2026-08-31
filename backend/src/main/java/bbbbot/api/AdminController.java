@@ -46,12 +46,14 @@ public class AdminController {
     private final WhisperClient whisper;
     private final FfmpegService ffmpeg;
     private final bbbbot.docs.TikaClient tika;
+    private final bbbbot.processing.ProcessingQueueService queue;
 
     public AdminController(SettingsService settings, AuthSettingsService authSettings,
                            LdapAuthenticator ldap, AppUserRepo userRepo,
                            RecordingRepo recordingRepo,
                            LlmClient llm, WhisperClient whisper, FfmpegService ffmpeg,
-                           bbbbot.docs.TikaClient tika) {
+                           bbbbot.docs.TikaClient tika,
+                           bbbbot.processing.ProcessingQueueService queue) {
         this.settings = settings;
         this.authSettings = authSettings;
         this.ldap = ldap;
@@ -61,6 +63,7 @@ public class AdminController {
         this.whisper = whisper;
         this.ffmpeg = ffmpeg;
         this.tika = tika;
+        this.queue = queue;
     }
 
     @GetMapping("/settings")
@@ -225,6 +228,41 @@ public class AdminController {
         target.setAdmin(request.admin());
         userRepo.save(target);
         return adminView(target, runningRecordingsByOwner());
+    }
+
+    // ------------------------------------------------------ Verarbeitung (Issue #5)
+
+    /**
+     * Zustand der Verarbeitungs-Warteschlange: was wartet, was laeuft, was ist
+     * gescheitert und woran, wie lange die Schritte dauern, und ob das
+     * Zeitfenster gerade offen ist.
+     *
+     * <p>Die Seite, die ein Admin morgens aufschlaegt. Bisher liess sich die
+     * Frage "ist die Nacht durchgelaufen?" nur beantworten, indem man einzelne
+     * Aufnahmen durchklickt oder das Server-Log liest.
+     */
+    @GetMapping("/processing")
+    public Dtos.ProcessingQueueView processing() {
+        return Dtos.ProcessingQueueView.of(queue.overview(),
+                bbbbot.processing.ProcessingService.MAX_JOB_ATTEMPTS);
+    }
+
+    /**
+     * Einen gescheiterten Auftrag erneut anstossen. Er laeuft danach sofort -
+     * wer hier drueckt, hat die Ursache behoben und will das Ergebnis heute.
+     */
+    @PostMapping("/processing/jobs/{jobId}/retry")
+    public Dtos.ProcessingQueueView retryJob(@PathVariable UUID jobId) {
+        try {
+            queue.retry(jobId);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        }
+        // Die ganze Uebersicht zurueck: Die Tabelle soll nach dem Klick sofort
+        // stimmen, ohne zweiten Aufruf.
+        return processing();
     }
 
     private Dtos.AdminUserView adminView(AppUser user,

@@ -3,6 +3,7 @@ package bbbbot.db;
 import bbbbot.domain.AppUser;
 import bbbbot.domain.BotTemplate;
 import bbbbot.domain.GlossaryEntry;
+import bbbbot.domain.ProcessingJob;
 import bbbbot.domain.Recording;
 import bbbbot.domain.RecordingDocument;
 import bbbbot.domain.RecordingSegment;
@@ -11,6 +12,7 @@ import bbbbot.domain.ShareLink;
 import bbbbot.domain.Summary;
 import bbbbot.repository.Repositories.BotTemplateRepo;
 import bbbbot.repository.Repositories.GlossaryEntryRepo;
+import bbbbot.repository.Repositories.ProcessingJobRepo;
 import bbbbot.repository.Repositories.RecordingDocumentRepo;
 import bbbbot.repository.Repositories.RecordingRepo;
 import bbbbot.repository.Repositories.RecordingSegmentRepo;
@@ -94,6 +96,9 @@ class MigrationSchemaIT {
 
     @Autowired
     private BotTemplateRepo botTemplateRepo;
+
+    @Autowired
+    private ProcessingJobRepo jobRepo;
 
     @Autowired
     private EntityManager em;
@@ -235,6 +240,53 @@ class MigrationSchemaIT {
         summary.setTemperature(0.9);
         summary.setCurrent(current);
         return summaryRepo.saveAndFlush(summary);
+    }
+
+    /**
+     * Verarbeitungs-Auftraege (V27): Die Schrittdauern lassen sich schreiben und
+     * lesen, und die Abfragen der Admin-Uebersicht treffen die richtigen Zeilen.
+     */
+    @Test
+    void schrittdauernUndWarteschlangenAbfragen() {
+        Recording recording = Recording.start(null, ownerId(), null, "/tmp/x", false, true, false);
+        recordingRepo.saveAndFlush(recording);
+
+        ProcessingJob fertig = ProcessingJob.create(recording.getId(), false);
+        fertig.setStatus(ProcessingJob.Status.DONE);
+        fertig.setStartedAt(java.time.Instant.now().minusSeconds(300));
+        fertig.setFinishedAt(java.time.Instant.now());
+        fertig.setSttMs(240_000L);
+        fertig.setCorrectionMs(30_000L);
+        fertig.setSummaryMs(25_000L);
+        jobRepo.saveAndFlush(fertig);
+
+        ProcessingJob wartend = ProcessingJob.create(recording.getId(), true);
+        jobRepo.saveAndFlush(wartend);
+
+        ProcessingJob gescheitert = ProcessingJob.create(recording.getId(), false);
+        gescheitert.setStatus(ProcessingJob.Status.FAILED);
+        gescheitert.setFinishedAt(java.time.Instant.now());
+        gescheitert.setLastError("Whisper nicht erreichbar");
+        jobRepo.saveAndFlush(gescheitert);
+
+        assertThat(jobRepo.findTop50ByStatusOrderByFinishedAtDesc(ProcessingJob.Status.DONE))
+                .singleElement()
+                .satisfies(j -> assertThat(j.getSttMs()).isEqualTo(240_000L))
+                .satisfies(j -> assertThat(j.getCorrectionMs()).isEqualTo(30_000L))
+                .satisfies(j -> assertThat(j.getSummaryMs()).isEqualTo(25_000L))
+                .satisfies(j -> assertThat(j.durationMs()).isNotNull());
+
+        assertThat(jobRepo.findByStatusInOrderByCreatedAtAsc(
+                List.of(ProcessingJob.Status.PENDING, ProcessingJob.Status.RUNNING)))
+                .extracting(ProcessingJob::getId)
+                .containsExactly(wartend.getId());
+
+        assertThat(jobRepo.findTop20ByStatusOrderByFinishedAtDesc(ProcessingJob.Status.FAILED))
+                .singleElement()
+                .satisfies(j -> assertThat(j.getLastError()).isEqualTo("Whisper nicht erreichbar"));
+
+        assertThat(jobRepo.countByStatus(ProcessingJob.Status.PENDING)).isEqualTo(1);
+        assertThat(jobRepo.countByStatus(ProcessingJob.Status.FAILED)).isEqualTo(1);
     }
 
     /**
