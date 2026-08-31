@@ -22,6 +22,13 @@ docs/       Anleitungen (u.a. Whisper-Diarisierung), Alt-Dokumentation
 - **Steuerung**: über das Frontend (Raum-URL eingeben, Aufnahme
   starten/stoppen) und weiterhin per Chat-Befehl im Meeting
   (`STARTRECORDING`/`STOPRECORDING`, Zwei-Marker-System gegen Selbst-Trigger).
+- **Bot-Vorlagen**: Ein regelmäßig aufgezeichneter Raum muss nicht jedes Mal neu
+  eingetragen werden. Im Tab **Bots** speichert jeder Nutzer benannte Vorlagen
+  (Meeting-URL, Bot-Name, Aufnahme- und Auswertungsschalter, Sprache der
+  Aufnahme); danach genügt "Bot starten" an der Vorlage. Alternativ lässt sich
+  eine Vorlage ins Startformular übernehmen, wenn einmal etwas abweichen soll.
+  Die Vorlagen sind **benutzerbezogen** — in der Meeting-URL steckt der Zugang
+  zum Raum, deshalb sieht sie niemand außer dem Besitzer (`/api/bot-templates`).
 - **Verarbeitung**: STT (Whisper) → **KI-Glättung des Transkripts** →
   Zusammenfassung (LLM), als Jobs in einem Admin-definierten Zeitfenster
   (Standard 20:00–06:00), damit die GPU tagsüber frei bleibt. Pro Aufnahme gibt
@@ -215,6 +222,36 @@ Alle fachlichen Parameter (Whisper-URL und -Parameter, LLM-Endpunkt/Modell,
 Zeitfenster, Segmentlänge, Chat-Befehle, Reconnect-Verhalten, …) werden zur
 Laufzeit im Frontend unter **Admin → Einstellungen** gepflegt und in der
 Datenbank gespeichert.
+
+## Bot-Vorlagen
+
+Wer denselben Meetingraum regelmäßig aufzeichnet, soll ihn nicht jedes Mal neu
+eintragen. Im Tab **Bots** steht über dem Startformular der Abschnitt
+**Bot-Vorlagen**: Eine Vorlage hält Name, Meeting-URL, Bot-Name, die Schalter
+für Aufnahme und Auswertung (automatisch aufnehmen, Video, KI-Analyse,
+Sprechererkennung) und die Sprache der Aufnahme — also genau die Angaben, die
+`POST /api/bots` erwartet. Danach genügt an der Vorlage **Bot starten**.
+
+Drei Wege führen zu einer Vorlage: **Neue Vorlage** (leeres Formular),
+**Als Vorlage speichern** unter dem Startformular (übernimmt, was gerade
+eingetragen ist) und **Bearbeiten** an einer bestehenden. Umgekehrt holt
+**Ins Formular** eine Vorlage ins Startformular zurück, wenn für diesen einen
+Termin etwas abweichen soll.
+
+**Vorlagen sind benutzerbezogen.** In der Meeting-URL steckt der Zugang zum
+Raum, deshalb sieht eine Vorlage nur ihr Besitzer — auch Admins bekommen unter
+`/api/bot-templates` ausschließlich ihre eigenen. Namen sind pro Nutzer
+eindeutig (case-insensitive, DB-seitig über `uq_bot_template_owner_name`); zwei
+Nutzer dürfen denselben Namen verwenden.
+
+Gestartet wird weiterhin über `POST /api/bots` — die Vorlage hält nur die
+Angaben. Damit eine Vorlage nicht erst beim Starten scheitert, prüfen Vorlage
+und Sofort-Start dieselben Regeln: `http(s)://` am Anfang und die
+SSRF-Allowlist `bot.allowedUrlHosts`. Die **Sprechererkennung** ist die eine
+Ausnahme: Sie wird in der Vorlage als Wunsch gespeichert, auch wenn der Admin
+sie gerade gesperrt hat (`whisper.diarize`) — sonst verliert die Vorlage die
+Einstellung, nur weil sie während einer Sperre gespeichert wurde. Über die
+Ausführung entscheidet der Start.
 
 ## Sprache der Oberfläche
 

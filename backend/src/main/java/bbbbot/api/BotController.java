@@ -28,6 +28,19 @@ import java.util.UUID;
 @RequestMapping("/api/bots")
 public class BotController {
 
+    /**
+     * Standardname, wenn der Aufrufer keinen angibt. Er erscheint in der
+     * Teilnehmerliste des Meetings.
+     */
+    static final String DEFAULT_BOT_NAME = "RecorderBot";
+
+    /**
+     * Laenge des Bot-Namens: Die Spalte {@code bot_session.bot_name} traegt mehr,
+     * aber ein Name in dieser Groessenordnung ist in der Teilnehmerliste noch
+     * lesbar - und ein zu langer soll als 400 auffallen statt beim Insert.
+     */
+    private static final int MAX_BOT_NAME_LENGTH = 100;
+
     private final BotManager botManager;
     private final BotSessionRepo sessionRepo;
     private final SettingsService settings;
@@ -62,16 +75,8 @@ public class BotController {
     @PostMapping
     public Dtos.BotView start(@RequestBody Dtos.StartBotRequest request) {
         AppUser user = CurrentUser.get();
-        if (request.meetingUrl() == null || request.meetingUrl().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Meeting-URL erforderlich");
-        }
-        String url = request.meetingUrl().trim();
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Meeting-URL muss mit http(s):// beginnen");
-        }
-        requireAllowedHost(url);
-        String botName = request.botName() == null || request.botName().isBlank()
-                ? "RecorderBot" : request.botName().trim();
+        String url = requireMeetingUrl(request.meetingUrl(), settings);
+        String botName = requireBotName(request.botName());
         boolean autoRecord = request.autoRecord() == null || request.autoRecord();
         boolean recordVideo = request.recordVideo() != null && request.recordVideo();
         boolean aiAnalysis = request.aiAnalysis() == null || request.aiAnalysis();
@@ -121,11 +126,39 @@ public class BotController {
     }
 
     /**
+     * Prueft eine Meeting-URL, wie sie der Bot oeffnen wuerde, und liefert sie
+     * ohne umgebende Leerzeichen zurueck. Gemeinsam genutzt vom Sofort-Start und
+     * von den Bot-Vorlagen ({@link BotTemplateController}) - eine Vorlage, die
+     * beim Starten scheitern wuerde, soll gar nicht erst speicherbar sein.
+     */
+    static String requireMeetingUrl(String raw, SettingsService settings) {
+        if (raw == null || raw.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Meeting-URL erforderlich");
+        }
+        String url = raw.trim();
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Meeting-URL muss mit http(s):// beginnen");
+        }
+        requireAllowedHost(url, settings);
+        return url;
+    }
+
+    /** Bot-Name: leer bedeutet {@link #DEFAULT_BOT_NAME}. */
+    static String requireBotName(String raw) {
+        String botName = raw == null || raw.isBlank() ? DEFAULT_BOT_NAME : raw.trim();
+        if (botName.length() > MAX_BOT_NAME_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Bot-Name ist zu lang (max. " + MAX_BOT_NAME_LENGTH + " Zeichen)");
+        }
+        return botName;
+    }
+
+    /**
      * Schutz gegen SSRF: Ist eine Allowlist konfiguriert (bot.allowedUrlHosts,
      * komma-getrennte Host-Suffixe), muss der Ziel-Host dazu passen. Leer =
      * keine Einschraenkung (Standard, unveraendertes Verhalten).
      */
-    private void requireAllowedHost(String url) {
+    private static void requireAllowedHost(String url, SettingsService settings) {
         String allowed = settings.get(SettingsService.BOT_ALLOWED_URL_HOSTS).trim();
         if (allowed.isBlank()) return;
         String host;

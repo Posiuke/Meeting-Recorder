@@ -91,6 +91,38 @@ export interface CreateBotRequest {
   sttLanguage?: string | null;
 }
 
+/**
+ * Persönliche Bot-Vorlage: ein benannter Meetingraum samt Einstellungen. Sie
+ * gehört genau einem Nutzer – in der Meeting-URL steckt der Zugang zum Raum.
+ */
+export interface BotTemplateView {
+  id: string;
+  name: string;
+  meetingUrl: string;
+  botName: string;
+  autoRecord: boolean;
+  recordVideo: boolean;
+  aiAnalysis: boolean;
+  /** Wunsch des Nutzers; ob die Sprechererkennung läuft, entscheidet der Start. */
+  diarize: boolean;
+  /** null = Admin-Standard, `auto` = Whisper erkennt die Sprache selbst. */
+  sttLanguage: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+/** Wie {@link CreateBotRequest}, nur mit Namen der Vorlage statt Sofort-Start. */
+export interface BotTemplateRequest {
+  name: string;
+  meetingUrl: string;
+  botName?: string;
+  autoRecord?: boolean;
+  recordVideo?: boolean;
+  aiAnalysis?: boolean;
+  diarize?: boolean;
+  sttLanguage?: string | null;
+}
+
 export interface BotSessionHistoryView {
   id: string;
   meetingUrl: string;

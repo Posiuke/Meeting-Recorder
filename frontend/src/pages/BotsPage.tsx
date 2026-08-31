@@ -10,22 +10,60 @@ import {
   stopBot,
   stopBotRecording,
 } from '../store/botsSlice';
+import {
+  deleteBotTemplate,
+  fetchBotTemplates,
+} from '../store/botTemplatesSlice';
 import StatusBadge from '../components/StatusBadge';
 import Spinner from '../components/Spinner';
 import Alert from '../components/Alert';
 import ConfirmDialog from '../components/ConfirmDialog';
 import HelpTip from '../components/HelpTip';
-import SttLanguageSelect from '../components/SttLanguageSelect';
+import SttLanguageSelect, { sttLanguageLabel } from '../components/SttLanguageSelect';
+import BotTemplateDialog from '../components/BotTemplateDialog';
+import type { BotTemplateSettings } from '../components/BotTemplateDialog';
 import { errorMessage, fetchUploadConfig } from '../api/client';
 import { formatDateTime } from '../utils/format';
 import { useI18n } from '../i18n';
-import type { BotView } from '../types';
+import type { translate } from '../i18n';
+import type { BotTemplateView, BotView, CreateBotRequest } from '../types';
+
+/** Serverseitige Grenzen (BotTemplateController, BotController). */
+const MAX_BOT_TEMPLATES = 100;
+const MAX_BOT_NAME_LENGTH = 100;
+
+/** Aus einer Vorlage wird die Startanfrage – die Vorlage hält genau diese Angaben. */
+const startRequestOf = (template: BotTemplateView): CreateBotRequest => ({
+  meetingUrl: template.meetingUrl,
+  botName: template.botName,
+  autoRecord: template.autoRecord,
+  recordVideo: template.recordVideo,
+  aiAnalysis: template.aiAnalysis,
+  diarize: template.diarize,
+  sttLanguage: template.sttLanguage,
+});
+
+/** Einzeiler unter dem Vorlagennamen: Bot-Name, Modus und Sprache der Aufnahme. */
+const summaryOf = (template: BotTemplateView, t: typeof translate): string => {
+  const parts = [
+    template.botName,
+    template.recordVideo ? t('bots.modeVideo') : t('bots.modeAudio'),
+    template.aiAnalysis ? t('bots.aiShort') : t('bots.noAiShort'),
+  ];
+  if (template.aiAnalysis && template.diarize) parts.push(t('bots.diarizeShort'));
+  if (!template.autoRecord) parts.push(t('bots.manualRecordShort'));
+  if (template.aiAnalysis && template.sttLanguage) {
+    parts.push(sttLanguageLabel(template.sttLanguage, t));
+  }
+  return parts.join(' · ');
+};
 
 export default function BotsPage() {
   const { t } = useI18n();
   const dispatch = useAppDispatch();
   const { items, loading, loaded, error, history, historyLoading, historyError } =
     useAppSelector((s) => s.bots);
+  const templates = useAppSelector((s) => s.botTemplates);
 
   const [meetingUrl, setMeetingUrl] = useState('');
   const [botName, setBotName] = useState('RecorderBot');
@@ -40,6 +78,14 @@ export default function BotsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  /** Offener Vorlagen-Dialog: bestehende Vorlage bearbeiten oder neue anlegen. */
+  const [editing, setEditing] = useState<
+    { template: BotTemplateView | null; prefill?: BotTemplateSettings } | null
+  >(null);
+  const [confirmDeleteTemplate, setConfirmDeleteTemplate] = useState<BotTemplateView | null>(null);
+  /** Vorlage, aus der gerade ein Bot startet bzw. die gerade gelöscht wird. */
+  const [templateBusyId, setTemplateBusyId] = useState<string | null>(null);
+  const [templateError, setTemplateError] = useState<string | null>(null);
 
   // Rahmenbedingungen der Auswertung: Sprechererkennung nur anzeigen, wenn der
   // Admin sie freigeschaltet hat; seine Sprachvorgabe beschriftet die Auswahl.
@@ -59,6 +105,10 @@ export default function BotsPage() {
       dispatch(fetchBots(true));
     }, 5000);
     return () => clearInterval(timer);
+  }, [dispatch]);
+
+  useEffect(() => {
+    void dispatch(fetchBotTemplates());
   }, [dispatch]);
 
   useEffect(() => {
@@ -91,9 +141,125 @@ export default function BotsPage() {
     }
   };
 
+  /** Vorlage ins Formular übernehmen – für den Fall, dass noch etwas abweicht. */
+  const applyTemplate = (template: BotTemplateView) => {
+    setFormError(null);
+    setMeetingUrl(template.meetingUrl);
+    setBotName(template.botName);
+    setAutoRecord(template.autoRecord);
+    setRecordVideo(template.recordVideo);
+    setAiAnalysis(template.aiAnalysis);
+    setDiarize(template.aiAnalysis && template.diarize);
+    setSttLanguage(template.sttLanguage ?? '');
+  };
+
+  /** Der kurze Weg aus dem Issue: Vorlage auswählen, Bot startet. */
+  const startFromTemplate = async (template: BotTemplateView) => {
+    setTemplateError(null);
+    setTemplateBusyId(template.id);
+    try {
+      await dispatch(createBot(startRequestOf(template))).unwrap();
+    } catch (err) {
+      setTemplateError(errorMessage(err));
+    } finally {
+      setTemplateBusyId(null);
+    }
+  };
+
+  const handleDeleteTemplate = async () => {
+    if (!confirmDeleteTemplate) return;
+    setTemplateError(null);
+    setTemplateBusyId(confirmDeleteTemplate.id);
+    try {
+      await dispatch(deleteBotTemplate(confirmDeleteTemplate.id)).unwrap();
+      setConfirmDeleteTemplate(null);
+    } catch (err) {
+      setTemplateError(errorMessage(err));
+      setConfirmDeleteTemplate(null);
+    } finally {
+      setTemplateBusyId(null);
+    }
+  };
+
   return (
     <div className="page">
       <h1>{t('bots.heading')}</h1>
+
+      <section className="card">
+        <div className="section-head">
+          <h2>{t('botTemplates.section')}</h2>
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={templates.items.length >= MAX_BOT_TEMPLATES}
+            title={
+              templates.items.length >= MAX_BOT_TEMPLATES
+                ? t('botTemplates.limitReached', { max: MAX_BOT_TEMPLATES })
+                : undefined
+            }
+            onClick={() => setEditing({ template: null })}
+          >
+            {t('botTemplates.new')}
+          </button>
+        </div>
+        <p className="muted">{t('botTemplates.intro')}</p>
+        {templates.error && <Alert kind="error">{templates.error}</Alert>}
+        {templateError && <Alert kind="error">{templateError}</Alert>}
+        {templates.loading && !templates.loaded && (
+          <Spinner label={t('botTemplates.loading')} />
+        )}
+        {templates.loaded && templates.items.length === 0 && (
+          <p className="muted">{t('botTemplates.empty')}</p>
+        )}
+        {templates.items.length > 0 && (
+          <ul className="bot-template-list">
+            {templates.items.map((template) => (
+              <li key={template.id} className="bot-template-row">
+                <div className="bot-template-info">
+                  <strong>{template.name}</strong>
+                  <span className="muted url-wrap" title={template.meetingUrl}>
+                    {template.meetingUrl}
+                  </span>
+                  <span className="muted bot-template-summary">{summaryOf(template, t)}</span>
+                </div>
+                <div className="bot-template-actions">
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    disabled={templateBusyId !== null}
+                    onClick={() => void startFromTemplate(template)}
+                  >
+                    {templateBusyId === template.id ? t('bots.submitting') : t('bots.submit')}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    title={t('botTemplates.applyHint')}
+                    onClick={() => applyTemplate(template)}
+                  >
+                    {t('botTemplates.apply')}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => setEditing({ template })}
+                  >
+                    {t('common.edit')}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-danger-text"
+                    disabled={templateBusyId !== null}
+                    onClick={() => setConfirmDeleteTemplate(template)}
+                  >
+                    {t('common.delete')}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className="card">
         <h2>{t('bots.startSection')}</h2>
@@ -116,6 +282,7 @@ export default function BotsPage() {
               id="bot-name"
               type="text"
               value={botName}
+              maxLength={MAX_BOT_NAME_LENGTH}
               onChange={(e) => setBotName(e.target.value)}
             />
           </div>
@@ -172,6 +339,36 @@ export default function BotsPage() {
           </div>
           <button type="submit" className="btn btn-primary" disabled={creating || !meetingUrl.trim()}>
             {creating ? t('bots.submitting') : t('bots.submit')}
+          </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={
+              creating ||
+              !meetingUrl.trim() ||
+              templates.items.length >= MAX_BOT_TEMPLATES
+            }
+            title={
+              templates.items.length >= MAX_BOT_TEMPLATES
+                ? t('botTemplates.limitReached', { max: MAX_BOT_TEMPLATES })
+                : t('botTemplates.saveAsHint')
+            }
+            onClick={() =>
+              setEditing({
+                template: null,
+                prefill: {
+                  meetingUrl: meetingUrl.trim(),
+                  botName: botName.trim(),
+                  autoRecord,
+                  recordVideo,
+                  aiAnalysis,
+                  diarize,
+                  sttLanguage,
+                },
+              })
+            }
+          >
+            {t('botTemplates.saveAs')}
           </button>
         </form>
       </section>
@@ -239,6 +436,28 @@ export default function BotsPage() {
           </div>
         )}
       </section>
+
+      {editing && (
+        <BotTemplateDialog
+          template={editing.template}
+          prefill={editing.prefill}
+          diarizeAllowed={diarizeAllowed}
+          defaultSttLanguage={defaultSttLanguage}
+          onClose={() => setEditing(null)}
+        />
+      )}
+
+      {confirmDeleteTemplate && (
+        <ConfirmDialog
+          title={t('botTemplates.confirmDeleteTitle')}
+          message={t('botTemplates.confirmDeleteMessage', { name: confirmDeleteTemplate.name })}
+          confirmLabel={t('common.delete')}
+          danger
+          busy={templateBusyId === confirmDeleteTemplate.id}
+          onConfirm={() => void handleDeleteTemplate()}
+          onCancel={() => setConfirmDeleteTemplate(null)}
+        />
+      )}
     </div>
   );
 }

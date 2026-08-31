@@ -519,6 +519,28 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           path: '/api/bots/history',
           summary: 'Beendete Bot-Sitzungen mit Zeitraum und Fehlern.',
         },
+        {
+          method: 'GET',
+          path: '/api/bot-templates',
+          summary:
+            'Eigene Bot-Vorlagen auflisten: benannte Meetingräume samt Einstellungen. Nur Ihre eigenen – Vorlagen sind benutzerbezogen.',
+          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/bot-templates"`,
+        },
+        {
+          method: 'POST',
+          path: '/api/bot-templates',
+          summary:
+            'Bot-Vorlage anlegen. Dieselben Angaben wie POST /api/bots, zusätzlich name. Zum Starten die Vorlage lesen und ihre Angaben an POST /api/bots schicken.',
+          example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
+  -d '{"name":"Technikrunde montags",
+       "meetingUrl":"https://bbb.example.intern/b/abc-def-ghi",
+       "botName":"Protokoll-Bot","autoRecord":true,
+       "recordVideo":false,"aiAnalysis":true,"diarize":false,
+       "sttLanguage":"de"}' \\
+  "$BBB/api/bot-templates"`,
+        },
+        { method: 'PUT', path: '/api/bot-templates/{id}', summary: 'Bot-Vorlage ändern.' },
+        { method: 'DELETE', path: '/api/bot-templates/{id}', summary: 'Bot-Vorlage löschen.' },
       ],
     },
 

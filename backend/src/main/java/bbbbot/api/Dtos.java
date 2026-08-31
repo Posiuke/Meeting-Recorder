@@ -2,6 +2,7 @@ package bbbbot.api;
 
 import bbbbot.domain.AppUser;
 import bbbbot.domain.BotSession;
+import bbbbot.domain.BotTemplate;
 import bbbbot.domain.Participant;
 import bbbbot.domain.ProcessingJob;
 import bbbbot.domain.PromptTemplate;
@@ -84,6 +85,30 @@ public final class Dtos {
     public record StartBotRequest(String meetingUrl, String botName, Boolean autoRecord,
                                   Boolean recordVideo, Boolean aiAnalysis, Boolean diarize,
                                   String sttLanguage) {}
+
+    /**
+     * Persoenliche Bot-Vorlage: ein benannter Meetingraum samt Einstellungen,
+     * aus dem sich ein Bot ohne weitere Eingabe starten laesst.
+     *
+     * @param diarize      Wunsch des Nutzers; ob die Sprechererkennung wirklich
+     *                     laeuft, entscheidet beim Start {@code whisper.diarize}
+     * @param sttLanguage  null = Admin-Standard, "auto" = selbst erkennen
+     */
+    public record BotTemplateView(UUID id, String name, String meetingUrl, String botName,
+                                  boolean autoRecord, boolean recordVideo, boolean aiAnalysis,
+                                  boolean diarize, String sttLanguage,
+                                  Instant createdAt, Instant updatedAt) {
+        public static BotTemplateView of(BotTemplate t) {
+            return new BotTemplateView(t.getId(), t.getName(), t.getMeetingUrl(), t.getBotName(),
+                    t.isAutoRecord(), t.isRecordVideo(), t.isAiAnalysis(), t.isDiarize(),
+                    t.getSttLanguage(), t.getCreatedAt(), t.getUpdatedAt());
+        }
+    }
+
+    /** Wie {@link StartBotRequest}, nur mit Namen der Vorlage statt Sofort-Start. */
+    public record BotTemplateRequest(String name, String meetingUrl, String botName,
+                                     Boolean autoRecord, Boolean recordVideo, Boolean aiAnalysis,
+                                     Boolean diarize, String sttLanguage) {}
 
     public record BotView(UUID sessionId, String status, String meetingUrl, String roomName,
                           String botName, boolean autoRecord, boolean recordVideo, boolean aiAnalysis,

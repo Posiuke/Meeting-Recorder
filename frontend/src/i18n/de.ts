@@ -132,6 +132,11 @@ export const de = {
     modeAudio: 'Audio',
     modeWithAi: ' · KI-Analyse',
     modeWithoutAi: ' · ohne Analyse',
+    // Kurzformen für die Zusammenfassung einer Bot-Vorlage in einer Zeile
+    aiShort: 'KI-Analyse',
+    noAiShort: 'ohne Analyse',
+    diarizeShort: 'Sprechererkennung',
+    manualRecordShort: 'Aufnahme manuell',
     startRecording: 'Aufnahme starten',
     stopRecording: 'Aufnahme beenden',
     discard: 'Verwerfen',
@@ -142,6 +147,29 @@ export const de = {
     confirmStopTitle: 'Bot stoppen',
     confirmStopMessage:
       'Der Bot verlässt den Raum. Eine laufende Aufnahme wird abgeschlossen. Fortfahren?',
+  },
+
+  /** Persönliche Bot-Vorlagen im Bereich „Bots" (Issue #27). */
+  botTemplates: {
+    section: 'Bot-Vorlagen',
+    intro:
+      'Ein regelmäßig aufgezeichneter Raum muss nicht jedes Mal neu eingetragen werden: Meeting-URL und Einstellungen einmal als Vorlage speichern, danach genügt „Bot starten". Ihre Vorlagen sind nur für Sie sichtbar.',
+    new: 'Neue Vorlage',
+    loading: 'Vorlagen werden geladen…',
+    empty: 'Noch keine Bot-Vorlage gespeichert.',
+    limitReached: 'Mehr als {{max}} Bot-Vorlagen sind nicht möglich.',
+    apply: 'Ins Formular',
+    applyHint:
+      'Übernimmt die Vorlage in das Formular „Bot starten" – zum Anpassen einzelner Angaben vor dem Start.',
+    saveAs: 'Als Vorlage speichern',
+    saveAsHint: 'Speichert die Angaben aus diesem Formular als neue Bot-Vorlage.',
+    newTitle: 'Neue Bot-Vorlage',
+    editTitle: 'Bot-Vorlage bearbeiten',
+    nameLabel: 'Name der Vorlage *',
+    namePlaceholder: 'z.B. Technikrunde montags',
+    confirmDeleteTitle: 'Bot-Vorlage löschen',
+    confirmDeleteMessage:
+      'Die Vorlage „{{name}}" wird gelöscht. Laufende Bots und bereits erstellte Aufnahmen bleiben davon unberührt. Fortfahren?',
   },
 
   dialogs: {
@@ -948,6 +976,7 @@ export const de = {
     authConfigLoad: 'Auth-Konfiguration konnte nicht geladen werden.',
     authConfigSave: 'Auth-Konfiguration konnte nicht gespeichert werden.',
     templatesLoad: 'Vorlagen konnten nicht geladen werden.',
+    botTemplatesLoad: 'Bot-Vorlagen konnten nicht geladen werden.',
     apiKeysLoad: 'API-Schlüssel konnten nicht geladen werden.',
     languageSave: 'Sprache konnte nicht gespeichert werden.',
   },

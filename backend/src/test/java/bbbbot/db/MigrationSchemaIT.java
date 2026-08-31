@@ -1,6 +1,7 @@
 package bbbbot.db;
 
 import bbbbot.domain.AppUser;
+import bbbbot.domain.BotTemplate;
 import bbbbot.domain.GlossaryEntry;
 import bbbbot.domain.Recording;
 import bbbbot.domain.RecordingDocument;
@@ -8,6 +9,7 @@ import bbbbot.domain.RecordingSegment;
 import bbbbot.domain.RecordingTag;
 import bbbbot.domain.ShareLink;
 import bbbbot.domain.Summary;
+import bbbbot.repository.Repositories.BotTemplateRepo;
 import bbbbot.repository.Repositories.GlossaryEntryRepo;
 import bbbbot.repository.Repositories.RecordingDocumentRepo;
 import bbbbot.repository.Repositories.RecordingRepo;
@@ -85,6 +87,9 @@ class MigrationSchemaIT {
 
     @Autowired
     private RecordingDocumentRepo documentRepo;
+
+    @Autowired
+    private BotTemplateRepo botTemplateRepo;
 
     @Autowired
     private EntityManager em;
@@ -202,6 +207,43 @@ class MigrationSchemaIT {
         summary.setTemperature(0.9);
         summary.setCurrent(current);
         return summaryRepo.saveAndFlush(summary);
+    }
+
+    /**
+     * Bot-Vorlagen (V26): Die Vorlagen zweier Nutzer duerfen denselben Namen
+     * tragen, ein Nutzer denselben Namen aber nur einmal - genau das sichert
+     * uq_bot_template_owner_name (case-insensitive) zu.
+     */
+    @Test
+    void botVorlagenSindProNutzerEindeutig() {
+        UUID owner = ownerId();
+        BotTemplate vorlage = BotTemplate.create(owner, "Technikrunde",
+                "https://bbb.example.org/b/abc-def-ghi", "Protokoll-Bot");
+        vorlage.setRecordVideo(true);
+        vorlage.setDiarize(true);
+        vorlage.setSttLanguage("de");
+        botTemplateRepo.saveAndFlush(vorlage);
+
+        assertThat(botTemplateRepo.findByOwnerIdOrderByNameAsc(owner))
+                .singleElement()
+                .satisfies(t -> assertThat(t.getMeetingUrl()).isEqualTo("https://bbb.example.org/b/abc-def-ghi"))
+                .satisfies(t -> assertThat(t.getBotName()).isEqualTo("Protokoll-Bot"))
+                .satisfies(t -> assertThat(t.isAutoRecord()).isTrue())
+                .satisfies(t -> assertThat(t.isRecordVideo()).isTrue())
+                .satisfies(t -> assertThat(t.isDiarize()).isTrue())
+                .satisfies(t -> assertThat(t.getSttLanguage()).isEqualTo("de"));
+        assertThat(botTemplateRepo.existsByOwnerIdAndNameIgnoreCase(owner, "technikrunde")).isTrue();
+        assertThat(botTemplateRepo.countByOwnerId(owner)).isEqualTo(1);
+
+        // Anderer Nutzer, gleicher Name: erlaubt.
+        botTemplateRepo.saveAndFlush(BotTemplate.create(ownerId(), "Technikrunde",
+                "https://bbb.example.org/b/abc-def-ghi", "RecorderBot"));
+
+        // Derselbe Nutzer, gleicher Name in anderer Schreibweise: abgewiesen.
+        BotTemplate doppelt = BotTemplate.create(owner, "technikRUNDE",
+                "https://bbb.example.org/b/xyz", "RecorderBot");
+        assertThatThrownBy(() -> botTemplateRepo.saveAndFlush(doppelt))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     /**

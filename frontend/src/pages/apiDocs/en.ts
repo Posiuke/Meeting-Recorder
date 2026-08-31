@@ -516,6 +516,28 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
           path: '/api/bots/history',
           summary: 'Finished bot sessions with time range and errors.',
         },
+        {
+          method: 'GET',
+          path: '/api/bot-templates',
+          summary:
+            'List your own bot templates: named meeting rooms including their settings. Yours only – templates are per user.',
+          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/bot-templates"`,
+        },
+        {
+          method: 'POST',
+          path: '/api/bot-templates',
+          summary:
+            'Create a bot template. Same fields as POST /api/bots plus name. To start one, read the template and send its values to POST /api/bots.',
+          example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
+  -d '{"name":"Monday tech meeting",
+       "meetingUrl":"https://bbb.example.intern/b/abc-def-ghi",
+       "botName":"Minutes bot","autoRecord":true,
+       "recordVideo":false,"aiAnalysis":true,"diarize":false,
+       "sttLanguage":"en"}' \\
+  "$BBB/api/bot-templates"`,
+        },
+        { method: 'PUT', path: '/api/bot-templates/{id}', summary: 'Change a bot template.' },
+        { method: 'DELETE', path: '/api/bot-templates/{id}', summary: 'Delete a bot template.' },
       ],
     },
 

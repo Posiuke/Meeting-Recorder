@@ -4,6 +4,7 @@ import bbbbot.domain.ApiKey;
 import bbbbot.domain.AppSetting;
 import bbbbot.domain.AppUser;
 import bbbbot.domain.BotSession;
+import bbbbot.domain.BotTemplate;
 import bbbbot.domain.GlossaryEntry;
 import bbbbot.domain.GroupMember;
 import bbbbot.domain.Participant;
@@ -180,6 +181,13 @@ public interface Repositories {
         List<ProcessingJob> findByStatusOrderByCreatedAt(ProcessingJob.Status status);
         List<ProcessingJob> findByRecordingIdOrderByCreatedAtDesc(UUID recordingId);
         boolean existsByRecordingIdAndStatusIn(UUID recordingId, List<ProcessingJob.Status> statuses);
+    }
+
+    /** Persoenliche Bot-Vorlagen: nur der Besitzer sieht seine eigenen. */
+    interface BotTemplateRepo extends JpaRepository<BotTemplate, UUID> {
+        List<BotTemplate> findByOwnerIdOrderByNameAsc(UUID ownerId);
+        long countByOwnerId(UUID ownerId);
+        boolean existsByOwnerIdAndNameIgnoreCase(UUID ownerId, String name);
     }
 
     interface PromptTemplateRepo extends JpaRepository<PromptTemplate, UUID> {

@@ -1,6 +1,7 @@
 import { configureStore } from '@reduxjs/toolkit';
 import auth from './authSlice';
 import bots from './botsSlice';
+import botTemplates from './botTemplatesSlice';
 import recordings from './recordingsSlice';
 import groups from './groupsSlice';
 import admin from './adminSlice';
@@ -12,6 +13,7 @@ export const store = configureStore({
   reducer: {
     auth,
     bots,
+    botTemplates,
     recordings,
     groups,
     admin,

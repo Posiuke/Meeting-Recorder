@@ -636,6 +636,58 @@ tbody tr:hover {
   margin-top: auto;
 }
 
+/* ===== Bot-Vorlagen ===== */
+/* Kopfzeile eines Abschnitts mit Aktion rechts (wie .page-head, nur fuer h2). */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.section-head h2 {
+  margin: 0;
+}
+
+.bot-template-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.bot-template-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.bot-template-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 240px;
+  flex: 1;
+}
+
+.bot-template-summary {
+  font-size: 0.85rem;
+}
+
+.bot-template-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
 /* ===== Aufklappbereiche ===== */
 .collapse-toggle {
   background: none;

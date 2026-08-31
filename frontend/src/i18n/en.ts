@@ -130,6 +130,10 @@ export const en: typeof de = {
     modeAudio: 'Audio',
     modeWithAi: ' · AI analysis',
     modeWithoutAi: ' · without analysis',
+    aiShort: 'AI analysis',
+    noAiShort: 'without analysis',
+    diarizeShort: 'Speaker recognition',
+    manualRecordShort: 'Record manually',
     startRecording: 'Start recording',
     stopRecording: 'Stop recording',
     discard: 'Discard',
@@ -140,6 +144,28 @@ export const en: typeof de = {
     confirmStopTitle: 'Stop bot',
     confirmStopMessage:
       'The bot will leave the room. A running recording will be finalised. Continue?',
+  },
+
+  botTemplates: {
+    section: 'Bot templates',
+    intro:
+      'A room you record regularly does not need to be typed in every time: save the meeting URL and settings once as a template, then "Start bot" is all it takes. Your templates are visible to you only.',
+    new: 'New template',
+    loading: 'Loading templates…',
+    empty: 'No bot template saved yet.',
+    limitReached: 'More than {{max}} bot templates are not possible.',
+    apply: 'Into the form',
+    applyHint:
+      'Copies the template into the "Start a bot" form – for adjusting individual settings before starting.',
+    saveAs: 'Save as template',
+    saveAsHint: 'Saves the details from this form as a new bot template.',
+    newTitle: 'New bot template',
+    editTitle: 'Edit bot template',
+    nameLabel: 'Template name *',
+    namePlaceholder: 'e.g. Monday tech meeting',
+    confirmDeleteTitle: 'Delete bot template',
+    confirmDeleteMessage:
+      'The template "{{name}}" will be deleted. Running bots and recordings already created are not affected. Continue?',
   },
 
   dialogs: {
@@ -935,6 +961,7 @@ export const en: typeof de = {
     authConfigLoad: 'Authentication configuration could not be loaded.',
     authConfigSave: 'Authentication configuration could not be saved.',
     templatesLoad: 'Templates could not be loaded.',
+    botTemplatesLoad: 'Bot templates could not be loaded.',
     apiKeysLoad: 'API keys could not be loaded.',
     languageSave: 'Language could not be saved.',
   },
