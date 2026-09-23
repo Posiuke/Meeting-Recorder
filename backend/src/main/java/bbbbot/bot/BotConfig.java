@@ -41,6 +41,21 @@ public record BotConfig(
         );
     }
 
+    /**
+     * Ist keine feste Adresse eingetragen ({@code bot.publicUrl}), gilt die, unter
+     * der der Nutzer die Anwendung beim Start aufgerufen hat - so wie die
+     * Oberflaeche Freigabe-Links aus {@code window.location.origin} baut.
+     */
+    public BotConfig withFallbackPublicUrl(String appOrigin) {
+        if ((publicUrl != null && !publicUrl.isBlank()) || appOrigin == null || appOrigin.isBlank()) {
+            return this;
+        }
+        return new BotConfig(chatStartCommand, chatStopCommand, sendChatWarning, warnMessage,
+                recordMinOthers, checkIntervalMs, autoReconnect, reconnectMaxAttempts,
+                reconnectBackoffBaseMs, reconnectBackoffFactor, segmentMinutes, minAudioBytes,
+                anonymousStopEnabled, appOrigin);
+    }
+
     /** Platzhalter fuer den anonymen Stopp-Link in der Warnmeldung. */
     static final String STOP_URL_PLACEHOLDER = "${STOP_URL}";
 

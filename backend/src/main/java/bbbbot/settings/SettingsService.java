@@ -96,7 +96,10 @@ public class SettingsService {
      * Bot aus dem Raum schicken kann - ohne sich im Chat zu erkennen zu geben.
      */
     public static final String BOT_ANONYMOUS_STOP_ENABLED = "bot.anonymousStopEnabled";
-    /** Adresse, unter der Meeting-Teilnehmer diese Anwendung erreichen (fuer den Stopp-Link). */
+    /**
+     * Optionale feste Adresse fuer den Stopp-Link. Leer = automatisch die
+     * Adresse, unter der der Bot gestartet bzw. seine Vorlage gespeichert wurde.
+     */
     public static final String BOT_PUBLIC_URL = "bot.publicUrl";
 
     /**

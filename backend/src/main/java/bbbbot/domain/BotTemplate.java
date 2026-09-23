@@ -105,6 +105,14 @@ public class BotTemplate {
 
     private Double summaryTemperature;
 
+    /**
+     * Adresse, unter der der Nutzer die Anwendung beim Speichern aufgerufen hat
+     * (Browser-Origin). Daraus baut ein vom Zeitplan gestarteter Bot seinen
+     * Stopp-Link - dort gibt es keine Browser-Anfrage.
+     */
+    @Column(length = 255)
+    private String appOrigin;
+
     @Column(nullable = false)
     private Instant createdAt;
 
@@ -180,6 +188,9 @@ public class BotTemplate {
         this.summaryModel = choice.model();
         this.summaryTemperature = choice.temperature();
     }
+
+    public String getAppOrigin() { return appOrigin; }
+    public void setAppOrigin(String appOrigin) { this.appOrigin = appOrigin; }
 
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

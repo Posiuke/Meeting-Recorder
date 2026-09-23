@@ -63,4 +63,17 @@ class StopLinkTest {
         assertThat(config("Zeile 1\nZeile 2", false, "").buildWarnMessage("RECabc"))
                 .isEqualTo("Zeile 1\nZeile 2 [RECabc]");
     }
+
+    /** Ohne feste Adresse gilt die, unter der der Nutzer die Anwendung aufgerufen hat. */
+    @Test
+    void adresseDesAufrufsAlsRueckfall() {
+        assertThat(config("x", true, "").withFallbackPublicUrl("http://192.168.178.43:8090").stopUrlBase())
+                .isEqualTo("http://192.168.178.43:8090");
+        // Eine eingetragene Adresse des Admins hat Vorrang.
+        assertThat(config("x", true, "https://recorder.intern").withFallbackPublicUrl("http://x:1").stopUrlBase())
+                .isEqualTo("https://recorder.intern");
+        // Ausgeschaltet bleibt ausgeschaltet.
+        assertThat(config("x", false, "").withFallbackPublicUrl("http://x:1").stopUrlBase()).isNull();
+        assertThat(config("x", true, "").withFallbackPublicUrl(null).stopUrlBase()).isNull();
+    }
 }

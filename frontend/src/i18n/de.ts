@@ -1086,9 +1086,9 @@ export const de = {
       botWarnMessage:
         'Hinweis, den der Bot beim Aufnahmestart in den Chat schreibt. Platzhalter: ${STOP} (Befehl zum Verwerfen), ${START} (Befehl zum Starten), ${STOP_URL} (anonymer Stopp-Link, falls eingeschaltet). Fehlt ${STOP_URL}, hängt der Bot den Link als eigenen Satz an.',
       botAnonymousStopEnabled:
-        'Anonymer Stopp-Link: Der Bot hängt an seinen Aufnahme-Hinweis einen einmaligen Link. Darüber kann ein Teilnehmer die Aufnahme verwerfen und den Bot aus dem Raum schicken, ohne sich im Chat zu erkennen zu geben. Braucht bot.publicUrl und bot.sendChatWarning = true.',
+        'Anonymer Stopp-Link: Der Bot hängt an seinen Aufnahme-Hinweis einen einmaligen Link. Darüber kann ein Teilnehmer die Aufnahme verwerfen und den Bot aus dem Raum schicken, ohne sich im Chat zu erkennen zu geben. Die Adresse des Links ergibt sich automatisch – wie bei Freigabe-Links – aus der Adresse, unter der der Bot gestartet bzw. die Vorlage gespeichert wurde. Braucht bot.sendChatWarning = true.',
       botPublicUrl:
-        'Adresse, unter der Meeting-Teilnehmer diese Anwendung erreichen (z.B. https://recorder.intern). Daraus baut der Bot den Stopp-Link. Leer = kein Stopp-Link.',
+        'Optional: feste Adresse für den Stopp-Link (z.B. https://recorder.intern). Leer = automatisch die Adresse, unter der der Bot gestartet bzw. seine Vorlage gespeichert wurde. Nur nötig, wenn Teilnehmer die Anwendung unter einer anderen Adresse erreichen als die Nutzer.',
       whisperProvider:
         'Wo die Spracherkennung läuft: „local" schickt die Audio-Segmente an den eigenen Whisper-Server im Intranet, „openai" an eine Cloud-API im OpenAI-Format (z. B. OpenAI, Groq).',
       whisperUrl: 'Adresse des Whisper-ASR-Webservice im Intranet (nur bei provider = local).',

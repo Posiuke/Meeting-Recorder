@@ -1060,9 +1060,9 @@ export const en: typeof de = {
       botWarnMessage:
         'Notice the bot posts to the chat when a recording starts. Placeholders: ${STOP} (command to discard), ${START} (command to start), ${STOP_URL} (anonymous stop link, if enabled). Without ${STOP_URL} the bot appends the link as a separate sentence.',
       botAnonymousStopEnabled:
-        'Anonymous stop link: the bot adds a one-time link to its recording notice. Through it, a participant can discard the recording and send the bot out of the room without revealing themselves in the chat. Requires bot.publicUrl and bot.sendChatWarning = true.',
+        'Anonymous stop link: the bot adds a one-time link to its recording notice. Through it, a participant can discard the recording and send the bot out of the room without revealing themselves in the chat. The link address is derived automatically – like share links – from the address at which the bot was started or its template was saved. Requires bot.sendChatWarning = true.',
       botPublicUrl:
-        'Address at which meeting participants reach this application (e.g. https://recorder.intern). The bot builds the stop link from it. Empty = no stop link.',
+        'Optional: fixed address for the stop link (e.g. https://recorder.intern). Empty = automatically the address at which the bot was started or its template was saved. Only needed if participants reach the application under a different address than its users.',
       whisperProvider:
         'Where speech recognition runs: "local" sends the audio segments to your own Whisper server on the intranet, "openai" to a cloud API in OpenAI format (e.g. OpenAI, Groq).',
       whisperUrl: 'Address of the Whisper ASR web service on the intranet (only for provider = local).',

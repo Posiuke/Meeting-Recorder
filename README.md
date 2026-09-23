@@ -401,7 +401,12 @@ Wer eine Aufnahme nicht möchte, muss dafür bisher `STOPRECORDING` in den Chat
 schreiben – vor allen anderen. Mit dem Stopp-Link geht das unauffällig:
 
 1. Beim Aufnahmestart hängt der Bot an seinen Hinweis einen Link
-   `<bot.publicUrl>/stop/<token>`. Die Stelle bestimmt der Platzhalter
+   `<Adresse der Anwendung>/stop/<token>`. Die Adresse ergibt sich wie bei
+   Freigabe-Links automatisch: aus dem `Origin` der Browser-Anfrage, die den Bot
+   gestartet hat, bzw. – bei Starts nach Zeitplan – aus der Adresse, unter der die
+   Vorlage zuletzt gespeichert wurde (`bot_template.app_origin`, V29). Nur wenn
+   Teilnehmer die Anwendung unter einer anderen Adresse erreichen als die Nutzer,
+   trägt der Admin eine feste Adresse in `bot.publicUrl` ein. Die Stelle bestimmt der Platzhalter
    `${STOP_URL}` in `bot.warnMessage`; fehlt er, wird der Link als eigener Satz
    angehängt.
 2. Die Seite hinter dem Link braucht keine Anmeldung und zeigt nur den Raumnamen
@@ -425,8 +430,9 @@ Eigenschaften:
   dieselbe 404.
 - **Admin-Schalter wirkt sofort**: Wird `bot.anonymousStopEnabled` abgeschaltet,
   sind auch bereits verschickte Links wirkungslos.
-- **Voraussetzungen**: `bot.publicUrl` (Adresse, unter der Teilnehmer die
-  Anwendung erreichen) und `bot.sendChatWarning = true`. Teilnehmer, die die
+- **Voraussetzungen**: nur `bot.sendChatWarning = true`. Vorlagen mit Zeitplan,
+  die vor dieser Version gespeichert wurden, kennen ihre Adresse noch nicht –
+  einmal öffnen und speichern, dann bekommen auch ihre Bots den Link. Teilnehmer, die die
   Anwendung nicht erreichen (z.B. externe Gäste), sehen einen toten Link.
 - Bei einem Zeitplan zählt der Stopp wie ein Beenden von Hand: Der Bot kommt im
   laufenden Termin nicht zurück, im nächsten schon.

@@ -88,6 +88,7 @@ public class BotTemplateController {
                 BotController.requireMeetingUrl(request.meetingUrl(), settings),
                 BotController.requireBotName(request.botName()));
         applySettings(template, request);
+        rememberOrigin(template);
         saveHandlingDuplicate(template);
         return Dtos.BotTemplateView.of(template, Instant.now());
     }
@@ -107,6 +108,7 @@ public class BotTemplateController {
         template.setMeetingUrl(BotController.requireMeetingUrl(request.meetingUrl(), settings));
         template.setBotName(BotController.requireBotName(request.botName()));
         applySettings(template, request);
+        rememberOrigin(template);
         template.setUpdatedAt(Instant.now());
         saveHandlingDuplicate(template);
         return Dtos.BotTemplateView.of(template, Instant.now());
@@ -136,6 +138,16 @@ public class BotTemplateController {
         template.setSttLanguage(RecordingController.requireSttLanguage(request.sttLanguage()));
         applySchedule(template, request.schedule());
         applySummary(template, request);
+    }
+
+    /**
+     * Merkt sich, unter welcher Adresse der Nutzer die Anwendung aufgerufen hat -
+     * fuer den Stopp-Link eines spaeter vom Zeitplan gestarteten Bots. Ohne
+     * erkennbare Adresse (z.B. Aufruf ohne Browser) bleibt die bisherige stehen.
+     */
+    private void rememberOrigin(BotTemplate template) {
+        String origin = RequestOrigin.current();
+        if (origin != null) template.setAppOrigin(origin);
     }
 
     /**

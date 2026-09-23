@@ -48,13 +48,22 @@ public class BotTemplateLauncher {
      *                               Raum schon einer laeuft
      */
     public BotSession start(BotTemplate template, Instant scheduledStopAt) {
+        return start(template, scheduledStopAt, null);
+    }
+
+    /**
+     * @param appOrigin Adresse der ausloesenden Browser-Anfrage; null = die beim
+     *                  Speichern der Vorlage gemerkte (Start nach Zeitplan)
+     */
+    public BotSession start(BotTemplate template, Instant scheduledStopAt, String appOrigin) {
         String url = BotController.requireMeetingUrl(template.getMeetingUrl(), settings);
         boolean diarize = template.isAiAnalysis() && template.isDiarize()
                 && settings.getBool(SettingsService.WHISPER_DIARIZE);
         return botManager.startBot(url, template.getBotName(), template.isAutoRecord(),
                 template.isRecordVideo(), template.isAiAnalysis(), diarize,
                 template.getSttLanguage(), resolveSummary(template), template.getId(),
-                scheduledStopAt, template.getOwnerId());
+                scheduledStopAt, appOrigin != null ? appOrigin : template.getAppOrigin(),
+                template.getOwnerId());
     }
 
     /**
@@ -62,8 +71,9 @@ public class BotTemplateLauncher {
      * dieser Termin: Der Bot endet dann zur geplanten Endzeit, und der
      * Scheduler startet keinen zweiten.
      */
-    public BotSession startNow(BotTemplate template, Instant now) {
-        return start(template, activeWindow(template, now).map(ScheduleWindow::end).orElse(null));
+    public BotSession startNow(BotTemplate template, Instant now, String appOrigin) {
+        return start(template, activeWindow(template, now).map(ScheduleWindow::end).orElse(null),
+                appOrigin);
     }
 
     /** Der gerade laufende Termin der Vorlage, falls ihr Zeitplan aktiv ist. */

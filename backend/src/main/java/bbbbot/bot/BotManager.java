@@ -48,12 +48,15 @@ public class BotManager {
      * @param summary     Auswertungs-Vorlage fuer die Aufnahmen dieser Session
      * @param botTemplateId Bot-Vorlage, aus der gestartet wird (null = keine)
      * @param scheduledStopAt Ende laut Zeitplan; null = kein automatisches Ende
+     * @param appOrigin   Adresse, unter der Teilnehmer die Anwendung erreichen
+     *                    (fuer den anonymen Stopp-Link); greift nur, wenn der
+     *                    Admin keine feste Adresse (bot.publicUrl) eingetragen hat
      */
     public synchronized BotSession startBot(String meetingUrl, String botName, boolean autoRecord,
                                             boolean recordVideo, boolean aiAnalysis, boolean diarize,
                                             String sttLanguage, SummaryChoice summary,
                                             UUID botTemplateId, Instant scheduledStopAt,
-                                            UUID userId) {
+                                            String appOrigin, UUID userId) {
         if (instances.size() >= props.getBots().getMaxConcurrent()) {
             throw new IllegalStateException("Maximale Anzahl gleichzeitiger Bots erreicht ("
                     + props.getBots().getMaxConcurrent() + ")");
@@ -69,7 +72,7 @@ public class BotManager {
         session.setScheduledStopAt(scheduledStopAt);
         sessionRepo.save(session);
 
-        BotConfig config = BotConfig.fromSettings(settings);
+        BotConfig config = BotConfig.fromSettings(settings).withFallbackPublicUrl(appOrigin);
         BotInstance instance = new BotInstance(session, config, props.getBots(),
                 recordingService, sessionRepo, () -> instances.remove(session.getId()));
         instances.put(session.getId(), instance);

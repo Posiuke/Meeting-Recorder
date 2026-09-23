@@ -103,7 +103,7 @@ public class BotController {
                 PromptTemplateController.checkTemperature(request.summaryTemperature()));
         try {
             BotSession session = botManager.startBot(url, botName, autoRecord, recordVideo, aiAnalysis,
-                    diarize, sttLanguage, summary, null, null, user.getId());
+                    diarize, sttLanguage, summary, null, null, RequestOrigin.current(), user.getId());
             return viewOf(session, user);
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
@@ -123,7 +123,7 @@ public class BotController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Bot-Vorlage nicht gefunden"));
         try {
-            return viewOf(launcher.startNow(template, Instant.now()), user);
+            return viewOf(launcher.startNow(template, Instant.now(), RequestOrigin.current()), user);
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
         }
