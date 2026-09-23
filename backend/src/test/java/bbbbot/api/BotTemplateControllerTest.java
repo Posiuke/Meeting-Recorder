@@ -2,7 +2,9 @@ package bbbbot.api;
 
 import bbbbot.domain.AppUser;
 import bbbbot.domain.BotTemplate;
+import bbbbot.domain.PromptTemplate;
 import bbbbot.repository.Repositories.BotTemplateRepo;
+import bbbbot.repository.Repositories.PromptTemplateRepo;
 import bbbbot.settings.SettingsService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +13,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.DayOfWeek;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,6 +38,7 @@ class BotTemplateControllerTest {
 
     private BotTemplateRepo templateRepo;
     private SettingsService settings;
+    private PromptTemplateRepo promptTemplateRepo;
     private BotTemplateController controller;
 
     private AppUser user;
@@ -44,7 +49,8 @@ class BotTemplateControllerTest {
         settings = mock(SettingsService.class);
         // Keine Allowlist konfiguriert = jeder Host erlaubt (Standard).
         when(settings.get(SettingsService.BOT_ALLOWED_URL_HOSTS)).thenReturn("");
-        controller = new BotTemplateController(templateRepo, settings);
+        promptTemplateRepo = mock(PromptTemplateRepo.class);
+        controller = new BotTemplateController(templateRepo, settings, promptTemplateRepo);
 
         user = AppUser.create("m.mustermann", "Mustermann", "m@example.org");
         SecurityContextHolder.getContext().setAuthentication(
@@ -204,5 +210,117 @@ class BotTemplateControllerTest {
                 null, null, null, null, null)))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Bot-Name ist zu lang");
+    }
+
+    // ------------------------------------------------------------- Zeitplan
+
+    private Dtos.BotTemplateRequest withSchedule(Dtos.BotScheduleRequest schedule) {
+        return new Dtos.BotTemplateRequest("Jour fixe", "https://bbb.example.org/b/jf", null,
+                null, null, null, null, null, schedule, null, null, null, null, null);
+    }
+
+    @Test
+    void speichertZeitplanMitTagenZeitenUndZeitzone() {
+        freierName();
+
+        var view = controller.create(withSchedule(new Dtos.BotScheduleRequest(true,
+                List.of(DayOfWeek.FRIDAY, DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY),
+                LocalTime.of(9, 0, 30), LocalTime.of(10, 0), "Europe/Berlin")));
+
+        assertThat(view.schedule().enabled()).isTrue();
+        // Wochentage sortiert, Sekunden abgeschnitten
+        assertThat(view.schedule().days())
+                .containsExactly(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY);
+        assertThat(view.schedule().start()).isEqualTo(LocalTime.of(9, 0));
+        assertThat(view.schedule().timeZone()).isEqualTo("Europe/Berlin");
+        assertThat(view.schedule().nextStart()).isNotNull();
+        assertThat(view.schedule().nextEnd()).isAfter(view.schedule().nextStart());
+    }
+
+    @Test
+    void aktiverZeitplanBrauchtTageUndUnterschiedlicheZeiten() {
+        freierName();
+
+        assertThatThrownBy(() -> controller.create(withSchedule(new Dtos.BotScheduleRequest(true,
+                List.of(), LocalTime.of(9, 0), LocalTime.of(10, 0), "Europe/Berlin"))))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Wochentag");
+        assertThatThrownBy(() -> controller.create(withSchedule(new Dtos.BotScheduleRequest(true,
+                List.of(DayOfWeek.MONDAY), LocalTime.of(9, 0), null, "Europe/Berlin"))))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Endzeit");
+        assertThatThrownBy(() -> controller.create(withSchedule(new Dtos.BotScheduleRequest(true,
+                List.of(DayOfWeek.MONDAY), LocalTime.of(9, 0), LocalTime.of(9, 0), "Europe/Berlin"))))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("nicht gleich");
+        assertThatThrownBy(() -> controller.create(withSchedule(new Dtos.BotScheduleRequest(true,
+                List.of(DayOfWeek.MONDAY), LocalTime.of(9, 0), LocalTime.of(10, 0), "Mars/Olympus"))))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Zeitzone");
+        verify(templateRepo, never()).save(any());
+    }
+
+    /** Ein ausgeschalteter Zeitplan behaelt seine Angaben und hat keinen naechsten Termin. */
+    @Test
+    void ausgeschalteterZeitplanBehaeltSeineAngaben() {
+        freierName();
+
+        var view = controller.create(withSchedule(new Dtos.BotScheduleRequest(false,
+                List.of(DayOfWeek.TUESDAY), LocalTime.of(14, 0), LocalTime.of(15, 30), "Europe/Berlin")));
+
+        assertThat(view.schedule().enabled()).isFalse();
+        assertThat(view.schedule().days()).containsExactly(DayOfWeek.TUESDAY);
+        assertThat(view.schedule().nextStart()).isNull();
+    }
+
+    // ------------------------------------------------ Auswertungs-Vorlage
+
+    private Dtos.BotTemplateRequest withSummary(String preset, String prompt, String name) {
+        return new Dtos.BotTemplateRequest("Jour fixe", "https://bbb.example.org/b/jf", null,
+                null, null, null, null, null, null, preset, prompt, name, "qwen", 0.3);
+    }
+
+    @Test
+    void speichertAuswertungsVorlage() {
+        freierName();
+
+        var view = controller.create(withSummary("talk", " Fasse den Vortrag zusammen. ", "Vortrag"));
+
+        assertThat(view.summaryPreset()).isEqualTo("talk");
+        assertThat(view.summaryPrompt()).isEqualTo("Fasse den Vortrag zusammen.");
+        assertThat(view.summaryTemplateName()).isEqualTo("Vortrag");
+        assertThat(view.summaryModel()).isEqualTo("qwen");
+        assertThat(view.summaryTemperature()).isEqualTo(0.3);
+    }
+
+    /** "Meeting (Standard)" folgt dem Admin - es wird nichts festgeschrieben. */
+    @Test
+    void standardAuswahlSchreibtNichtsFest() {
+        freierName();
+
+        var view = controller.create(withSummary("", "egal", "egal"));
+
+        assertThat(view.summaryPreset()).isNull();
+        assertThat(view.summaryPrompt()).isNull();
+        assertThat(view.summaryModel()).isNull();
+    }
+
+    @Test
+    void eigenePromptvorlageMussDemNutzerGehoeren() {
+        freierName();
+        PromptTemplate own = PromptTemplate.create(user.getId(), "Meine", "Prompt");
+        PromptTemplate foreign = PromptTemplate.create(UUID.randomUUID(), "Fremd", "Prompt");
+        when(promptTemplateRepo.findById(own.getId())).thenReturn(Optional.of(own));
+        when(promptTemplateRepo.findById(foreign.getId())).thenReturn(Optional.of(foreign));
+
+        var view = controller.create(withSummary("tpl:" + own.getId(), "Prompt", "Meine"));
+        assertThat(view.summaryPreset()).isEqualTo("tpl:" + own.getId());
+
+        assertThatThrownBy(() -> controller.create(withSummary("tpl:" + foreign.getId(), "Prompt", "Fremd")))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("nicht gefunden");
+        assertThatThrownBy(() -> controller.create(withSummary("tpl:kaputt", "Prompt", "X")))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("ungueltig");
     }
 }

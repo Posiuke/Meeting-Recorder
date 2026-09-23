@@ -107,6 +107,9 @@ const KEY_HELP: Record<string, TranslationKey> = {
   'capture.maxMegabytes': 'admin.keyHelp.captureMaxMegabytes',
   'capture.staleMinutes': 'admin.keyHelp.captureStaleMinutes',
   'sharing.publicLinks': 'admin.keyHelp.sharingPublicLinks',
+  'bot.warnMessage': 'admin.keyHelp.botWarnMessage',
+  'bot.anonymousStopEnabled': 'admin.keyHelp.botAnonymousStopEnabled',
+  'bot.publicUrl': 'admin.keyHelp.botPublicUrl',
 };
 
 type AdminTab = 'settings' | 'auth' | 'users' | 'processing';

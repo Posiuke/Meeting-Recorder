@@ -81,10 +81,24 @@ public final class Dtos {
     /**
      * @param sttLanguage Sprache der Spracherkennung fuer die Aufnahmen dieses
      *                    Bots; leer = Admin-Standard, "auto" = automatisch erkennen
+     * @param summaryPrompt Auswertungs-Prompt fuer die Aufnahmen dieses Bots
+     *                    (leer = Admin-Standard); samt Name, Modell und
+     *                    Temperatur wie beim Upload
      */
     public record StartBotRequest(String meetingUrl, String botName, Boolean autoRecord,
                                   Boolean recordVideo, Boolean aiAnalysis, Boolean diarize,
-                                  String sttLanguage) {}
+                                  String sttLanguage, String summaryPrompt,
+                                  String summaryTemplateName, String summaryModel,
+                                  Double summaryTemperature) {
+
+        /** Aeltere Aufrufer ohne Auswertungs-Vorlage. */
+        public StartBotRequest(String meetingUrl, String botName, Boolean autoRecord,
+                               Boolean recordVideo, Boolean aiAnalysis, Boolean diarize,
+                               String sttLanguage) {
+            this(meetingUrl, botName, autoRecord, recordVideo, aiAnalysis, diarize, sttLanguage,
+                    null, null, null, null);
+        }
+    }
 
     /**
      * Persoenliche Bot-Vorlage: ein benannter Meetingraum samt Einstellungen,
@@ -97,23 +111,78 @@ public final class Dtos {
     public record BotTemplateView(UUID id, String name, String meetingUrl, String botName,
                                   boolean autoRecord, boolean recordVideo, boolean aiAnalysis,
                                   boolean diarize, String sttLanguage,
+                                  BotScheduleView schedule, String summaryPreset,
+                                  String summaryPrompt, String summaryTemplateName,
+                                  String summaryModel, Double summaryTemperature,
                                   Instant createdAt, Instant updatedAt) {
-        public static BotTemplateView of(BotTemplate t) {
+        public static BotTemplateView of(BotTemplate t, Instant now) {
+            var summary = t.getSummaryChoice();
             return new BotTemplateView(t.getId(), t.getName(), t.getMeetingUrl(), t.getBotName(),
                     t.isAutoRecord(), t.isRecordVideo(), t.isAiAnalysis(), t.isDiarize(),
-                    t.getSttLanguage(), t.getCreatedAt(), t.getUpdatedAt());
+                    t.getSttLanguage(), BotScheduleView.of(t, now), t.getSummaryPreset(),
+                    summary.prompt(), summary.templateName(), summary.model(), summary.temperature(),
+                    t.getCreatedAt(), t.getUpdatedAt());
         }
     }
 
-    /** Wie {@link StartBotRequest}, nur mit Namen der Vorlage statt Sofort-Start. */
+    /**
+     * Zeitplan einer Bot-Vorlage.
+     *
+     * @param days      Wochentage, an denen der Bot beitritt
+     * @param start     Beitritt, Uhrzeit in {@code timeZone} ("HH:mm")
+     * @param end       Ende, Uhrzeit in {@code timeZone}; liegt sie vor dem
+     *                  Beginn, endet der Termin am Folgetag
+     * @param timeZone  IANA-Zeitzone, z.B. Europe/Berlin
+     * @param nextStart Beginn des naechsten (oder gerade laufenden) Termins;
+     *                  null, wenn der Zeitplan aus ist
+     * @param nextEnd   Ende dieses Termins
+     */
+    public record BotScheduleView(boolean enabled, List<java.time.DayOfWeek> days,
+                                  java.time.LocalTime start, java.time.LocalTime end,
+                                  String timeZone, Instant nextStart, Instant nextEnd) {
+        static BotScheduleView of(BotTemplate t, Instant now) {
+            var next = bbbbot.bot.BotTemplateLauncher.nextWindow(t, now);
+            return new BotScheduleView(t.isScheduleEnabled(), List.copyOf(t.getScheduleDays()),
+                    t.getScheduleStart(), t.getScheduleEnd(), t.getScheduleTimeZone(),
+                    next.map(bbbbot.bot.ScheduleWindow::start).orElse(null),
+                    next.map(bbbbot.bot.ScheduleWindow::end).orElse(null));
+        }
+    }
+
+    /** Zeitplan in einer Anfrage; fehlt er, ist der Zeitplan aus. */
+    public record BotScheduleRequest(Boolean enabled, List<java.time.DayOfWeek> days,
+                                     java.time.LocalTime start, java.time.LocalTime end,
+                                     String timeZone) {}
+
+    /**
+     * Wie {@link StartBotRequest}, nur mit Namen der Vorlage statt Sofort-Start -
+     * dazu der Zeitplan und die Auswahl der Auswertungs-Vorlage.
+     *
+     * @param summaryPreset Auswahl der Oberflaeche: leer = Admin-Standard,
+     *                      {@code tpl:<id>} = eigene Promptvorlage, sonst
+     *                      Schluessel einer integrierten Vorlage
+     */
     public record BotTemplateRequest(String name, String meetingUrl, String botName,
                                      Boolean autoRecord, Boolean recordVideo, Boolean aiAnalysis,
-                                     Boolean diarize, String sttLanguage) {}
+                                     Boolean diarize, String sttLanguage,
+                                     BotScheduleRequest schedule, String summaryPreset,
+                                     String summaryPrompt, String summaryTemplateName,
+                                     String summaryModel, Double summaryTemperature) {
+
+        /** Vorlage ohne Zeitplan und mit der Auswertungs-Vorgabe des Admins. */
+        public BotTemplateRequest(String name, String meetingUrl, String botName,
+                                  Boolean autoRecord, Boolean recordVideo, Boolean aiAnalysis,
+                                  Boolean diarize, String sttLanguage) {
+            this(name, meetingUrl, botName, autoRecord, recordVideo, aiAnalysis, diarize,
+                    sttLanguage, null, null, null, null, null, null);
+        }
+    }
 
     public record BotView(UUID sessionId, String status, String meetingUrl, String roomName,
                           String botName, boolean autoRecord, boolean recordVideo, boolean aiAnalysis,
                           UUID recordingId, int participants, int audioTracks,
-                          String lastError, Instant createdAt, boolean mine) {}
+                          String lastError, Instant createdAt, boolean mine,
+                          UUID botTemplateId, Instant scheduledStopAt) {}
 
     /**
      * @param hasAudio wirklich abspielbar: Der Pfad steht nicht nur in der

@@ -2,6 +2,7 @@ package bbbbot.bot;
 
 import bbbbot.config.AppProperties;
 import bbbbot.domain.BotSession;
+import bbbbot.domain.SummaryChoice;
 import bbbbot.recording.RecordingService;
 import bbbbot.repository.Repositories.BotSessionRepo;
 import bbbbot.settings.SettingsService;
@@ -10,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,22 +45,28 @@ public class BotManager {
     /**
      * @param sttLanguage Sprache der Spracherkennung fuer die Aufnahmen dieser
      *                    Session; null = Admin-Standard, "auto" = automatisch erkennen
+     * @param summary     Auswertungs-Vorlage fuer die Aufnahmen dieser Session
+     * @param botTemplateId Bot-Vorlage, aus der gestartet wird (null = keine)
+     * @param scheduledStopAt Ende laut Zeitplan; null = kein automatisches Ende
      */
     public synchronized BotSession startBot(String meetingUrl, String botName, boolean autoRecord,
                                             boolean recordVideo, boolean aiAnalysis, boolean diarize,
-                                            String sttLanguage, UUID userId) {
+                                            String sttLanguage, SummaryChoice summary,
+                                            UUID botTemplateId, Instant scheduledStopAt,
+                                            UUID userId) {
         if (instances.size() >= props.getBots().getMaxConcurrent()) {
             throw new IllegalStateException("Maximale Anzahl gleichzeitiger Bots erreicht ("
                     + props.getBots().getMaxConcurrent() + ")");
         }
-        boolean urlInUse = instances.values().stream()
-                .anyMatch(b -> b.getMeetingUrl().equalsIgnoreCase(meetingUrl.trim()));
-        if (urlInUse) {
+        if (isUrlInUse(meetingUrl)) {
             throw new IllegalStateException("Fuer diesen Raum laeuft bereits ein Bot");
         }
 
         BotSession session = BotSession.create(meetingUrl.trim(), botName, userId, autoRecord, recordVideo, aiAnalysis, diarize);
         session.setSttLanguage(sttLanguage);
+        session.setSummaryChoice(summary);
+        session.setBotTemplateId(botTemplateId);
+        session.setScheduledStopAt(scheduledStopAt);
         sessionRepo.save(session);
 
         BotConfig config = BotConfig.fromSettings(settings);
@@ -75,6 +83,37 @@ public class BotManager {
     }
 
     /** Nimmt gerade eine aktive Bot-Instanz diese Aufnahme auf? (Fuer Loesch-/Aufraeum-Schutz.) */
+    /** Bot, dessen laufende Aufnahme zu diesem Stopp-Link gehoert (ohne ihn einzuloesen). */
+    public Optional<BotInstance> findByStopToken(String token) {
+        String hash = StopTokens.hash(token);
+        if (hash == null) return Optional.empty();
+        return instances.values().stream().filter(b -> b.hasStopToken(hash)).findFirst();
+    }
+
+    /**
+     * Loest einen Stopp-Link ein: Die Aufnahme wird verworfen und der Bot
+     * verlaesst den Raum. Jeder Link wirkt genau einmal.
+     *
+     * @return der betroffene Bot, leer bei unbekanntem/verbrauchtem Link
+     */
+    public Optional<BotInstance> anonymousStop(String token) {
+        String hash = StopTokens.hash(token);
+        if (hash == null) return Optional.empty();
+        for (BotInstance bot : instances.values()) {
+            if (bot.claimStopToken(hash)) {
+                bot.requestAnonymousStop();
+                return Optional.of(bot);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** Laeuft fuer diese Meeting-URL gerade ein Bot (egal von wem)? */
+    public boolean isUrlInUse(String meetingUrl) {
+        return instances.values().stream()
+                .anyMatch(b -> b.getMeetingUrl().equalsIgnoreCase(meetingUrl.trim()));
+    }
+
     public boolean isRecordingActive(UUID recordingId) {
         return instances.values().stream()
                 .anyMatch(b -> recordingId.equals(b.getCurrentRecordingId()));

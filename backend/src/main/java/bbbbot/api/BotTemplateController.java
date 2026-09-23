@@ -3,7 +3,10 @@ package bbbbot.api;
 import bbbbot.auth.CurrentUser;
 import bbbbot.domain.AppUser;
 import bbbbot.domain.BotTemplate;
+import bbbbot.bot.BotTemplateLauncher;
+import bbbbot.domain.SummaryChoice;
 import bbbbot.repository.Repositories.BotTemplateRepo;
+import bbbbot.repository.Repositories.PromptTemplateRepo;
 import bbbbot.settings.SettingsService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -16,8 +19,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.DateTimeException;
+import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -33,6 +41,9 @@ import java.util.UUID;
  * Angaben, den Start verantwortet weiterhin der {@link BotController}. Deshalb
  * pruefen beide dieselben Regeln fuer URL und Bot-Namen - eine Vorlage, die
  * beim Starten scheitern wuerde, laesst sich gar nicht erst speichern.
+ *
+ * <p>Dazu kommen ein optionaler Zeitplan (den der {@link bbbbot.bot.BotScheduler}
+ * ausfuehrt) und die Auswertungs-Vorlage fuer die Aufnahmen des Bots.
  */
 @RestController
 @RequestMapping("/api/bot-templates")
@@ -40,20 +51,24 @@ public class BotTemplateController {
 
     private static final int MAX_TEMPLATES_PER_USER = 100;
     private static final int MAX_NAME_LENGTH = 100;
+    private static final int MAX_PRESET_LENGTH = 64;
 
     private final BotTemplateRepo templateRepo;
     private final SettingsService settings;
+    private final PromptTemplateRepo promptTemplateRepo;
 
-    public BotTemplateController(BotTemplateRepo templateRepo, SettingsService settings) {
+    public BotTemplateController(BotTemplateRepo templateRepo, SettingsService settings,
+                                 PromptTemplateRepo promptTemplateRepo) {
         this.templateRepo = templateRepo;
         this.settings = settings;
+        this.promptTemplateRepo = promptTemplateRepo;
     }
 
     @GetMapping
     public List<Dtos.BotTemplateView> list() {
         AppUser user = CurrentUser.get();
         return templateRepo.findByOwnerIdOrderByNameAsc(user.getId()).stream()
-                .map(Dtos.BotTemplateView::of)
+                .map(t -> Dtos.BotTemplateView.of(t, Instant.now()))
                 .toList();
     }
 
@@ -74,7 +89,7 @@ public class BotTemplateController {
                 BotController.requireBotName(request.botName()));
         applySettings(template, request);
         saveHandlingDuplicate(template);
-        return Dtos.BotTemplateView.of(template);
+        return Dtos.BotTemplateView.of(template, Instant.now());
     }
 
     @PutMapping("/{id}")
@@ -94,7 +109,7 @@ public class BotTemplateController {
         applySettings(template, request);
         template.setUpdatedAt(Instant.now());
         saveHandlingDuplicate(template);
-        return Dtos.BotTemplateView.of(template);
+        return Dtos.BotTemplateView.of(template, Instant.now());
     }
 
     @DeleteMapping("/{id}")
@@ -119,6 +134,103 @@ public class BotTemplateController {
         template.setAiAnalysis(request.aiAnalysis() == null || request.aiAnalysis());
         template.setDiarize(request.diarize() != null && request.diarize());
         template.setSttLanguage(RecordingController.requireSttLanguage(request.sttLanguage()));
+        applySchedule(template, request.schedule());
+        applySummary(template, request);
+    }
+
+    /**
+     * Zeitplan uebernehmen. Auch ein ausgeschalteter Zeitplan behaelt seine
+     * Tage und Zeiten - wer ihn fuer die Ferien abschaltet, soll ihn danach
+     * nicht neu eintragen muessen. Pflichtangaben gelten deshalb nur, wenn er an
+     * ist.
+     */
+    private void applySchedule(BotTemplate template, Dtos.BotScheduleRequest schedule) {
+        if (schedule == null) {
+            template.setScheduleEnabled(false);
+            return;
+        }
+        boolean enabled = schedule.enabled() != null && schedule.enabled();
+        Set<DayOfWeek> days = schedule.days() == null || schedule.days().isEmpty()
+                ? EnumSet.noneOf(DayOfWeek.class)
+                : EnumSet.copyOf(schedule.days().stream().filter(d -> d != null).toList());
+        if (enabled) {
+            if (days.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Zeitplan: mindestens einen Wochentag waehlen");
+            }
+            if (schedule.start() == null || schedule.end() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Zeitplan: Start- und Endzeit angeben");
+            }
+            if (schedule.start().equals(schedule.end())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Zeitplan: Start- und Endzeit duerfen nicht gleich sein");
+            }
+        }
+        template.setScheduleEnabled(enabled);
+        template.setScheduleDays(days);
+        template.setScheduleStart(schedule.start() == null ? null : schedule.start().withSecond(0).withNano(0));
+        template.setScheduleEnd(schedule.end() == null ? null : schedule.end().withSecond(0).withNano(0));
+        template.setScheduleTimeZone(requireTimeZone(schedule.timeZone()));
+    }
+
+    /** IANA-Zeitzone; leer bedeutet die Zeitzone des Servers. */
+    private static String requireTimeZone(String raw) {
+        if (raw == null || raw.isBlank()) return ZoneId.systemDefault().getId();
+        try {
+            return ZoneId.of(raw.trim()).getId();
+        } catch (DateTimeException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Zeitplan: unbekannte Zeitzone '" + raw.trim() + "'");
+        }
+    }
+
+    /**
+     * Auswertungs-Vorlage uebernehmen: die Auswahl der Oberflaeche und den
+     * aufgeloesten Prompt samt Name, Modell und Temperatur - mit denselben
+     * Pruefungen wie beim Upload. Eine gewaehlte eigene Promptvorlage muss dem
+     * Nutzer gehoeren.
+     */
+    private void applySummary(BotTemplate template, Dtos.BotTemplateRequest request) {
+        String preset = request.summaryPreset() == null || request.summaryPreset().isBlank()
+                ? null : request.summaryPreset().trim();
+        if (preset == null) {
+            template.setSummaryPreset(null);
+            template.setSummaryChoice(SummaryChoice.DEFAULT);
+            return;
+        }
+        if (preset.length() > MAX_PRESET_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Auswertungs-Vorlage ist ungueltig");
+        }
+        // Eine unveraenderte Auswahl wird nicht erneut geprueft: Ist die eigene
+        // Promptvorlage inzwischen geloescht, soll die Bot-Vorlage trotzdem
+        // speicherbar bleiben - sie arbeitet dann mit dem gespeicherten Stand.
+        boolean unchanged = preset.equals(template.getSummaryPreset());
+        if (!unchanged && preset.startsWith(BotTemplateLauncher.OWN_TEMPLATE_PREFIX)) {
+            requireOwnPromptTemplate(preset.substring(BotTemplateLauncher.OWN_TEMPLATE_PREFIX.length()),
+                    template.getOwnerId());
+        }
+        template.setSummaryPreset(preset);
+        template.setSummaryChoice(new SummaryChoice(
+                RecordingController.requireSummaryPrompt(request.summaryPrompt()),
+                RecordingController.checkTemplateName(request.summaryTemplateName()),
+                PromptTemplateController.checkModel(request.summaryModel()),
+                PromptTemplateController.checkTemperature(request.summaryTemperature())));
+    }
+
+    private void requireOwnPromptTemplate(String rawId, UUID ownerId) {
+        UUID id;
+        try {
+            id = UUID.fromString(rawId);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Auswertungs-Vorlage ist ungueltig");
+        }
+        boolean own = promptTemplateRepo.findById(id)
+                .filter(p -> p.getOwnerId().equals(ownerId))
+                .isPresent();
+        if (!own) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Auswertungs-Vorlage nicht gefunden");
+        }
     }
 
     /**

@@ -6,7 +6,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -18,10 +21,31 @@ public class ChatOps {
 
     private static final Logger log = LoggerFactory.getLogger(ChatOps.class);
 
+    /** Hoechstzahl gemerkter eigener Texte - der Bot schreibt nur wenige Hinweise. */
+    private static final int MAX_SENT_TEXTS = 200;
+
     private final Page page;
 
+    /**
+     * Texte, die der Bot in dieser Sitzung selbst gesendet hat (normalisiert).
+     * Rueckfall fuer die Erkennung eigener Nachrichten, falls BBB den
+     * Bearbeiten-Button nicht anzeigt.
+     */
+    private final Set<String> sentTexts;
+
     public ChatOps(Page page) {
+        this(page, java.util.Collections.synchronizedSet(new LinkedHashSet<>()));
+    }
+
+    /**
+     * @param sentTexts gemeinsamer Speicher der eigenen Texte - die Bot-Instanz
+     *                  reicht ihn ueber einen Reconnect weiter. Nach dem
+     *                  Wiederbeitritt ist der Bot fuer BBB ein neuer Nutzer, seine
+     *                  alten Nachrichten tragen dann keinen Bearbeiten-Button mehr.
+     */
+    public ChatOps(Page page, Set<String> sentTexts) {
         this.page = page;
+        this.sentTexts = sentTexts;
     }
 
     public void ensureChatOpen() {
@@ -80,57 +104,105 @@ public class ChatOps {
         } catch (RuntimeException e) {
             input.type(message, new Locator.TypeOptions().setDelay(10));
         }
+        rememberSent(message);
         input.press("Enter");
     }
 
-    /** Gesamter Chat als eine Zeile pro Nachricht ("User: Body") fuer die Befehls-Erkennung. */
-    public String getAllChatText() {
-        try {
-            Object result = page.evaluate(BrowserScripts.load(BrowserScripts.CHAT_TEXT));
-            return result == null ? "" : result.toString();
-        } catch (RuntimeException e) {
-            log.debug("getAllChatText fehlgeschlagen: {}", e.getMessage());
-            return "";
+    private void rememberSent(String message) {
+        synchronized (sentTexts) {
+            if (sentTexts.size() >= MAX_SENT_TEXTS) {
+                sentTexts.remove(sentTexts.iterator().next());
+            }
+            sentTexts.add(CommandDetector.normalize(message));
         }
     }
 
-    /** Alle Chat-Nachrichten im Format "[Zeit] User:\nBody", Keepalive-Nachrichten gefiltert. */
+    /**
+     * Eine Chat-Nachricht.
+     *
+     * @param own  vom Bot selbst gesendet
+     * @param time Uhrzeit, wie BBB sie anzeigt (nur an der letzten Nachricht
+     *             einer Gruppe, sonst leer)
+     * @param text Nachrichtentext, Zeilenumbrueche erhalten
+     */
+    public record ChatEntry(boolean own, String time, String text) {}
+
+    /** Alle Nachrichten in Chat-Reihenfolge, eigene markiert (siehe chatMessages.js). */
     @SuppressWarnings("unchecked")
-    public List<String> extractMessages(String keepalivePrefix) {
-        ensureChatOpen();
+    public List<ChatEntry> readEntries() {
         try {
-            Object result = page.evaluate(BrowserScripts.load(BrowserScripts.CHAT_MESSAGES));
-            List<String> raw = result instanceof List ? (List<String>) result : List.of();
-            List<String> filtered = new ArrayList<>();
-            for (String m : raw) {
-                String trimmed = m == null ? "" : m.trim();
-                if (trimmed.isEmpty()) continue;
-                if (keepalivePrefix != null && !keepalivePrefix.isEmpty() && trimmed.startsWith(keepalivePrefix)) continue;
-                filtered.add(trimmed);
+            Object result = page.evaluate(BrowserScripts.load(BrowserScripts.CHAT_MESSAGES),
+                    List.copyOf(sentTexts));
+            if (!(result instanceof List<?> raw)) return List.of();
+            List<ChatEntry> entries = new ArrayList<>();
+            for (Object o : raw) {
+                if (!(o instanceof Map<?, ?> m)) continue;
+                Object text = m.get("text");
+                if (text == null || text.toString().isBlank()) continue;
+                Object time = m.get("time");
+                entries.add(new ChatEntry(Boolean.TRUE.equals(m.get("own")),
+                        time == null ? "" : time.toString(), text.toString()));
             }
-            return filtered;
+            return entries;
         } catch (RuntimeException e) {
-            log.warn("extractMessages fehlgeschlagen: {}", e.getMessage());
+            log.debug("Chat konnte nicht gelesen werden: {}", e.getMessage());
             return List.of();
         }
     }
 
     /**
-     * Chat-Text nach dem Session-Marker (Datenschutz-Filter fuer die KI-Auswertung).
-     * Ohne Marker oder wenn er nicht gefunden wird: leerer String, KEIN Fallback
-     * auf den Gesamt-Chat.
+     * Chat als eine Zeile pro Nachricht fuer die Befehlserkennung. Eigene
+     * Nachrichten des Bots fehlen - mit einer Ausnahme: Zeilen mit Session-Marker
+     * bleiben als Anker stehen, denn die Erkennung sucht Befehle erst NACH dem
+     * Marker. {@link CommandDetector#stripBotMarkerLines} entfernt sie danach.
      */
-    public String getChatSinceMarker(String marker, int retries, long retryDelayMs, String keepalivePrefix) {
+    public String getAllChatText() {
+        StringBuilder sb = new StringBuilder();
+        for (ChatEntry e : readEntries()) {
+            String line = CommandDetector.normalize(e.text());
+            if (e.own() && !SessionMarkers.containsMarker(line)) continue;
+            sb.append(line).append('\n');
+        }
+        return sb.toString();
+    }
+
+    /** Nachrichten der Teilnehmer im Format "[Zeit]\nText" - ohne Nachrichten des Bots. */
+    public List<String> extractMessages() {
+        ensureChatOpen();
+        return readEntries().stream()
+                .filter(e -> !e.own())
+                .map(ChatOps::format)
+                .toList();
+    }
+
+    private static String format(ChatEntry e) {
+        return e.time().isEmpty() ? e.text() : "[" + e.time() + "]\n" + e.text();
+    }
+
+    /**
+     * Chat seit dem Session-Marker (Datenschutz-Filter fuer die KI-Auswertung und
+     * den Reiter "Chat" der Aufnahme) - nur Nachrichten der Teilnehmer, nichts
+     * vom Bot. Ohne Marker oder wenn er nicht gefunden wird: leerer String, KEIN
+     * Fallback auf den Gesamt-Chat.
+     */
+    public String getChatSinceMarker(String marker, int retries, long retryDelayMs) {
         if (marker == null || marker.isEmpty()) {
             log.warn("Kein aktiver Marker - Chat wird aus Datenschutzgruenden leer uebernommen");
             return "";
         }
         for (int attempt = 1; attempt <= retries; attempt++) {
             try {
-                String fullChat = String.join("\n", extractMessages(keepalivePrefix));
-                int idx = fullChat.indexOf(marker);
+                ensureChatOpen();
+                List<ChatEntry> entries = readEntries();
+                int idx = -1;
+                for (int i = 0; i < entries.size(); i++) {
+                    if (entries.get(i).text().contains(marker)) { idx = i; break; }
+                }
                 if (idx >= 0) {
-                    return fullChat.substring(idx + marker.length()).trim();
+                    return String.join("\n", entries.subList(idx + 1, entries.size()).stream()
+                            .filter(e -> !e.own())
+                            .map(ChatOps::format)
+                            .toList()).trim();
                 }
                 log.warn("Marker nicht im Chat gefunden (Versuch {}/{})", attempt, retries);
             } catch (RuntimeException e) {
@@ -150,7 +222,8 @@ public class ChatOps {
         try {
             // JS-Regex kennt kein \Q...\E (Pattern.quote), daher manuell escapen:
             String escaped = command.replaceAll("[.*+?^${}()|\\[\\]\\\\]", "\\\\$0");
-            Object result = page.evaluate(BrowserScripts.load(BrowserScripts.START_COMMAND_INFO), escaped);
+            Object result = page.evaluate(BrowserScripts.load(BrowserScripts.START_COMMAND_INFO),
+                    Map.of("cmd", escaped, "sent", List.copyOf(sentTexts)));
             if (result instanceof java.util.Map<?, ?> map && Boolean.TRUE.equals(map.get("found"))) {
                 Object preview = map.get("messagePreview");
                 Object timestamp = map.get("timestamp");

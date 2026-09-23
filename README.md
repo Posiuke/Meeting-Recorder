@@ -22,10 +22,19 @@ docs/       Anleitungen (u.a. Whisper-Diarisierung), Alt-Dokumentation
 - **Steuerung**: über das Frontend (Raum-URL eingeben, Aufnahme
   starten/stoppen) und weiterhin per Chat-Befehl im Meeting
   (`STARTRECORDING`/`STOPRECORDING`, Zwei-Marker-System gegen Selbst-Trigger).
+  Eigene Nachrichten des Bots wertet er nie als Befehl aus, und sie landen nicht
+  im Chat-Protokoll der Aufnahme.
+- **Anonymer Stopp-Link** (Admin-Schalter `bot.anonymousStopEnabled`, Standard
+  aus): Der Aufnahme-Hinweis im Chat enthält zusätzlich einen einmaligen Link.
+  Darüber kann ein Teilnehmer die Aufnahme verwerfen und den Bot aus dem Raum
+  schicken, ohne sich im Chat als „Spielverderber“ zu erkennen zu geben
+  (siehe [Anonymer Stopp-Link](#anonymer-stopp-link)).
 - **Bot-Vorlagen**: Ein regelmäßig aufgezeichneter Raum muss nicht jedes Mal neu
   eingetragen werden. Im Tab **Bots** speichert jeder Nutzer benannte Vorlagen
   (Meeting-URL, Bot-Name, Aufnahme- und Auswertungsschalter, Sprache der
-  Aufnahme); danach genügt "Bot starten" an der Vorlage. Alternativ lässt sich
+  Aufnahme, Auswertungs-Vorlage); danach genügt "Bot starten" an der Vorlage.
+  Mit einem **Zeitplan** (z.B. Mo/Mi/Fr 09:00–10:00) tritt der Bot sogar selbst
+  bei und verlässt den Raum zur Endzeit. Alternativ lässt sich
   eine Vorlage ins Startformular übernehmen, wenn einmal etwas abweichen soll.
   Die Vorlagen sind **benutzerbezogen** — in der Meeting-URL steckt der Zugang
   zum Raum, deshalb sieht sie niemand außer dem Besitzer (`/api/bot-templates`).
@@ -337,14 +346,90 @@ Raum, deshalb sieht eine Vorlage nur ihr Besitzer — auch Admins bekommen unter
 eindeutig (case-insensitive, DB-seitig über `uq_bot_template_owner_name`); zwei
 Nutzer dürfen denselben Namen verwenden.
 
-Gestartet wird weiterhin über `POST /api/bots` — die Vorlage hält nur die
-Angaben. Damit eine Vorlage nicht erst beim Starten scheitert, prüfen Vorlage
+Gestartet wird über `POST /api/bots/from-template/{id}` — der Server liest die
+Vorlage selbst (dieselbe Logik nutzt der Zeitplan). Damit eine Vorlage nicht erst beim Starten scheitert, prüfen Vorlage
 und Sofort-Start dieselben Regeln: `http(s)://` am Anfang und die
 SSRF-Allowlist `bot.allowedUrlHosts`. Die **Sprechererkennung** ist die eine
 Ausnahme: Sie wird in der Vorlage als Wunsch gespeichert, auch wenn der Admin
 sie gerade gesperrt hat (`whisper.diarize`) — sonst verliert die Vorlage die
 Einstellung, nur weil sie während einer Sperre gespeichert wurde. Über die
 Ausführung entscheidet der Start.
+
+### Auswertungs-Vorlage
+
+Jede Bot-Vorlage (und auch das Startformular) wählt, mit welcher
+**Auswertungs-Vorlage** die Aufnahmen des Bots im Anschluss ausgewertet werden —
+dieselbe Auswahl wie beim Upload: „Meeting (Standard)" (folgt der Vorgabe des
+Admins), eine integrierte Vorlage (Meeting, Vortrag, Interview, Sprachnotiz) oder
+eine eigene Promptvorlage samt Modell und Temperatur. Die Wahl wandert über die
+Bot-Session an jede Aufnahme, bevor der Verarbeitungs-Job entsteht; schon die
+erste (auch sofortige) Auswertung läuft also mit ihr. Eine eigene Promptvorlage
+wird bei jedem Start frisch gelesen (`summary_preset = tpl:<id>`), Änderungen
+daran wirken sofort. Ist sie inzwischen gelöscht, bleibt der beim Speichern
+festgehaltene Stand in Kraft.
+
+### Zeitplan
+
+Optional trägt eine Vorlage einen **Zeitplan**: Wochentage plus Start- und
+Endzeit, z.B. *Mo, Mi, Fr 09:00–10:00*. Der `BotScheduler` prüft alle 30 s
+(`bbbbot.bots.schedule-check-ms`), tritt zu Beginn eines Termins selbst bei und
+schickt den Bot zur Endzeit aus dem Raum — die laufende Aufnahme wird dabei
+regulär abgeschlossen und ausgewertet.
+
+- **Zeitzone**: Die Uhrzeiten gelten in der Zeitzone, die beim Speichern aus dem
+  Browser kommt (z.B. `Europe/Berlin`), nicht in der des Containers (oft UTC).
+  Sommer-/Winterzeit wird berücksichtigt. Liegt die Endzeit vor der Startzeit,
+  endet der Termin am Folgetag.
+- **Ein Bot pro Termin**: Ob für einen Termin schon ein Bot lief, steht in den
+  Bot-Sessions (`bot_session.bot_template_id` + Startzeit) — das übersteht auch
+  einen Neustart des Servers. Scheitert der Beitritt (Session `FAILED`, z.B.
+  Raum noch nicht geöffnet oder Server neu gestartet), versucht es der
+  Scheduler nach 2 Minuten erneut, höchstens 5 Mal pro Termin. Wer den Bot von
+  Hand beendet (`STOPPED`), bekommt ihn in diesem Termin nicht zurück.
+- **Belegte Plätze**: Sind alle Bot-Plätze belegt, versucht es der Scheduler bei
+  jedem Durchlauf erneut; nimmt schon ein anderer Bot den Raum auf, startet
+  keiner zusätzlich.
+- **Start von Hand im Termin**: Wird eine Vorlage während eines laufenden Termins
+  per „Bot starten" gestartet, gilt das als dieser Termin — der Bot verlässt den
+  Raum zur geplanten Endzeit, und der Scheduler startet keinen zweiten.
+- Ein **pausierter** Zeitplan behält Tage und Zeiten, damit er nach den Ferien
+  nur wieder eingeschaltet werden muss.
+
+## Anonymer Stopp-Link
+
+Wer eine Aufnahme nicht möchte, muss dafür bisher `STOPRECORDING` in den Chat
+schreiben – vor allen anderen. Mit dem Stopp-Link geht das unauffällig:
+
+1. Beim Aufnahmestart hängt der Bot an seinen Hinweis einen Link
+   `<bot.publicUrl>/stop/<token>`. Die Stelle bestimmt der Platzhalter
+   `${STOP_URL}` in `bot.warnMessage`; fehlt er, wird der Link als eigener Satz
+   angehängt.
+2. Die Seite hinter dem Link braucht keine Anmeldung und zeigt nur den Raumnamen
+   und einen Button „Aufnahme beenden und verwerfen“ samt Rückfrage.
+3. Nach der Bestätigung wird die Aufnahme verworfen (Dateien gelöscht, auch ein
+   Video), der Bot schreibt die neutrale Nachricht „Die Aufnahme wurde beendet
+   und verworfen. Der Bot verlässt jetzt den Raum.“ und geht. Beim Besitzer steht
+   an der Aufnahme nur „Durch einen Teilnehmer beendet“.
+
+Eigenschaften:
+
+- **Nur der Klick zählt**: `GET /api/public/bot-stop/{token}` zeigt nur den
+  Raumnamen, erst `POST` beendet. Link-Vorschauen und Virenscanner, die Links
+  vorab abrufen, lösen also nichts aus.
+- **Einmalig und kurzlebig**: 256-Bit-Zufallstoken, gilt nur für die laufende
+  Aufnahme und nur einmal; jede neue Aufnahme bekommt einen neuen Link. Der Bot
+  hält nur den SHA-256-Hash im Arbeitsspeicher – nach einem Server-Neustart sind
+  alle Links ungültig.
+- **Anonym**: Über den Aufrufer wird nichts gespeichert oder geloggt. Jeder
+  ungültige Fall (unbekannt, verbraucht, abgelaufen, Funktion aus) liefert
+  dieselbe 404.
+- **Admin-Schalter wirkt sofort**: Wird `bot.anonymousStopEnabled` abgeschaltet,
+  sind auch bereits verschickte Links wirkungslos.
+- **Voraussetzungen**: `bot.publicUrl` (Adresse, unter der Teilnehmer die
+  Anwendung erreichen) und `bot.sendChatWarning = true`. Teilnehmer, die die
+  Anwendung nicht erreichen (z.B. externe Gäste), sehen einen toten Link.
+- Bei einem Zeitplan zählt der Stopp wie ein Beenden von Hand: Der Bot kommt im
+  laufenden Termin nicht zurück, im nächsten schon.
 
 ## Sprache der Oberfläche
 

@@ -526,7 +526,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           method: 'POST',
           path: '/api/bots',
           summary:
-            'Bot starten. sttLanguage setzt die Sprache der Spracherkennung für die Aufnahmen dieses Bots (auto = automatisch erkennen, weglassen = Standardvorgabe des Administrators).',
+            'Bot starten. sttLanguage setzt die Sprache der Spracherkennung für die Aufnahmen dieses Bots (auto = automatisch erkennen, weglassen = Standardvorgabe des Administrators). Optional summaryPrompt, summaryTemplateName, summaryModel und summaryTemperature: Auswertungs-Vorlage für die Aufnahmen dieses Bots (weglassen = Vorgabe des Administrators).',
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
   -d '{"meetingUrl":"https://bbb.example.intern/b/abc-def-ghi",
        "botName":"Protokoll-Bot","autoRecord":true,
@@ -568,17 +568,32 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           method: 'POST',
           path: '/api/bot-templates',
           summary:
-            'Bot-Vorlage anlegen. Dieselben Angaben wie POST /api/bots, zusätzlich name. Zum Starten die Vorlage lesen und ihre Angaben an POST /api/bots schicken.',
+            'Bot-Vorlage anlegen. Dieselben Angaben wie POST /api/bots, zusätzlich name, optional ein Zeitplan (schedule: Wochentage, Start/Ende als HH:mm in timeZone; Ende vor Start = endet am Folgetag) und die Auswertungs-Vorlage (summaryPreset = Auswahl, z.B. tpl:<id> für eine eigene Promptvorlage, dazu summaryPrompt/summaryTemplateName/summaryModel/summaryTemperature). Mit aktivem Zeitplan tritt der Bot zur Startzeit selbst bei und verlässt den Raum zur Endzeit.',
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
-  -d '{"name":"Technikrunde montags",
+  -d '{"name":"Jour fixe",
        "meetingUrl":"https://bbb.example.intern/b/abc-def-ghi",
        "botName":"Protokoll-Bot","autoRecord":true,
        "recordVideo":false,"aiAnalysis":true,"diarize":false,
-       "sttLanguage":"de"}' \\
+       "sttLanguage":"de",
+       "schedule":{"enabled":true,"days":["MONDAY","WEDNESDAY","FRIDAY"],
+                   "start":"09:00","end":"10:00","timeZone":"Europe/Berlin"},
+       "summaryPreset":"tpl:3c1e..."}' \\
   "$BBB/api/bot-templates"`,
+          response: `{ "id": "b71f...", "name": "Jour fixe",
+  "schedule": { "enabled": true, "days": ["MONDAY","WEDNESDAY","FRIDAY"],
+                "start": "09:00:00", "end": "10:00:00", "timeZone": "Europe/Berlin",
+                "nextStart": "2026-09-25T07:00:00Z", "nextEnd": "2026-09-25T08:00:00Z" },
+  "summaryPreset": "tpl:3c1e...", "summaryTemplateName": "Protokoll", ... }`,
         },
         { method: 'PUT', path: '/api/bot-templates/{id}', summary: 'Bot-Vorlage ändern.' },
         { method: 'DELETE', path: '/api/bot-templates/{id}', summary: 'Bot-Vorlage löschen.' },
+        {
+          method: 'POST',
+          path: '/api/bots/from-template/{id}',
+          summary:
+            'Bot aus einer eigenen Bot-Vorlage starten, samt ihrer Auswertungs-Vorlage. Läuft gerade ein Termin ihres Zeitplans, verlässt der Bot den Raum zu dessen Endzeit.',
+          example: `curl -s -X POST -H "X-API-Key: $KEY" "$BBB/api/bots/from-template/$TID"`,
+        },
       ],
     },
 

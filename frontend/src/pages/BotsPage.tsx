@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
   createBot,
+  createBotFromTemplate,
   fetchBotHistory,
   fetchBots,
   startBotRecording,
@@ -22,26 +23,18 @@ import HelpTip from '../components/HelpTip';
 import SttLanguageSelect, { sttLanguageLabel } from '../components/SttLanguageSelect';
 import BotTemplateDialog from '../components/BotTemplateDialog';
 import type { BotTemplateSettings } from '../components/BotTemplateDialog';
+import { scheduleSummary } from '../components/BotScheduleFields';
+import PromptPresetSelect, { resolveSummarySelection } from '../components/PromptPresetSelect';
+import { fetchPromptTemplates } from '../store/promptTemplatesSlice';
 import { errorMessage, fetchUploadConfig } from '../api/client';
-import { formatDateTime } from '../utils/format';
+import { formatDateTime, formatTime } from '../utils/format';
 import { useI18n } from '../i18n';
 import type { translate } from '../i18n';
-import type { BotTemplateView, BotView, CreateBotRequest } from '../types';
+import type { BotTemplateView, BotView } from '../types';
 
 /** Serverseitige Grenzen (BotTemplateController, BotController). */
 const MAX_BOT_TEMPLATES = 100;
 const MAX_BOT_NAME_LENGTH = 100;
-
-/** Aus einer Vorlage wird die Startanfrage – die Vorlage hält genau diese Angaben. */
-const startRequestOf = (template: BotTemplateView): CreateBotRequest => ({
-  meetingUrl: template.meetingUrl,
-  botName: template.botName,
-  autoRecord: template.autoRecord,
-  recordVideo: template.recordVideo,
-  aiAnalysis: template.aiAnalysis,
-  diarize: template.diarize,
-  sttLanguage: template.sttLanguage,
-});
 
 /** Einzeiler unter dem Vorlagennamen: Bot-Name, Modus und Sprache der Aufnahme. */
 const summaryOf = (template: BotTemplateView, t: typeof translate): string => {
@@ -55,7 +48,23 @@ const summaryOf = (template: BotTemplateView, t: typeof translate): string => {
   if (template.aiAnalysis && template.sttLanguage) {
     parts.push(sttLanguageLabel(template.sttLanguage, t));
   }
+  if (template.aiAnalysis && template.summaryPreset && template.summaryTemplateName) {
+    parts.push(t('botTemplates.presetShort', { name: template.summaryTemplateName }));
+  }
   return parts.join(' · ');
+};
+
+/** Zeile zum Zeitplan: Tage und Zeiten, dazu der nächste bzw. laufende Termin. */
+const scheduleLineOf = (template: BotTemplateView, t: typeof translate): string | null => {
+  const { schedule } = template;
+  if (schedule.days.length === 0 || !schedule.start) return null;
+  const base = scheduleSummary(schedule, t);
+  if (!schedule.enabled) return `${base} · ${t('botTemplates.schedule.off')}`;
+  if (!schedule.nextStart) return base;
+  const running = new Date(schedule.nextStart).getTime() <= Date.now();
+  return running
+    ? `${base} · ${t('botTemplates.schedule.running', { time: formatTime(schedule.nextEnd) })}`
+    : `${base} · ${t('botTemplates.schedule.next', { date: formatDateTime(schedule.nextStart) })}`;
 };
 
 export default function BotsPage() {
@@ -64,6 +73,7 @@ export default function BotsPage() {
   const { items, loading, loaded, error, history, historyLoading, historyError } =
     useAppSelector((s) => s.bots);
   const templates = useAppSelector((s) => s.botTemplates);
+  const promptTemplates = useAppSelector((s) => s.promptTemplates);
 
   const [meetingUrl, setMeetingUrl] = useState('');
   const [botName, setBotName] = useState('RecorderBot');
@@ -75,6 +85,8 @@ export default function BotsPage() {
   // '' = Sprachvorgabe des Administrators
   const [sttLanguage, setSttLanguage] = useState('');
   const [defaultSttLanguage, setDefaultSttLanguage] = useState('');
+  // Auswertungs-Vorlage: '' = „Meeting (Standard)"
+  const [preset, setPreset] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -112,6 +124,12 @@ export default function BotsPage() {
   }, [dispatch]);
 
   useEffect(() => {
+    if (!promptTemplates.loaded && !promptTemplates.loading) {
+      void dispatch(fetchPromptTemplates());
+    }
+  }, [dispatch, promptTemplates.loaded, promptTemplates.loading]);
+
+  useEffect(() => {
     if (historyOpen) {
       dispatch(fetchBotHistory());
     }
@@ -131,6 +149,7 @@ export default function BotsPage() {
           aiAnalysis,
           diarize,
           sttLanguage,
+          ...resolveSummarySelection(preset, promptTemplates.items),
         }),
       ).unwrap();
       setMeetingUrl('');
@@ -151,6 +170,7 @@ export default function BotsPage() {
     setAiAnalysis(template.aiAnalysis);
     setDiarize(template.aiAnalysis && template.diarize);
     setSttLanguage(template.sttLanguage ?? '');
+    setPreset(template.summaryPreset ?? '');
   };
 
   /** Der kurze Weg aus dem Issue: Vorlage auswählen, Bot startet. */
@@ -158,7 +178,7 @@ export default function BotsPage() {
     setTemplateError(null);
     setTemplateBusyId(template.id);
     try {
-      await dispatch(createBot(startRequestOf(template))).unwrap();
+      await dispatch(createBotFromTemplate(template.id)).unwrap();
     } catch (err) {
       setTemplateError(errorMessage(err));
     } finally {
@@ -221,6 +241,13 @@ export default function BotsPage() {
                     {template.meetingUrl}
                   </span>
                   <span className="muted bot-template-summary">{summaryOf(template, t)}</span>
+                  {scheduleLineOf(template, t) && (
+                    <span
+                      className={`bot-template-schedule${template.schedule.enabled ? ' active' : ''}`}
+                    >
+                      {scheduleLineOf(template, t)}
+                    </span>
+                  )}
                 </div>
                 <div className="bot-template-actions">
                   <button
@@ -337,6 +364,19 @@ export default function BotsPage() {
               onChange={setSttLanguage}
             />
           </div>
+          <div className="form-field">
+            <label htmlFor="bot-preset">
+              {t('botTemplates.presetLabel')}
+              <HelpTip text={t('botTemplates.presetHelp')} />
+            </label>
+            <PromptPresetSelect
+              id="bot-preset"
+              value={preset}
+              templates={promptTemplates.items}
+              disabled={!aiAnalysis}
+              onChange={setPreset}
+            />
+          </div>
           <button type="submit" className="btn btn-primary" disabled={creating || !meetingUrl.trim()}>
             {creating ? t('bots.submitting') : t('bots.submit')}
           </button>
@@ -364,6 +404,7 @@ export default function BotsPage() {
                   aiAnalysis,
                   diarize,
                   sttLanguage,
+                  summaryPreset: preset || null,
                 },
               })
             }
@@ -518,6 +559,12 @@ function BotCard({ bot }: { bot: BotView }) {
           <span className="meta-label">{t('bots.cardStarted')}</span>
           <span className="meta-value">{formatDateTime(bot.createdAt)}</span>
         </div>
+        {bot.scheduledStopAt && (
+          <div className="meta-row">
+            <span className="meta-label">{t('bots.cardScheduledStop')}</span>
+            <span className="meta-value">{formatTime(bot.scheduledStopAt)}</span>
+          </div>
+        )}
         {bot.recordingId && (
           <div className="meta-row">
             <span className="meta-label">{t('bots.cardRecording')}</span>
@@ -535,6 +582,7 @@ function BotCard({ bot }: { bot: BotView }) {
             type="button"
             className="btn btn-primary btn-sm"
             disabled={busy}
+            title={t('bots.startRecordingHint')}
             onClick={() => run(() => dispatch(startBotRecording(bot.sessionId)).unwrap())}
           >
             {t('bots.startRecording')}
@@ -546,6 +594,7 @@ function BotCard({ bot }: { bot: BotView }) {
               type="button"
               className="btn btn-primary btn-sm"
               disabled={busy}
+              title={t('bots.stopRecordingHint')}
               onClick={() =>
                 run(() =>
                   dispatch(
@@ -560,6 +609,7 @@ function BotCard({ bot }: { bot: BotView }) {
               type="button"
               className="btn btn-sm"
               disabled={busy}
+              title={t('bots.discardHint')}
               onClick={() => setConfirm('discard')}
             >
               {t('bots.discard')}
@@ -570,6 +620,7 @@ function BotCard({ bot }: { bot: BotView }) {
           type="button"
           className="btn btn-danger btn-sm"
           disabled={busy}
+          title={t('bots.stopBotHint')}
           onClick={() => setConfirm('stopBot')}
         >
           {t('bots.stopBot')}

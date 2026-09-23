@@ -2,9 +2,11 @@ package bbbbot.api;
 
 import bbbbot.bot.BotInstance;
 import bbbbot.bot.BotManager;
+import bbbbot.bot.BotTemplateLauncher;
 import bbbbot.domain.AppUser;
 import bbbbot.domain.BotSession;
 import bbbbot.repository.Repositories.BotSessionRepo;
+import bbbbot.repository.Repositories.BotTemplateRepo;
 import bbbbot.settings.SettingsService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +42,8 @@ class BotControllerTest {
         botManager = mock(BotManager.class);
         sessionRepo = mock(BotSessionRepo.class);
         settings = mock(SettingsService.class);
-        controller = new BotController(botManager, sessionRepo, settings);
+        controller = new BotController(botManager, sessionRepo, settings,
+                mock(BotTemplateRepo.class), mock(BotTemplateLauncher.class));
 
         owner = AppUser.create("owner", "Owner", "o@x");
         other = AppUser.create("other", "Other", "e@x");

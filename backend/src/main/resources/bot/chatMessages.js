@@ -1,42 +1,66 @@
-// Extrahiert alle Chat-Nachrichten inkl. Zeit und Absender als Liste von
-// Strings im Format "[Zeit] User:\nBody" (fuer Chat-Protokoll und KI-Kontext).
-// BBB-DOM hier: Nachricht = data-test="chatMessageItem", Body =
-// data-test="messageContent". Sortierung nach data-sequence (aeltestes zuerst).
-() => {
-  function htmlToTextLocal(html) {
+// Liest alle Chat-Nachrichten in DOM-Reihenfolge (aeltestes zuerst) als
+// Objekte { own, time, text }. Parameter: Liste der Texte, die der Bot selbst
+// gesendet hat (whitespace-normalisiert).
+//
+// BBB-DOM (3.x): Nachricht = data-test="chatMessageItem", Text =
+// data-test="messageContent", Uhrzeit = <time> (nur an der letzten Nachricht
+// einer Gruppe). Den Absendernamen traegt die einzelne Nachricht NICHT.
+//
+// "own" = vom Bot selbst gesendet. Erkennung: BBB zeigt "Nachricht bearbeiten"
+// nur dem Autor einer Nachricht - auch Moderatoren nicht bei fremden. Nur wenn
+// im ganzen Chat KEIN Bearbeiten-Button existiert (Bearbeiten in BBB
+// abgeschaltet), zaehlt als Rueckfall jeder Text, den der Bot selbst geschickt
+// hat. Beides zu mischen waere falsch: Tippt ein Teilnehmer woertlich dasselbe
+// wie der Bot, wuerde seine Nachricht sonst verschluckt.
+(sentTexts) => {
+  const norm = (s) => (s || '').replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
+  const sent = new Set((sentTexts || []).map(norm));
+
+  function htmlToText(html) {
     return html
       .replace(/<\s*br\s*\/?>/gi, '\n')
       .replace(/<\/\s*p\s*>/gi, '\n')
       .replace(/<\/\s*div\s*>/gi, '\n')
       .replace(/<[^>]+>/g, '')
-      .replace(/ /g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
       .replace(/\r?\n/g, '\n')
       .split('\n').map(l => l.trim()).filter(l => l.length > 0).join('\n');
   }
 
-  const seqOf = (el) => {
-    const holder = (el.closest && el.closest('[data-sequence]')) || el;
-    const s = parseInt((holder.getAttribute && holder.getAttribute('data-sequence')) || '', 10);
-    return isNaN(s) ? 0 : s;
-  };
+  // Nur Nachrichten im Chat-Verlauf selbst: BBB zeigt neue Nachrichten
+  // zusaetzlich kurz als Benachrichtigung an - die zaehlte sonst doppelt.
+  // Nicht [data-test^="chatMessage"]: das traefe auch den Container.
+  // Doppelte IDs (z.B. waehrend BBB neu rendert) werden verworfen.
+  const scope = document.querySelector('[data-test="chatMessages"]') || document;
+  const seenIds = new Set();
+  const nodes = Array.from(scope.querySelectorAll(
+    '[data-test="chatMessageItem"], [data-test="chatMessage"]')).filter(m => {
+      const id = m.getAttribute('data-chat-message-id');
+      if (!id) return true;
+      if (seenIds.has(id)) return false;
+      seenIds.add(id);
+      return true;
+    });
+
+  const editButtons = nodes.some(m => m.querySelector('[data-test="editMessageButton"]'));
 
   const out = [];
-  const msgNodes = Array.from(document.querySelectorAll(
-    '[data-test="chatMessageItem"], [data-test="chatMessage"], [data-test^="chatMessage"]'
-  ));
-  msgNodes.sort((a, b) => seqOf(a) - seqOf(b));
-
-  for (const m of msgNodes) {
+  for (const m of nodes) {
     try {
-      const time = (m.querySelector('[data-test="chatMessageTime"]')?.textContent || '').trim();
-      const user = (m.querySelector('[data-test="chatMessageUser"], [data-test="userName"]')?.textContent || '').trim();
       const bodyEl = m.querySelector('[data-test="messageContent"], [data-test="chatMessageBody"]');
-      const body = bodyEl ? htmlToTextLocal(bodyEl.innerHTML) : htmlToTextLocal(m.innerHTML);
-      const prefix = [];
-      if (time) prefix.push('[' + time + ']');
-      if (user) prefix.push(user + ':');
-      out.push(prefix.length ? prefix.join(' ') + '\n' + body : body);
-    } catch {}
+      const text = bodyEl ? htmlToText(bodyEl.innerHTML) : '';
+      if (!text) continue;
+      const time = (m.querySelector('time, [data-test="chatMessageTime"]')?.textContent || '').trim();
+      const own = editButtons
+        ? !!m.querySelector('[data-test="editMessageButton"]')
+        : sent.has(norm(text));
+      out.push({ own, time, text });
+    } catch (e) { /* einzelne kaputte Nachricht ueberspringen */ }
   }
   return out;
 }

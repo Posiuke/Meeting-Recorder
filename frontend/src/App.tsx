@@ -11,6 +11,7 @@ import BotsPage from './pages/BotsPage';
 import RecordingsPage from './pages/RecordingsPage';
 import RecordingDetailPage from './pages/RecordingDetailPage';
 import SharePage from './pages/SharePage';
+import StopRecordingPage from './pages/StopRecordingPage';
 import GroupsPage from './pages/GroupsPage';
 import TemplatesPage from './pages/TemplatesPage';
 import GlossaryPage from './pages/GlossaryPage';
@@ -53,6 +54,8 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       {/* Freigabe-Link: bewusst ohne RequireAuth - die Berechtigung steckt im Token */}
       <Route path="/share/:token" element={<SharePage />} />
+      {/* Anonymer Stopp-Link aus dem Aufnahme-Hinweis des Bots - ohne Anmeldung */}
+      <Route path="/stop/:token" element={<StopRecordingPage />} />
       <Route
         element={
           <RequireAuth>

@@ -523,7 +523,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
           method: 'POST',
           path: '/api/bots',
           summary:
-            'Start a bot. sttLanguage sets the speech recognition language for this bot’s recordings (auto = detect automatically, omitted = the administrator default).',
+            'Start a bot. sttLanguage sets the speech recognition language for this bot’s recordings (auto = detect automatically, omitted = the administrator default). Optionally summaryPrompt, summaryTemplateName, summaryModel and summaryTemperature: the analysis template for this bot’s recordings (omitted = the administrator default).',
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
   -d '{"meetingUrl":"https://bbb.example.intern/b/abc-def-ghi",
        "botName":"Minutes bot","autoRecord":true,
@@ -565,17 +565,32 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
           method: 'POST',
           path: '/api/bot-templates',
           summary:
-            'Create a bot template. Same fields as POST /api/bots plus name. To start one, read the template and send its values to POST /api/bots.',
+            'Create a bot template. Same fields as POST /api/bots plus name, optionally a schedule (schedule: weekdays, start/end as HH:mm in timeZone; end before start = ends the following day) and the analysis template (summaryPreset = the selection, e.g. tpl:<id> for an own prompt template, plus summaryPrompt/summaryTemplateName/summaryModel/summaryTemperature). With an active schedule the bot joins at the start time by itself and leaves the room at the end time.',
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
-  -d '{"name":"Monday tech meeting",
+  -d '{"name":"Weekly sync",
        "meetingUrl":"https://bbb.example.intern/b/abc-def-ghi",
        "botName":"Minutes bot","autoRecord":true,
        "recordVideo":false,"aiAnalysis":true,"diarize":false,
-       "sttLanguage":"en"}' \\
+       "sttLanguage":"en",
+       "schedule":{"enabled":true,"days":["MONDAY","WEDNESDAY","FRIDAY"],
+                   "start":"09:00","end":"10:00","timeZone":"Europe/Berlin"},
+       "summaryPreset":"tpl:3c1e..."}' \\
   "$BBB/api/bot-templates"`,
+          response: `{ "id": "b71f...", "name": "Weekly sync",
+  "schedule": { "enabled": true, "days": ["MONDAY","WEDNESDAY","FRIDAY"],
+                "start": "09:00:00", "end": "10:00:00", "timeZone": "Europe/Berlin",
+                "nextStart": "2026-09-25T07:00:00Z", "nextEnd": "2026-09-25T08:00:00Z" },
+  "summaryPreset": "tpl:3c1e...", "summaryTemplateName": "Minutes", ... }`,
         },
         { method: 'PUT', path: '/api/bot-templates/{id}', summary: 'Change a bot template.' },
         { method: 'DELETE', path: '/api/bot-templates/{id}', summary: 'Delete a bot template.' },
+        {
+          method: 'POST',
+          path: '/api/bots/from-template/{id}',
+          summary:
+            'Start a bot from one of your bot templates, including its analysis template. If a session of its schedule is running, the bot leaves the room at that session\'s end time.',
+          example: `curl -s -X POST -H "X-API-Key: $KEY" "$BBB/api/bots/from-template/$TID"`,
+        },
       ],
     },
 

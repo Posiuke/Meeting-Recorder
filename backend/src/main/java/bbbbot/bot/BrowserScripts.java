@@ -11,7 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class BrowserScripts {
 
     public static final String RECORDER = "bot/recorder.js";
-    public static final String CHAT_TEXT = "bot/chatText.js";
     public static final String CHAT_MESSAGES = "bot/chatMessages.js";
     public static final String ATTENDEES = "bot/attendees.js";
     public static final String AUDIO_STATS = "bot/audioStats.js";

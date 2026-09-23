@@ -13,7 +13,7 @@ Frontend (React) and backend (Spring Boot, Java 21, Playwright) run together in
 
 - 🎙️ **Audio recording** of the meeting (mixed participant streams), segmented into MP3
 - 🎬 **Optional video recording** of the meeting view as MP4 (playback & download in the UI)
-- 🤖 **Bot templates**: save a room you record regularly once — URL, bot name and settings — then it is just "Start bot". Templates are per user and visible to nobody else
+- 🤖 **Bot templates**: save a room you record regularly once — URL, bot name and settings — then it is just "Start bot". With an optional **schedule** (e.g. Mon/Wed/Fri 09:00–10:00) the bot joins and leaves on its own, and each template picks the **analysis template** used afterwards. Templates are per user and visible to nobody else
 - 📤 **File upload**: take existing audio/video files (MP3, WAV, M4A, MP4, MKV …) in as a recording and analyse them — the analysis template can be picked right in the upload dialog
 - 🖥️ **Screen recording in the browser**: capture a screen, window or tab including system audio and an optional microphone, straight from the tool — for meetings without a bot (Teams/Zoom/WebEx, in-person). **Requires HTTPS** and Chrome/Edge, see [docs/SCREEN_CAPTURE.md](https://github.com/Posiuke/Meeting-Recorder/blob/master/docs/SCREEN_CAPTURE.md)
 - 📝 **Transcription** either through **your own Whisper server** (optionally with speaker separation via WhisperX) or an **OpenAI-compatible cloud API** — with continuous timestamps across the whole recording and a structured view in the UI

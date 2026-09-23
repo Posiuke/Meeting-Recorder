@@ -1,5 +1,5 @@
 import { translate, useI18n } from '../i18n';
-import type { PromptTemplateView } from '../types';
+import type { PromptTemplateView, SummarySelection } from '../types';
 
 /**
  * Integrierte Prompt-Vorlagen für typische Inhalte. Beschriftung und Prompt
@@ -54,6 +54,42 @@ export function resolvePresetPrompt(selection: string, templates: PromptTemplate
   if (own) return own.prompt;
   const builtIn = PRESET_KEYS.find((p) => p.key === selection);
   return builtIn ? translate(builtIn.promptKey) : '';
+}
+
+/** Gespeicherter Stand einer Auswahl, etwa aus einer Bot-Vorlage. */
+export interface StoredSummarySelection extends SummarySelection {
+  summaryPreset: string | null;
+}
+
+/**
+ * Prompt, Name, Modell und Temperatur zur getroffenen Auswahl – so, wie sie an
+ * den Server gehen. Eine eigene Vorlage bringt ihr Modell und ihre Temperatur
+ * mit; sonst gilt die Vorgabe des Administrators.
+ *
+ * Ist die gewählte eigene Vorlage inzwischen gelöscht, bleibt bei
+ * unveränderter Auswahl der gespeicherte Stand (`stored`) erhalten, statt
+ * stillschweigend auf den Standard zu fallen.
+ */
+export function resolveSummarySelection(
+  selection: string,
+  templates: PromptTemplateView[],
+  stored?: StoredSummarySelection | null,
+): SummarySelection {
+  const own = findOwnTemplate(selection, templates);
+  if (selection.startsWith('tpl:') && !own && stored && stored.summaryPreset === selection) {
+    return {
+      summaryPrompt: stored.summaryPrompt ?? null,
+      summaryTemplateName: stored.summaryTemplateName ?? null,
+      summaryModel: stored.summaryModel ?? null,
+      summaryTemperature: stored.summaryTemperature ?? null,
+    };
+  }
+  return {
+    summaryPrompt: resolvePresetPrompt(selection, templates) || null,
+    summaryTemplateName: presetLabel(selection, templates),
+    summaryModel: own?.model ?? null,
+    summaryTemperature: own?.temperature ?? null,
+  };
 }
 
 interface PromptPresetSelectProps {

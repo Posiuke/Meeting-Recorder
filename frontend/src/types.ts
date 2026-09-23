@@ -139,9 +139,24 @@ export interface BotView {
   lastError: string | null;
   createdAt: string;
   mine: boolean;
+  /** Bot-Vorlage, aus der der Bot stammt (null = von Hand gestartet). */
+  botTemplateId: string | null;
+  /** Ende laut Zeitplan der Vorlage; null = kein geplantes Ende. */
+  scheduledStopAt: string | null;
 }
 
-export interface CreateBotRequest {
+/**
+ * Gewählte Auswertungs-Vorlage für kommende Aufnahmen – wie beim Upload.
+ * `null`/leer bedeutet jeweils „Vorgabe des Administrators".
+ */
+export interface SummarySelection {
+  summaryPrompt?: string | null;
+  summaryTemplateName?: string | null;
+  summaryModel?: string | null;
+  summaryTemperature?: number | null;
+}
+
+export interface CreateBotRequest extends SummarySelection {
   meetingUrl: string;
   botName?: string;
   autoRecord?: boolean;
@@ -172,12 +187,51 @@ export interface BotTemplateView {
   diarize: boolean;
   /** null = Admin-Standard, `auto` = Whisper erkennt die Sprache selbst. */
   sttLanguage: string | null;
+  schedule: BotScheduleView;
+  /**
+   * Auswahl der Auswertungs-Vorlage: null = „Meeting (Standard)", `tpl:<id>` =
+   * eigene Vorlage, sonst Schlüssel einer integrierten Vorlage.
+   */
+  summaryPreset: string | null;
+  /** Stand der Auswertungs-Vorlage beim Speichern. */
+  summaryPrompt: string | null;
+  summaryTemplateName: string | null;
+  summaryModel: string | null;
+  summaryTemperature: number | null;
   createdAt: string;
   updatedAt: string | null;
 }
 
+/** ISO-Wochentag, wie Java ihn als `DayOfWeek` schreibt. */
+export type Weekday =
+  | 'MONDAY'
+  | 'TUESDAY'
+  | 'WEDNESDAY'
+  | 'THURSDAY'
+  | 'FRIDAY'
+  | 'SATURDAY'
+  | 'SUNDAY';
+
+/** Zeitplan einer Bot-Vorlage: an diesen Tagen von `start` bis `end`. */
+export interface BotScheduleRequest {
+  enabled: boolean;
+  days: Weekday[];
+  /** Uhrzeit „HH:mm" in `timeZone`. */
+  start: string | null;
+  /** Liegt das Ende vor dem Beginn, endet der Termin am Folgetag. */
+  end: string | null;
+  /** IANA-Zeitzone, z.B. Europe/Berlin. */
+  timeZone: string | null;
+}
+
+export interface BotScheduleView extends BotScheduleRequest {
+  /** Beginn des nächsten (oder laufenden) Termins; null, wenn der Zeitplan aus ist. */
+  nextStart: string | null;
+  nextEnd: string | null;
+}
+
 /** Wie {@link CreateBotRequest}, nur mit Namen der Vorlage statt Sofort-Start. */
-export interface BotTemplateRequest {
+export interface BotTemplateRequest extends SummarySelection {
   name: string;
   meetingUrl: string;
   botName?: string;
@@ -186,6 +240,8 @@ export interface BotTemplateRequest {
   aiAnalysis?: boolean;
   diarize?: boolean;
   sttLanguage?: string | null;
+  schedule?: BotScheduleRequest | null;
+  summaryPreset?: string | null;
 }
 
 export interface BotSessionHistoryView {

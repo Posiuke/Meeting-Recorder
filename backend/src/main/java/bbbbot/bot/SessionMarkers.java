@@ -26,6 +26,14 @@ public class SessionMarkers {
         return sb.toString();
     }
 
+    private static final java.util.regex.Pattern MARKER =
+            java.util.regex.Pattern.compile("\\[REC[0-9A-Za-z]{12}\\]");
+
+    /** Enthaelt der Text einen Session-Marker "[RECxxxxxxxxxxxx]"? */
+    public static boolean containsMarker(String text) {
+        return text != null && MARKER.matcher(text).find();
+    }
+
     public String getActive() { return active; }
     public void setActive(String marker) { this.active = marker; }
     public void clearActive() { this.active = null; }

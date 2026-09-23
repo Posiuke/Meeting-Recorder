@@ -150,7 +150,7 @@ public class RecordingController {
      * Normalisiert einen Auswertungs-Prompt: leer bedeutet "Admin-Standard
      * verwenden" (null), zu lang wird abgelehnt.
      */
-    private static String requireSummaryPrompt(String raw) {
+    static String requireSummaryPrompt(String raw) {
         if (raw == null || raw.isBlank()) return null;
         String prompt = raw.trim();
         if (prompt.length() > MAX_SUMMARY_PROMPT_LENGTH) {
@@ -179,7 +179,7 @@ public class RecordingController {
      * benannte Vorlage" (null). Der Name ist reine Beschriftung der Fassung -
      * ein zu langer wird gekuerzt statt den Aufruf scheitern zu lassen.
      */
-    private static String checkTemplateName(String raw) {
+    static String checkTemplateName(String raw) {
         if (raw == null || raw.isBlank()) return null;
         String name = raw.trim();
         return name.length() > MAX_TEMPLATE_NAME_LENGTH

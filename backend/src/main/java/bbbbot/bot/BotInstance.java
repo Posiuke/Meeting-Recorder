@@ -41,7 +41,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * Die Ablauflogik ist die bewaehrte des alten Node-Bots: Auto-Start nach
  * Teilnehmerzahl + Audiotracks (mit Doppel-Bestaetigung ueber zwei Ticks),
- * Chat-Befehle mit Zwei-Marker-System, Keepalive, Auto-Reconnect.
+ * Chat-Befehle mit Zwei-Marker-System, Anwesenheits-Bestaetigung, Auto-Reconnect.
  */
 public class BotInstance {
 
@@ -75,6 +75,12 @@ public class BotInstance {
     private final boolean diarize;
     /** Sprache der Spracherkennung; null = Admin-Standard, "auto" = automatisch erkennen. */
     private final String sttLanguage;
+    /** Auswertungs-Vorlage, die jede Aufnahme dieser Session mitbekommt. */
+    private final bbbbot.domain.SummaryChoice summaryChoice;
+    /** Bot-Vorlage, aus der die Session stammt (null = von Hand gestartet). */
+    private final UUID botTemplateId;
+    /** Ende laut Zeitplan (null = kein geplantes Ende). */
+    private final Instant scheduledStopAt;
     private final BotConfig config;
     private final AppProperties.Bots botProps;
     private final RecordingService recordingService;
@@ -95,7 +101,6 @@ public class BotInstance {
     private final BbbJoiner joiner = new BbbJoiner();
 
     private ScheduledFuture<?> monitorTask;
-    private ScheduledFuture<?> keepaliveTask;
     private ScheduledFuture<?> watchdogTask;
 
     /** Zeitstempel des letzten Lebenszeichens des Bot-Threads (fuer den Watchdog). */
@@ -122,6 +127,16 @@ public class BotInstance {
     private boolean stoppingRecording;
     private boolean lastChunkReceived;
     private final StringBuilder participantsLog = new StringBuilder();
+    /**
+     * Hash des anonymen Stopp-Links der laufenden Aufnahme (null = kein Link
+     * gueltig). Atomar, weil der Link aus einem Web-Request eingeloest wird,
+     * waehrend der Bot-Thread die Aufnahme beenden kann.
+     */
+    private final java.util.concurrent.atomic.AtomicReference<String> stopTokenHash =
+            new java.util.concurrent.atomic.AtomicReference<>();
+    /** Vom Bot gesendete Chat-Texte - bleiben ueber Reconnects erhalten (siehe ChatOps). */
+    private final Set<String> sentChatTexts =
+            java.util.Collections.synchronizedSet(new java.util.LinkedHashSet<>());
     private final Set<String> knownParticipants = new LinkedHashSet<>();
 
     // Monitor-Zaehler (nur Bot-Thread)
@@ -145,6 +160,12 @@ public class BotInstance {
     // wieder aufgehoben. Auto-Stopp (keine Teilnehmer) setzt dies NICHT.
     private volatile boolean autoRecordSuppressed;
 
+    /** Grund an der verworfenen Aufnahme - bewusst ohne jeden Hinweis auf die Person. */
+    static final String ANONYMOUS_STOP_REASON = "Durch einen Teilnehmer beendet";
+    /** Neutrale Abschiedsnachricht: verraet nicht, wie die Aufnahme beendet wurde. */
+    static final String ANONYMOUS_STOP_CHAT_MESSAGE =
+            "Die Aufnahme wurde beendet und verworfen. Der Bot verlaesst jetzt den Raum.";
+
     public BotInstance(BotSession session, BotConfig config, AppProperties.Bots botProps,
                        RecordingService recordingService, BotSessionRepo sessionRepo, Runnable onTerminated) {
         this.sessionId = session.getId();
@@ -156,6 +177,9 @@ public class BotInstance {
         this.aiAnalysis = session.isAiAnalysis();
         this.diarize = session.isDiarize();
         this.sttLanguage = session.getSttLanguage();
+        this.summaryChoice = session.getSummaryChoice();
+        this.botTemplateId = session.getBotTemplateId();
+        this.scheduledStopAt = session.getScheduledStopAt();
         this.config = config;
         this.botProps = botProps;
         this.recordingService = recordingService;
@@ -245,6 +269,45 @@ public class BotInstance {
         });
     }
 
+    /** Gehoert der (gehashte) Stopp-Link zur laufenden Aufnahme dieses Bots? */
+    public boolean hasStopToken(String hash) {
+        return StopTokens.matches(stopTokenHash.get(), hash);
+    }
+
+    /**
+     * Loest den Stopp-Link ein - genau einmal: Der erste Aufruf mit passendem
+     * Hash gewinnt und entwertet den Link, jeder weitere liefert false.
+     */
+    public boolean claimStopToken(String hash) {
+        String current = stopTokenHash.get();
+        return StopTokens.matches(current, hash) && stopTokenHash.compareAndSet(current, null);
+    }
+
+    /**
+     * Anonymer Stopp ueber den Link: Die laufende Aufnahme wird verworfen
+     * (Dateien geloescht), der Bot verabschiedet sich mit einer neutralen
+     * Nachricht - ohne Hinweis auf den Link - und verlaesst den Raum.
+     */
+    public void requestAnonymousStop() {
+        shuttingDown = true;
+        executor.execute(() -> {
+            try {
+                log.info("Aufnahme ueber den anonymen Stopp-Link beendet - verwerfen und Raum verlassen.");
+                autoRecordSuppressed = true;
+                if (currentRecordingId != null) {
+                    stopRecording(true, ANONYMOUS_STOP_REASON);
+                }
+                try {
+                    chat.sendMessage(ANONYMOUS_STOP_CHAT_MESSAGE);
+                } catch (RuntimeException e) {
+                    log.debug("Abschiedsnachricht konnte nicht gesendet werden: {}", e.getMessage());
+                }
+            } finally {
+                terminate(BotSession.Status.STOPPED, null);
+            }
+        });
+    }
+
     public void shutdownAsync() {
         shuttingDown = true;
         executor.execute(() -> {
@@ -268,6 +331,10 @@ public class BotInstance {
     public String getBotName() { return botName; }
     public String getRoomName() { return roomName; }
     public UUID getOwnerId() { return ownerId; }
+    public UUID getBotTemplateId() { return botTemplateId; }
+    public Instant getScheduledStopAt() { return scheduledStopAt; }
+    /** Wurde der Bot bereits zum Beenden aufgefordert? */
+    public boolean isShuttingDown() { return shuttingDown; }
 
     // ---------------------------------------------------------- Lebenszyklus
 
@@ -279,7 +346,6 @@ public class BotInstance {
             updateStatus(BotSession.Status.JOINED, null);
             detectRoomName();
             startMonitor();
-            startKeepalive();
             log.info("Bot {} ist dem Raum beigetreten.", botName);
         } catch (RuntimeException e) {
             log.error("Join fehlgeschlagen: {}", e.getMessage());
@@ -329,7 +395,7 @@ public class BotInstance {
         page = context.newPage();
         // Ab hier laeuft die Kontext-/Videoaufnahme; Zeitpunkt fuer die A/V-Sync merken.
         videoStartEpochMs = System.currentTimeMillis();
-        chat = new ChatOps(page);
+        chat = new ChatOps(page, sentChatTexts);
         participants = new ParticipantOps(page);
         recorder = new PageAudioRecorder(page);
 
@@ -364,21 +430,9 @@ public class BotInstance {
                 config.checkIntervalMs(), config.checkIntervalMs(), TimeUnit.MILLISECONDS);
     }
 
-    private void startKeepalive() {
-        if (!config.keepaliveEnabled()) return;
-        if (keepaliveTask != null) keepaliveTask.cancel(false);
-        keepaliveTask = executor.scheduleWithFixedDelay(() -> {
-            if (status != BotSession.Status.JOINED && status != BotSession.Status.RECORDING) return;
-            try {
-                chat.sendMessage(config.keepalivePrefix() + " " + config.keepaliveMessage());
-            } catch (RuntimeException e) {
-                log.debug("Keepalive fehlgeschlagen: {}", e.getMessage());
-            }
-        }, config.keepaliveIntervalMs(), config.keepaliveIntervalMs(), TimeUnit.MILLISECONDS);
-    }
-
     private void terminate(BotSession.Status finalStatus, String error) {
         if (!terminated.compareAndSet(false, true)) return;
+        stopTokenHash.set(null);
         if (watchdogTask != null) watchdogTask.cancel(false);
         closeBrowserQuietly();
         updateStatus(finalStatus, error);
@@ -493,6 +547,11 @@ public class BotInstance {
         heartbeat();
         if (shuttingDown || status == BotSession.Status.RECONNECTING || page == null) return;
         try {
+            // Anwesenheitsabfrage von BBB ("Sind Sie noch da?") bestaetigen, sonst
+            // wirft BBB den Bot als inaktiv hinaus. Das ersetzt die fruehere
+            // Keepalive-Nachricht im Chat.
+            try { joiner.confirmActivityCheck(page); } catch (RuntimeException ignored) {}
+
             // Verzoegert erscheinende Info-Fenster (z.B. "Session details") wegklicken,
             // damit sie im aufgenommenen Video die geteilte Ansicht nicht verdecken.
             try { joiner.dismissModals(page); } catch (RuntimeException ignored) {}
@@ -626,7 +685,7 @@ public class BotInstance {
             // Erkannter Raumname wird Titel der Aufnahme (Uebersicht zeigt dann
             // den Namen statt der Meeting-URL).
             Recording recording = recordingService.createRecording(sessionId, ownerId, meetingUrl,
-                    recordVideo, aiAnalysis, diarize, sttLanguage, roomName);
+                    recordVideo, aiAnalysis, diarize, sttLanguage, summaryChoice, roomName);
             currentRecordingId = recording.getId();
             if (recordVideo) {
                 // Video des laufenden Kontextes auch dieser Aufnahme zuordnen.
@@ -660,8 +719,16 @@ public class BotInstance {
             recorder.start(segmentMs, this::onAudioChunk);
 
             if (config.sendChatWarning()) {
+                // Anonymer Stopp-Link: nur sinnvoll, wenn er auch im Chat steht.
+                String stopUrl = null;
+                String base = config.stopUrlBase();
+                if (base != null) {
+                    String token = StopTokens.generate();
+                    stopTokenHash.set(StopTokens.hash(token));
+                    stopUrl = base + "/stop/" + token;
+                }
                 try {
-                    chat.sendMessage(config.buildWarnMessage(marker));
+                    chat.sendMessage(config.buildWarnMessage(marker, stopUrl));
                 } catch (RuntimeException e) {
                     log.warn("Warnmeldung konnte nicht gesendet werden: {}", e.getMessage());
                 }
@@ -722,7 +789,7 @@ public class BotInstance {
         String chatLog = "";
         if (!discard) {
             try {
-                chatLog = chat.getChatSinceMarker(markers.getActive(), 3, 250, config.keepalivePrefix());
+                chatLog = chat.getChatSinceMarker(markers.getActive(), 3, 250);
             } catch (RuntimeException e) {
                 log.warn("Chat-Extraktion fehlgeschlagen: {}", e.getMessage());
             }
@@ -751,6 +818,8 @@ public class BotInstance {
     }
 
     private void clearRecordingState() {
+        // Mit der Aufnahme endet auch ihr Stopp-Link.
+        stopTokenHash.set(null);
         currentRecordingId = null;
         currentSegment = null;
         try { if (segmentOut != null) segmentOut.close(); } catch (IOException ignored) {}

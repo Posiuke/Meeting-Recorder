@@ -64,6 +64,31 @@ public class BotSession {
     @Column(length = 16)
     private String sttLanguage;
 
+    /**
+     * Auswertungs-Vorlage fuer die Aufnahmen dieser Session (null = Admin-
+     * Vorgabe). Wird wie die Sprache beim Aufnahmestart an die Aufnahme
+     * weitergegeben.
+     */
+    @Column(columnDefinition = "text")
+    private String summaryPrompt;
+
+    @Column(length = 200)
+    private String summaryTemplateName;
+
+    @Column(length = 200)
+    private String summaryModel;
+
+    private Double summaryTemperature;
+
+    /** Bot-Vorlage, aus der die Session gestartet wurde (null = von Hand eingegeben). */
+    private UUID botTemplateId;
+
+    /**
+     * Zeitpunkt, zu dem der Zeitplan der Vorlage den Bot wieder beendet (null =
+     * laeuft, bis ihn jemand stoppt oder das Meeting endet).
+     */
+    private Instant scheduledStopAt;
+
     public static BotSession create(String meetingUrl, String botName, UUID createdBy, boolean autoRecord,
                                     boolean recordVideo, boolean aiAnalysis, boolean diarize) {
         BotSession s = new BotSession();
@@ -103,4 +128,18 @@ public class BotSession {
     public void setDiarize(boolean diarize) { this.diarize = diarize; }
     public String getSttLanguage() { return sttLanguage; }
     public void setSttLanguage(String sttLanguage) { this.sttLanguage = sttLanguage; }
+    public SummaryChoice getSummaryChoice() {
+        return new SummaryChoice(summaryPrompt, summaryTemplateName,
+                summaryModel, summaryTemperature);
+    }
+    public void setSummaryChoice(SummaryChoice choice) {
+        this.summaryPrompt = choice.prompt();
+        this.summaryTemplateName = choice.templateName();
+        this.summaryModel = choice.model();
+        this.summaryTemperature = choice.temperature();
+    }
+    public UUID getBotTemplateId() { return botTemplateId; }
+    public void setBotTemplateId(UUID botTemplateId) { this.botTemplateId = botTemplateId; }
+    public Instant getScheduledStopAt() { return scheduledStopAt; }
+    public void setScheduledStopAt(Instant scheduledStopAt) { this.scheduledStopAt = scheduledStopAt; }
 }

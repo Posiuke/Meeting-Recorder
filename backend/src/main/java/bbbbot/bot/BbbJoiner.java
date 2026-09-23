@@ -256,6 +256,49 @@ public class BbbJoiner {
      * ({@code data-test="closeModal"} / {@code i.icon-bbb-close}). Gibt true zurueck,
      * wenn ein Fenster geschlossen wurde. Best-effort, Fehlschlaege sind unkritisch.
      */
+    /**
+     * Bestaetigt die Anwesenheitsabfrage von BBB ("Activity check" /
+     * "Aktivitaetspruefung": "Pruefen, ob der Teilnehmer noch in der Konferenz
+     * ist"). Wer sie nicht rechtzeitig bestaetigt, fliegt als inaktiv aus dem
+     * Raum. Frueher hielt eine regelmaessige Chat-Nachricht den Bot "aktiv";
+     * die stoerte im Chat und ist damit entbehrlich.
+     *
+     * <p>Gesucht wird ein sichtbarer Dialog, dessen Text nach der Abfrage klingt;
+     * geklickt wird dessen Bestaetigungs-Button (nicht "Schliessen").
+     *
+     * @return true, wenn eine Abfrage bestaetigt wurde
+     */
+    public boolean confirmActivityCheck(Page page) {
+        Object clicked = page.evaluate("""
+                () => {
+                  const pattern = /activity check|aktivit\u00e4tspr\u00fcfung|still in (the )?meeting|noch in der konferenz|are you still (here|there)|noch da\\?/i;
+                  const dialogs = Array.from(document.querySelectorAll(
+                    '[role="dialog"], [aria-modal="true"], [data-test$="Modal"], [data-test*="activityCheck" i]'));
+                  for (const d of dialogs) {
+                    const r = d.getBoundingClientRect();
+                    if (r.width === 0 || r.height === 0) continue;
+                    if (!pattern.test(d.innerText || '')) continue;
+                    const buttons = Array.from(d.querySelectorAll('button')).filter(b => {
+                      const label = ((b.getAttribute('aria-label') || '') + ' ' + (b.innerText || '')).toLowerCase();
+                      return b.getAttribute('data-test') !== 'closeModal'
+                          && !b.querySelector('i.icon-bbb-close')
+                          && !/close|schlie\u00dfen/.test(label)
+                          && b.getBoundingClientRect().width > 0;
+                    });
+                    if (buttons.length > 0) {
+                      buttons[0].click();
+                      return (buttons[0].innerText || buttons[0].getAttribute('aria-label') || 'Button').trim();
+                    }
+                  }
+                  return null;
+                }""");
+        if (clicked != null) {
+            log.info("Anwesenheitsabfrage von BBB bestaetigt ('{}').", clicked);
+            return true;
+        }
+        return false;
+    }
+
     public boolean dismissModals(Page page) {
         for (String sel : DIALOG_CLOSE_SELECTORS) {
             try {

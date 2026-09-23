@@ -1,40 +1,54 @@
-// Sucht (neueste zuerst) nach einem START-Befehl im gesamten Chat und liefert
-// Metadaten der Nachricht (fuer Debounce/Logging). Parameter: escaped Regex.
-// BBB-DOM hier: Nachricht = data-test="chatMessageItem", Body =
-// data-test="messageContent". Bot-eigene Hinweismeldungen (mit Marker
-// "[RECxxxxxxxxxxxx]") werden uebersprungen -> kein Selbst-Trigger.
-(escapedCmd) => {
+// Sucht (neueste zuerst) nach einem START-Befehl im Chat und liefert Metadaten
+// der Nachricht (fuer Debounce/Logging). Parameter: { cmd: escaped Regex,
+// sent: vom Bot selbst gesendete Texte }.
+// Nachrichten des Bots selbst werden uebersprungen (kein Selbst-Trigger) -
+// Erkennung wie in chatMessages.js: Bearbeiten-Button (nur beim Autor), nur
+// ohne jeden Bearbeiten-Button im Chat ersatzweise die selbst gesendeten Texte. Zusaetzlich bleiben Zeilen mit
+// Bot-Marker "[RECxxxxxxxxxxxx]" aussen vor.
+({ cmd, sent }) => {
   // \b nur setzen, wenn der Befehlsrand ein Wortzeichen ist: bei Befehlen wie
   // "!start" gibt es vor dem "!" keine Wortgrenze, starres \b matcht dann nie.
-  // (escapedCmd beginnt bei Sonderzeichen mit "\", das ist kein Wortzeichen.)
+  // (cmd beginnt bei Sonderzeichen mit "\", das ist kein Wortzeichen.)
   const wordChar = /\w/;
-  const prefix = wordChar.test(escapedCmd[0]) ? '\\b' : '';
-  const suffix = wordChar.test(escapedCmd[escapedCmd.length - 1]) ? '\\b' : '';
-  const cmdRegex = new RegExp(prefix + escapedCmd + suffix, 'i');
+  const prefix = wordChar.test(cmd[0]) ? '\\b' : '';
+  const suffix = wordChar.test(cmd[cmd.length - 1]) ? '\\b' : '';
+  const cmdRegex = new RegExp(prefix + cmd + suffix, 'i');
   const botMarker = /\[REC[0-9A-Za-z]{12}\]/;
+  const norm = (s) => (s || '').replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
+  const sentSet = new Set((sent || []).map(norm));
 
-  const seqOf = (el) => {
-    const holder = (el.closest && el.closest('[data-sequence]')) || el;
-    const s = parseInt((holder.getAttribute && holder.getAttribute('data-sequence')) || '', 10);
-    return isNaN(s) ? 0 : s;
-  };
+  // Nur Nachrichten im Chat-Verlauf selbst: BBB zeigt neue Nachrichten
+  // zusaetzlich kurz als Benachrichtigung an - die zaehlte sonst doppelt.
+  // Nicht [data-test^="chatMessage"]: das traefe auch den Container.
+  // Doppelte IDs (z.B. waehrend BBB neu rendert) werden verworfen.
+  const scope = document.querySelector('[data-test="chatMessages"]') || document;
+  const seenIds = new Set();
+  const nodes = Array.from(scope.querySelectorAll(
+    '[data-test="chatMessageItem"], [data-test="chatMessage"]')).filter(m => {
+      const id = m.getAttribute('data-chat-message-id');
+      if (!id) return true;
+      if (seenIds.has(id)) return false;
+      seenIds.add(id);
+      return true;
+    });
 
-  const nodes = Array.from(document.querySelectorAll(
-    '[data-test="chatMessageItem"], [data-test="chatMessage"], [data-test^="chatMessage"]'
-  ));
-  nodes.sort((a, b) => seqOf(a) - seqOf(b));
+  const editButtons = nodes.some(m => m.querySelector('[data-test="editMessageButton"]'));
 
   for (let i = nodes.length - 1; i >= 0; i--) {
     const m = nodes[i];
     const bodyEl = m.querySelector('[data-test="messageContent"], [data-test="chatMessageBody"]');
-    const timeEl = m.querySelector('[data-test="chatMessageTime"]');
-    const userEl = m.querySelector('[data-test="chatMessageUser"], [data-test="userName"]');
-    const body = bodyEl ? (bodyEl.textContent || '') : (m.textContent || '');
-    if (botMarker.test(body)) continue; // Bot-eigene Nachricht ignorieren
+    const body = norm(bodyEl ? bodyEl.textContent : '');
+    if (!body) continue;
+    const own = editButtons
+      ? !!m.querySelector('[data-test="editMessageButton"]')
+      : sentSet.has(body);
+    if (own) continue;
+    if (botMarker.test(body)) continue;
     if (cmdRegex.test(body)) {
-      const time = timeEl ? timeEl.textContent || '' : '';
-      const user = userEl ? userEl.textContent || '' : '';
-      return { found: true, messagePreview: (user + ': ' + body.substring(0, 100)).trim(), timestamp: time };
+      const time = (m.querySelector('time, [data-test="chatMessageTime"]')?.textContent || '').trim();
+      // Die ID macht gleichlautende Befehle zu verschiedenen Zeiten unterscheidbar.
+      const id = m.getAttribute('data-chat-message-id') || '';
+      return { found: true, messagePreview: body.substring(0, 100), timestamp: (time + ' ' + id).trim() };
     }
   }
   return { found: false };

@@ -33,7 +33,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class LiveRoomFunctionsTest {
 
     private static final String BOT_NAME = System.getProperty("bbb.it.name", "RecorderBot-IT");
-    private static final String KEEPALIVE_PREFIX = "~KA~";
 
     private Playwright playwright;
     private Browser browser;
@@ -112,33 +111,38 @@ class LiveRoomFunctionsTest {
         assertTrue(Boolean.FALSE.equals(sessionDetailsVisible), "Session-Details-Modal wurde nicht geschlossen");
         assertTrue(participants.remoteAudioTrackCount() >= 1, "Remote-Audio nach Modal-Dismiss verloren");
 
-        // --- Chat: senden, lesen, Marker-Extraktion ------------------------
+        // --- Chat: eigene Nachrichten erkennen und ausblenden ---------------
+        // Der Test-Browser ist hier der einzige Teilnehmer: Alles, was er
+        // schreibt, ist "eigene Nachricht" und darf weder in der
+        // Befehlserkennung noch im Chat-Protokoll auftauchen.
         ChatOps chat = new ChatOps(page);
-        String marker = "IT-MARKER-" + Long.toHexString(System.nanoTime());
+        String marker = bbbbot.bot.SessionMarkers.generate();
         chat.sendMessage("Aufzeichnungshinweis (Test) [" + marker + "]");
         page.waitForTimeout(1_500);
-        chat.sendMessage("Nachricht nach Marker");
+        chat.sendMessage("Eigene Nachricht nach Marker");
         page.waitForTimeout(1_500);
 
+        List<ChatOps.ChatEntry> entries = chat.readEntries();
+        diag.note("readEntries: " + entries);
+        assertTrue(entries.stream().anyMatch(e -> e.own() && e.text().contains("Eigene Nachricht")),
+                "Eigene Nachricht nicht als eigene erkannt");
+
         String allChat = chat.getAllChatText();
-        diag.note("getAllChatText length=" + allChat.length());
-        assertTrue(allChat.contains(marker), "Gesendeter Marker nicht im Chat-Text gefunden");
+        assertTrue(allChat.contains(marker), "Marker-Zeile fehlt als Anker im Chat-Text");
+        assertTrue(!allChat.contains("Eigene Nachricht"), "Eigene Nachricht in der Befehlserkennung: " + allChat);
 
-        List<String> messages = chat.extractMessages(KEEPALIVE_PREFIX);
-        diag.note("extractMessages: " + messages.size() + " Nachrichten");
-        assertTrue(messages.stream().anyMatch(m -> m.contains(marker)), "Marker nicht in extractMessages");
+        List<String> messages = chat.extractMessages();
+        assertTrue(messages.stream().noneMatch(m -> m.contains(marker) || m.contains("Eigene Nachricht")),
+                "Bot-Nachrichten im Chat-Protokoll: " + messages);
+        assertTrue(chat.getChatSinceMarker(marker, 3, 500).isEmpty(), "Chat seit Marker enthaelt Bot-Nachrichten");
 
-        String sinceMarker = chat.getChatSinceMarker(marker, 3, 500, KEEPALIVE_PREFIX);
-        diag.note("getChatSinceMarker: " + sinceMarker.replace('\n', ' '));
-        assertTrue(sinceMarker.contains("Nachricht nach Marker"), "Chat nach Marker unvollstaendig: '" + sinceMarker + "'");
-
-        // --- START-Befehls-Erkennung ---------------------------------------
+        // --- START-Befehl: eigene Nachricht loest NICHT aus -----------------
         String startCommand = "!aufnahme-start-test";
         chat.sendMessage(startCommand);
         page.waitForTimeout(1_500);
         ChatOps.StartCommandInfo cmd = chat.detectStartCommandWithInfo(startCommand);
-        diag.note("StartCommand erkannt: " + cmd.found() + " preview=" + cmd.messagePreview());
-        assertTrue(cmd.found(), "START-Befehl im Chat nicht erkannt");
+        diag.note("StartCommand (eigene Nachricht) erkannt: " + cmd.found());
+        assertTrue(!cmd.found(), "Eigene START-Nachricht wurde als Befehl erkannt");
 
         // --- Audioaufnahme mit Segment-Rotation ----------------------------
         PageAudioRecorder recorder = new PageAudioRecorder(page);

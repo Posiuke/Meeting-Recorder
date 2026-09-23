@@ -98,6 +98,9 @@ class MigrationSchemaIT {
     private BotTemplateRepo botTemplateRepo;
 
     @Autowired
+    private bbbbot.repository.Repositories.BotSessionRepo sessionRepo;
+
+    @Autowired
     private ProcessingJobRepo jobRepo;
 
     @Autowired
@@ -324,6 +327,55 @@ class MigrationSchemaIT {
                 "https://bbb.example.org/b/xyz", "RecorderBot");
         assertThatThrownBy(() -> botTemplateRepo.saveAndFlush(doppelt))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    /**
+     * Zeitplan und Auswertungs-Vorlage (V28): Wochentage, Uhrzeiten (TIME) und
+     * die Verknuepfung Session -> Vorlage kommen unveraendert zurueck; der
+     * Scheduler findet die Vorlage und ihre Sessions seit Terminbeginn.
+     */
+    @Test
+    void botVorlagenMitZeitplanUndAuswertung() {
+        UUID owner = ownerId();
+        BotTemplate vorlage = BotTemplate.create(owner, "Jour fixe",
+                "https://bbb.example.org/b/jf", "RecorderBot");
+        vorlage.setScheduleEnabled(true);
+        vorlage.setScheduleDays(java.util.EnumSet.of(java.time.DayOfWeek.MONDAY, java.time.DayOfWeek.FRIDAY));
+        vorlage.setScheduleStart(java.time.LocalTime.of(9, 0));
+        vorlage.setScheduleEnd(java.time.LocalTime.of(10, 30));
+        vorlage.setScheduleTimeZone("Europe/Berlin");
+        vorlage.setSummaryPreset("talk");
+        vorlage.setSummaryChoice(new bbbbot.domain.SummaryChoice("Prompt", "Vortrag", "qwen", 0.2));
+        botTemplateRepo.saveAndFlush(vorlage);
+        em.clear();
+
+        assertThat(botTemplateRepo.findByScheduleEnabledTrue())
+                .singleElement()
+                .satisfies(t -> assertThat(t.getScheduleDays())
+                        .containsExactly(java.time.DayOfWeek.MONDAY, java.time.DayOfWeek.FRIDAY))
+                .satisfies(t -> assertThat(t.getScheduleEnd()).isEqualTo(java.time.LocalTime.of(10, 30)))
+                .satisfies(t -> assertThat(t.getSummaryChoice())
+                        .isEqualTo(new bbbbot.domain.SummaryChoice("Prompt", "Vortrag", "qwen", 0.2)));
+
+        java.time.Instant stop = java.time.Instant.now().plusSeconds(3600);
+        bbbbot.domain.BotSession session = bbbbot.domain.BotSession.create(vorlage.getMeetingUrl(),
+                "RecorderBot", owner, true, false, true, false);
+        session.setBotTemplateId(vorlage.getId());
+        session.setScheduledStopAt(stop);
+        session.setSummaryChoice(vorlage.getSummaryChoice());
+        sessionRepo.saveAndFlush(session);
+
+        assertThat(sessionRepo.findByBotTemplateIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                vorlage.getId(), session.getCreatedAt().minusSeconds(1)))
+                .singleElement()
+                .satisfies(s -> assertThat(s.getSummaryChoice().templateName()).isEqualTo("Vortrag"));
+
+        // Vorlage loeschen: Die Session bleibt (Historie), verliert nur den Verweis.
+        botTemplateRepo.deleteById(vorlage.getId());
+        botTemplateRepo.flush();
+        em.clear();
+        assertThat(sessionRepo.findById(session.getId()))
+                .hasValueSatisfying(s -> assertThat(s.getBotTemplateId()).isNull());
     }
 
     /**

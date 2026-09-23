@@ -151,8 +151,8 @@ async function errorFromResponse(response: Response): Promise<ApiError> {
  * Berechtigung steckt im Token der Adresse. Ein abgelaufenes Login im
  * Browser darf die Ansicht nicht stören – auch nicht durch eine Abmeldung.
  */
-export async function publicApi<T>(path: string): Promise<T> {
-  const response = await fetch(path);
+export async function publicApi<T>(path: string, init?: { method: 'GET' | 'POST' }): Promise<T> {
+  const response = await fetch(path, init);
   if (!response.ok) {
     throw await errorFromResponse(response);
   }
@@ -355,6 +355,16 @@ export function shareLinkUrl(token: string): string {
 
 export function publicShare(token: string): Promise<PublicShareView> {
   return publicApi<PublicShareView>(`/api/public/shares/${encodeURIComponent(token)}`);
+}
+
+/** Anonymer Stopp-Link: Raumname anzeigen, ohne etwas zu beenden. */
+export function stopLinkInfo(token: string): Promise<{ roomName: string | null }> {
+  return publicApi(`/api/public/bot-stop/${encodeURIComponent(token)}`);
+}
+
+/** Anonymer Stopp-Link: Aufnahme verwerfen, Bot verlässt den Raum. Wirkt genau einmal. */
+export function stopViaLink(token: string): Promise<{ roomName: string | null }> {
+  return publicApi(`/api/public/bot-stop/${encodeURIComponent(token)}`, { method: 'POST' });
 }
 
 export function publicAudioUrl(token: string, segmentId: string): string {

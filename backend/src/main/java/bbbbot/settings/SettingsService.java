@@ -84,16 +84,20 @@ public class SettingsService {
     public static final String BOT_WARN_MESSAGE = "bot.warnMessage";
     public static final String BOT_RECORD_MIN_OTHERS = "bot.recordMinOthers";
     public static final String BOT_CHECK_INTERVAL_MS = "bot.checkIntervalMs";
-    public static final String BOT_KEEPALIVE_ENABLED = "bot.keepaliveEnabled";
-    public static final String BOT_KEEPALIVE_INTERVAL_MS = "bot.keepaliveIntervalMs";
-    public static final String BOT_KEEPALIVE_MESSAGE = "bot.keepaliveMessage";
-    public static final String BOT_KEEPALIVE_PREFIX = "bot.keepalivePrefix";
     public static final String BOT_AUTO_RECONNECT = "bot.autoReconnect";
     public static final String BOT_RECONNECT_MAX_ATTEMPTS = "bot.reconnectMaxAttempts";
     public static final String BOT_RECONNECT_BACKOFF_BASE_MS = "bot.reconnectBackoffBaseMs";
     public static final String BOT_RECONNECT_BACKOFF_FACTOR = "bot.reconnectBackoffFactor";
     /** SSRF-Schutz: komma-getrennte erlaubte Host-Suffixe fuer die Meeting-URL. Leer = keine Einschraenkung. */
     public static final String BOT_ALLOWED_URL_HOSTS = "bot.allowedUrlHosts";
+    /**
+     * Anonymer Stopp-Link: Der Bot haengt an seinen Aufnahme-Hinweis einen
+     * einmaligen Link, ueber den ein Teilnehmer die Aufnahme verwerfen und den
+     * Bot aus dem Raum schicken kann - ohne sich im Chat zu erkennen zu geben.
+     */
+    public static final String BOT_ANONYMOUS_STOP_ENABLED = "bot.anonymousStopEnabled";
+    /** Adresse, unter der Meeting-Teilnehmer diese Anwendung erreichen (fuer den Stopp-Link). */
+    public static final String BOT_PUBLIC_URL = "bot.publicUrl";
 
     /**
      * Beigefuegte Unterlagen (Tagesordnung, Folien, Papiere) einer Aufnahme. Aus =
@@ -245,15 +249,13 @@ public class SettingsService {
         DEFAULTS.put(BOT_WARN_MESSAGE, DEFAULT_WARN_MESSAGE);
         DEFAULTS.put(BOT_RECORD_MIN_OTHERS, "1");
         DEFAULTS.put(BOT_CHECK_INTERVAL_MS, "5000");
-        DEFAULTS.put(BOT_KEEPALIVE_ENABLED, "true");
-        DEFAULTS.put(BOT_KEEPALIVE_INTERVAL_MS, "240000");
-        DEFAULTS.put(BOT_KEEPALIVE_MESSAGE, "ping");
-        DEFAULTS.put(BOT_KEEPALIVE_PREFIX, "[KEEPALIVE]");
         DEFAULTS.put(BOT_AUTO_RECONNECT, "true");
         DEFAULTS.put(BOT_RECONNECT_MAX_ATTEMPTS, "-1");
         DEFAULTS.put(BOT_RECONNECT_BACKOFF_BASE_MS, "5000");
         DEFAULTS.put(BOT_RECONNECT_BACKOFF_FACTOR, "1.5");
         DEFAULTS.put(BOT_ALLOWED_URL_HOSTS, "");
+        DEFAULTS.put(BOT_ANONYMOUS_STOP_ENABLED, "false");
+        DEFAULTS.put(BOT_PUBLIC_URL, "");
 
         DEFAULTS.put(CAPTURE_ENABLED, "true");
         // 8 GB reichen fuer mehrere Stunden in Standardqualitaet und verhindern,
@@ -326,7 +328,7 @@ public class SettingsService {
                      RECORDING_SEGMENT_MINUTES, RECORDING_MIN_AUDIO_BYTES,
                      CORRECTION_CHUNK_CHARS, CORRECTION_MAX_SENTENCE_CHARS,
                      CORRECTION_GLOSSARY_MAX_CHARS,
-                     BOT_RECORD_MIN_OTHERS, BOT_CHECK_INTERVAL_MS, BOT_KEEPALIVE_INTERVAL_MS,
+                     BOT_RECORD_MIN_OTHERS, BOT_CHECK_INTERVAL_MS,
                      BOT_RECONNECT_MAX_ATTEMPTS, BOT_RECONNECT_BACKOFF_BASE_MS,
                      CAPTURE_MAX_MEGABYTES, CAPTURE_STALE_MINUTES,
                      DOCUMENTS_MAX_MEGABYTES, DOCUMENTS_TIKA_TIMEOUT_SEC,
@@ -334,7 +336,7 @@ public class SettingsService {
                      CLEANUP_OLDER_THAN_DAYS -> Long.parseLong(value.trim());
                 case LLM_TEMPERATURE, BOT_RECONNECT_BACKOFF_FACTOR -> Double.parseDouble(value.trim());
                 case WHISPER_VAD_FILTER, WHISPER_DIARIZE, LLM_DISABLE_THINKING,
-                     BOT_SEND_CHAT_WARNING, BOT_KEEPALIVE_ENABLED,
+                     BOT_SEND_CHAT_WARNING, BOT_ANONYMOUS_STOP_ENABLED,
                      BOT_AUTO_RECONNECT, CAPTURE_ENABLED, CORRECTION_ENABLED, CLEANUP_ENABLED,
                      DOCUMENTS_ENABLED, SHARING_PUBLIC_LINKS -> {
                     if (!value.trim().equalsIgnoreCase("true") && !value.trim().equalsIgnoreCase("false")) {
@@ -342,6 +344,18 @@ public class SettingsService {
                     }
                 }
                 case PROCESSING_WINDOW_START, PROCESSING_WINDOW_END -> java.time.LocalTime.parse(value.trim());
+                // Leer = Stopp-Link aus; sonst eine vollstaendige http(s)-Adresse,
+                // denn der Bot schreibt sie woertlich in den Chat.
+                case BOT_PUBLIC_URL -> {
+                    String v = value.trim();
+                    if (!v.isEmpty()) {
+                        java.net.URI uri = java.net.URI.create(v);
+                        if (uri.getHost() == null
+                                || !("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))) {
+                            throw new IllegalArgumentException("erwartet http(s)://host");
+                        }
+                    }
+                }
                 case WHISPER_PROVIDER -> {
                     if (!value.trim().equalsIgnoreCase("local") && !value.trim().equalsIgnoreCase("openai")) {
                         throw new IllegalArgumentException("erwartet local/openai");

@@ -3,9 +3,13 @@ package bbbbot.api;
 import bbbbot.auth.CurrentUser;
 import bbbbot.bot.BotInstance;
 import bbbbot.bot.BotManager;
+import bbbbot.bot.BotTemplateLauncher;
 import bbbbot.domain.AppUser;
 import bbbbot.domain.BotSession;
+import bbbbot.domain.BotTemplate;
+import bbbbot.domain.SummaryChoice;
 import bbbbot.repository.Repositories.BotSessionRepo;
+import bbbbot.repository.Repositories.BotTemplateRepo;
 import bbbbot.settings.SettingsService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -20,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -44,11 +49,16 @@ public class BotController {
     private final BotManager botManager;
     private final BotSessionRepo sessionRepo;
     private final SettingsService settings;
+    private final BotTemplateRepo templateRepo;
+    private final BotTemplateLauncher launcher;
 
-    public BotController(BotManager botManager, BotSessionRepo sessionRepo, SettingsService settings) {
+    public BotController(BotManager botManager, BotSessionRepo sessionRepo, SettingsService settings,
+                         BotTemplateRepo templateRepo, BotTemplateLauncher launcher) {
         this.botManager = botManager;
         this.sessionRepo = sessionRepo;
         this.settings = settings;
+        this.templateRepo = templateRepo;
+        this.launcher = launcher;
     }
 
     @GetMapping
@@ -85,14 +95,43 @@ public class BotController {
                 && settings.getBool(SettingsService.WHISPER_DIARIZE);
         // Sprache der Spracherkennung: leer = Admin-Standard, "auto" = automatisch erkennen
         String sttLanguage = RecordingController.requireSttLanguage(request.sttLanguage());
+        // Auswertungs-Vorlage - dieselben Pruefungen wie beim Upload
+        SummaryChoice summary = new SummaryChoice(
+                RecordingController.requireSummaryPrompt(request.summaryPrompt()),
+                RecordingController.checkTemplateName(request.summaryTemplateName()),
+                PromptTemplateController.checkModel(request.summaryModel()),
+                PromptTemplateController.checkTemperature(request.summaryTemperature()));
         try {
             BotSession session = botManager.startBot(url, botName, autoRecord, recordVideo, aiAnalysis,
-                    diarize, sttLanguage, user.getId());
-            BotInstance instance = botManager.get(session.getId()).orElseThrow();
-            return toView(instance, user);
+                    diarize, sttLanguage, summary, null, null, user.getId());
+            return viewOf(session, user);
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
         }
+    }
+
+    /**
+     * Startet den Bot einer eigenen Bot-Vorlage - der kurze Weg "Vorlage
+     * waehlen, Bot starten". Laeuft gerade ein Termin ihres Zeitplans, endet der
+     * Bot zu dessen Endzeit.
+     */
+    @PostMapping("/from-template/{templateId}")
+    public Dtos.BotView startFromTemplate(@PathVariable UUID templateId) {
+        AppUser user = CurrentUser.get();
+        BotTemplate template = templateRepo.findById(templateId)
+                .filter(t -> t.getOwnerId().equals(user.getId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Bot-Vorlage nicht gefunden"));
+        try {
+            return viewOf(launcher.startNow(template, Instant.now()), user);
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        }
+    }
+
+    private Dtos.BotView viewOf(BotSession session, AppUser user) {
+        BotInstance instance = botManager.get(session.getId()).orElseThrow();
+        return toView(instance, user);
     }
 
     @DeleteMapping("/{sessionId}")
@@ -131,7 +170,7 @@ public class BotController {
      * von den Bot-Vorlagen ({@link BotTemplateController}) - eine Vorlage, die
      * beim Starten scheitern wuerde, soll gar nicht erst speicherbar sein.
      */
-    static String requireMeetingUrl(String raw, SettingsService settings) {
+    public static String requireMeetingUrl(String raw, SettingsService settings) {
         if (raw == null || raw.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Meeting-URL erforderlich");
         }
@@ -206,7 +245,9 @@ public class BotController {
                 instance.getCurrentAudioTracks(),
                 instance.getLastError(),
                 session == null ? null : session.getCreatedAt(),
-                instance.getOwnerId().equals(user.getId())
+                instance.getOwnerId().equals(user.getId()),
+                instance.getBotTemplateId(),
+                instance.getScheduledStopAt()
         );
     }
 }

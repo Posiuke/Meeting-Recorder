@@ -100,12 +100,19 @@ public class RecordingService {
     /**
      * @param sttLanguage Sprache der Spracherkennung dieser Aufnahme; null =
      *                    Admin-Standard, "auto" = Whisper erkennt sie selbst
+     * @param summary     Auswertungs-Vorlage der Bot-Session; sie muss wie die
+     *                    Sprache vor dem Verarbeitungs-Job an der Aufnahme stehen
      */
     public Recording createRecording(UUID botSessionId, UUID ownerId, String meetingUrl,
                                      boolean recordVideo, boolean aiAnalysis, boolean diarize,
-                                     String sttLanguage, String title) {
+                                     String sttLanguage, bbbbot.domain.SummaryChoice summary,
+                                     String title) {
         Recording recording = Recording.start(botSessionId, ownerId, meetingUrl, "", recordVideo, aiAnalysis, diarize);
         recording.setSttLanguage(sttLanguage);
+        recording.setSummaryPrompt(summary.prompt());
+        recording.setSummaryTemplateName(summary.templateName());
+        recording.setSummaryModel(summary.model());
+        recording.setSummaryTemperature(summary.temperature());
         if (title != null && !title.isBlank()) {
             recording.setTitle(title.trim());
         }

@@ -126,6 +126,7 @@ export const de = {
     cardAudioTracks: 'Audiotracks',
     cardMode: 'Modus',
     cardStarted: 'Gestartet',
+    cardScheduledStop: 'Verlässt den Raum',
     cardRecording: 'Aufnahme',
     cardRecordingLink: 'Zur laufenden Aufnahme',
     modeVideo: 'Video',
@@ -141,6 +142,14 @@ export const de = {
     stopRecording: 'Aufnahme beenden',
     discard: 'Verwerfen',
     stopBot: 'Bot stoppen',
+    startRecordingHint:
+      'Startet jetzt eine neue Aufnahme in diesem Raum. Der Bot bleibt im Raum, bis Sie ihn stoppen.',
+    stopRecordingHint:
+      'Beendet die Aufnahme und speichert sie – sie erscheint unter „Aufnahmen" und wird – bei aktivierter KI-Analyse – ausgewertet. Der Bot bleibt im Raum und nimmt erst wieder auf, wenn Sie „Aufnahme starten" drücken.',
+    discardHint:
+      'Beendet die Aufnahme und löscht sie unwiderruflich – es wird nichts gespeichert. Der Bot bleibt im Raum.',
+    stopBotHint:
+      'Der Bot verlässt den Raum. Eine laufende Aufnahme wird dabei ebenfalls gespeichert (wie bei „Aufnahme beenden").',
     confirmDiscardTitle: 'Aufnahme verwerfen',
     confirmDiscardMessage:
       'Die laufende Aufnahme wird beendet und unwiderruflich verworfen. Fortfahren?',
@@ -170,6 +179,44 @@ export const de = {
     confirmDeleteTitle: 'Bot-Vorlage löschen',
     confirmDeleteMessage:
       'Die Vorlage „{{name}}" wird gelöscht. Laufende Bots und bereits erstellte Aufnahmen bleiben davon unberührt. Fortfahren?',
+    schedule: {
+      legend: 'Zeitplan',
+      enabled: 'Bot automatisch nach Zeitplan starten',
+      days: 'Wochentage',
+      start: 'Beitritt um',
+      end: 'Verlässt den Raum um',
+      hint: 'Der Bot tritt an den gewählten Tagen zur Startzeit selbst bei und verlässt den Raum zur Endzeit; die laufende Aufnahme wird dabei regulär abgeschlossen.',
+      overnightHint: 'Die Endzeit liegt vor der Startzeit – der Termin endet am Folgetag.',
+      timeZone: 'Zeitzone: {{zone}}.',
+      invalid: 'Für den Zeitplan mindestens einen Wochentag sowie unterschiedliche Start- und Endzeiten angeben.',
+      next: 'Nächster Termin: {{date}}',
+      running: 'Termin läuft – Bot bleibt bis {{time}}',
+      off: 'Zeitplan pausiert',
+      dayShort: {
+        MONDAY: 'Mo',
+        TUESDAY: 'Di',
+        WEDNESDAY: 'Mi',
+        THURSDAY: 'Do',
+        FRIDAY: 'Fr',
+        SATURDAY: 'Sa',
+        SUNDAY: 'So',
+      },
+      dayLong: {
+        MONDAY: 'Montag',
+        TUESDAY: 'Dienstag',
+        WEDNESDAY: 'Mittwoch',
+        THURSDAY: 'Donnerstag',
+        FRIDAY: 'Freitag',
+        SATURDAY: 'Samstag',
+        SUNDAY: 'Sonntag',
+      },
+    },
+    presetLabel: 'Auswertungs-Vorlage',
+    presetHelp:
+      'Mit dieser Vorlage werden die Aufnahmen des Bots im Anschluss ausgewertet – schon die erste Auswertung. „Meeting (Standard)" folgt der Vorgabe des Administrators. Eine eigene Vorlage wird bei jedem Start frisch gelesen, Änderungen daran wirken also auch hier.',
+    presetMissing:
+      'Die gewählte eigene Vorlage „{{name}}" wurde gelöscht – der Bot wertet mit ihrem zuletzt gespeicherten Stand aus.',
+    presetShort: 'Auswertung: {{name}}',
   },
 
   dialogs: {
@@ -852,6 +899,26 @@ export const de = {
       'Download, API, Freigabe-Ansicht und summary.md folgen dann dieser Fassung; die andere bleibt erhalten.',
   },
 
+  stopPage: {
+    loading: 'Wird geladen…',
+    title: 'Aufnahme beenden',
+    room: 'Meeting:',
+    intro:
+      'Hier können Sie die laufende Aufnahme dieses Meetings beenden. Die Aufnahme wird dabei vollständig gelöscht und der Aufnahme-Bot verlässt den Raum.',
+    anonymous:
+      'Das geschieht anonym: Im Meeting ist nicht zu sehen, wer die Aufnahme beendet hat. Über Sie wird nichts gespeichert.',
+    submit: 'Aufnahme beenden und verwerfen',
+    confirm: 'Wirklich beenden? Die Aufnahme lässt sich danach nicht wiederherstellen.',
+    confirmYes: 'Ja, Aufnahme beenden',
+    stopping: 'Wird beendet…',
+    doneTitle: 'Aufnahme beendet',
+    done: 'Die Aufnahme wurde beendet und gelöscht. Der Bot verlässt den Raum.',
+    doneHint: 'Sie können dieses Fenster jetzt schließen.',
+    invalidTitle: 'Link nicht mehr gültig',
+    invalid:
+      'Dieser Link ist nicht (mehr) gültig – die Aufnahme ist bereits beendet oder der Link wurde schon verwendet.',
+  },
+
   sharePage: {
     loading: 'Freigabe wird geladen…',
     intro:
@@ -1016,6 +1083,12 @@ export const de = {
     usersRunningNone: 'Derzeit läuft keine Aufnahme – Wartungsarbeiten sind unkritisch.',
     usersUntitled: 'ohne Titel',
     keyHelp: {
+      botWarnMessage:
+        'Hinweis, den der Bot beim Aufnahmestart in den Chat schreibt. Platzhalter: ${STOP} (Befehl zum Verwerfen), ${START} (Befehl zum Starten), ${STOP_URL} (anonymer Stopp-Link, falls eingeschaltet). Fehlt ${STOP_URL}, hängt der Bot den Link als eigenen Satz an.',
+      botAnonymousStopEnabled:
+        'Anonymer Stopp-Link: Der Bot hängt an seinen Aufnahme-Hinweis einen einmaligen Link. Darüber kann ein Teilnehmer die Aufnahme verwerfen und den Bot aus dem Raum schicken, ohne sich im Chat zu erkennen zu geben. Braucht bot.publicUrl und bot.sendChatWarning = true.',
+      botPublicUrl:
+        'Adresse, unter der Meeting-Teilnehmer diese Anwendung erreichen (z.B. https://recorder.intern). Daraus baut der Bot den Stopp-Link. Leer = kein Stopp-Link.',
       whisperProvider:
         'Wo die Spracherkennung läuft: „local" schickt die Audio-Segmente an den eigenen Whisper-Server im Intranet, „openai" an eine Cloud-API im OpenAI-Format (z. B. OpenAI, Groq).',
       whisperUrl: 'Adresse des Whisper-ASR-Webservice im Intranet (nur bei provider = local).',

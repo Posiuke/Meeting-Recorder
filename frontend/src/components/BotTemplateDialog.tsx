@@ -1,11 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { useAppDispatch } from '../store/hooks';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { createBotTemplate, updateBotTemplate } from '../store/botTemplatesSlice';
+import { fetchPromptTemplates } from '../store/promptTemplatesSlice';
 import Modal from './Modal';
 import Alert from './Alert';
 import HelpTip from './HelpTip';
 import SttLanguageSelect from './SttLanguageSelect';
+import PromptPresetSelect, {
+  findOwnTemplate,
+  resolveSummarySelection,
+} from './PromptPresetSelect';
+import BotScheduleFields, {
+  scheduleRequestOf,
+  scheduleValid,
+} from './BotScheduleFields';
 import { errorMessage } from '../api/client';
 import { useI18n } from '../i18n';
 import type { BotTemplateRequest, BotTemplateView } from '../types';
@@ -14,8 +23,15 @@ import type { BotTemplateRequest, BotTemplateView } from '../types';
 const MAX_NAME_LENGTH = 100;
 const MAX_BOT_NAME_LENGTH = 100;
 
-/** Einstellungen einer Vorlage ohne ihren Namen – so kommen sie aus dem Bot-Formular. */
-export type BotTemplateSettings = Omit<BotTemplateRequest, 'name'>;
+/**
+ * Einstellungen einer Vorlage ohne ihren Namen – so kommen sie aus dem
+ * Bot-Formular. Dort gibt es keinen Zeitplan; die Auswahl der
+ * Auswertungs-Vorlage wird als Auswahl übergeben und hier aufgelöst.
+ */
+export type BotTemplateSettings = Omit<
+  BotTemplateRequest,
+  'name' | 'schedule' | 'summaryPrompt' | 'summaryTemplateName' | 'summaryModel' | 'summaryTemperature'
+>;
 
 interface BotTemplateDialogProps {
   /** Zu bearbeitende Vorlage; null = neue Vorlage anlegen. */
@@ -43,6 +59,18 @@ export default function BotTemplateDialog({
 }: BotTemplateDialogProps) {
   const { t } = useI18n();
   const dispatch = useAppDispatch();
+  const {
+    items: promptTemplates,
+    loaded: promptTemplatesLoaded,
+    loading: promptTemplatesLoading,
+  } = useAppSelector((s) => s.promptTemplates);
+
+  // Eigene Auswertungs-Vorlagen nur laden, wenn sie noch nicht im Store sind
+  useEffect(() => {
+    if (!promptTemplatesLoaded && !promptTemplatesLoading) {
+      void dispatch(fetchPromptTemplates());
+    }
+  }, [dispatch, promptTemplatesLoaded, promptTemplatesLoading]);
 
   const [name, setName] = useState(template?.name ?? '');
   const [meetingUrl, setMeetingUrl] = useState(template?.meetingUrl ?? prefill?.meetingUrl ?? '');
@@ -56,11 +84,24 @@ export default function BotTemplateDialog({
   const [sttLanguage, setSttLanguage] = useState(
     template?.sttLanguage ?? prefill?.sttLanguage ?? '',
   );
+  const [schedule, setSchedule] = useState(() => scheduleRequestOf(template?.schedule));
+  // '' = „Meeting (Standard)", 'tpl:<id>' = eigene Vorlage, sonst integrierte
+  const [preset, setPreset] = useState(
+    template?.summaryPreset ?? prefill?.summaryPreset ?? '',
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Gewählte eigene Vorlage inzwischen gelöscht? Dann arbeitet die Bot-Vorlage
+  // mit ihrem gespeicherten Stand weiter – das soll man sehen.
+  const presetMissing =
+    promptTemplatesLoaded &&
+    preset.startsWith('tpl:') &&
+    !findOwnTemplate(preset, promptTemplates);
+
   const trimmedName = name.trim();
-  const canSave = !busy && trimmedName !== '' && meetingUrl.trim() !== '';
+  const canSave =
+    !busy && trimmedName !== '' && meetingUrl.trim() !== '' && scheduleValid(schedule);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -76,6 +117,9 @@ export default function BotTemplateDialog({
       aiAnalysis,
       diarize,
       sttLanguage,
+      schedule,
+      summaryPreset: preset || null,
+      ...resolveSummarySelection(preset, promptTemplates, template),
     };
     try {
       if (template) {
@@ -207,6 +251,30 @@ export default function BotTemplateDialog({
             onChange={setSttLanguage}
           />
         </div>
+
+        <div className="form-field">
+          <label htmlFor="bot-template-preset">
+            {t('botTemplates.presetLabel')}
+            <HelpTip text={t('botTemplates.presetHelp')} />
+          </label>
+          <PromptPresetSelect
+            id="bot-template-preset"
+            value={presetMissing ? '' : preset}
+            templates={promptTemplates}
+            disabled={busy || !aiAnalysis}
+            onChange={setPreset}
+          />
+          {presetMissing && (
+            <span className="muted upload-preset-hint">
+              {t('botTemplates.presetMissing', { name: template?.summaryTemplateName ?? '' })}
+            </span>
+          )}
+        </div>
+
+        <BotScheduleFields value={schedule} disabled={busy} onChange={setSchedule} />
+        {schedule.enabled && !scheduleValid(schedule) && (
+          <span className="muted schedule-hint">{t('botTemplates.schedule.invalid')}</span>
+        )}
       </form>
     </Modal>
   );

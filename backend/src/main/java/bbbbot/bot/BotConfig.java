@@ -13,16 +13,14 @@ public record BotConfig(
         String warnMessage,
         int recordMinOthers,
         long checkIntervalMs,
-        boolean keepaliveEnabled,
-        long keepaliveIntervalMs,
-        String keepaliveMessage,
-        String keepalivePrefix,
         boolean autoReconnect,
         int reconnectMaxAttempts,
         long reconnectBackoffBaseMs,
         double reconnectBackoffFactor,
         int segmentMinutes,
-        long minAudioBytes
+        long minAudioBytes,
+        boolean anonymousStopEnabled,
+        String publicUrl
 ) {
     public static BotConfig fromSettings(SettingsService settings) {
         return new BotConfig(
@@ -32,25 +30,57 @@ public record BotConfig(
                 settings.get(SettingsService.BOT_WARN_MESSAGE),
                 settings.getInt(SettingsService.BOT_RECORD_MIN_OTHERS),
                 settings.getLong(SettingsService.BOT_CHECK_INTERVAL_MS),
-                settings.getBool(SettingsService.BOT_KEEPALIVE_ENABLED),
-                settings.getLong(SettingsService.BOT_KEEPALIVE_INTERVAL_MS),
-                settings.get(SettingsService.BOT_KEEPALIVE_MESSAGE),
-                settings.get(SettingsService.BOT_KEEPALIVE_PREFIX),
                 settings.getBool(SettingsService.BOT_AUTO_RECONNECT),
                 settings.getInt(SettingsService.BOT_RECONNECT_MAX_ATTEMPTS),
                 settings.getLong(SettingsService.BOT_RECONNECT_BACKOFF_BASE_MS),
                 settings.getDouble(SettingsService.BOT_RECONNECT_BACKOFF_FACTOR),
                 settings.getInt(SettingsService.RECORDING_SEGMENT_MINUTES),
-                settings.getLong(SettingsService.RECORDING_MIN_AUDIO_BYTES)
+                settings.getLong(SettingsService.RECORDING_MIN_AUDIO_BYTES),
+                settings.getBool(SettingsService.BOT_ANONYMOUS_STOP_ENABLED),
+                settings.get(SettingsService.BOT_PUBLIC_URL)
         );
     }
 
-    /** Warnmeldung mit eingesetztem Stop-Befehl und angehaengtem Session-Marker. */
+    /** Platzhalter fuer den anonymen Stopp-Link in der Warnmeldung. */
+    static final String STOP_URL_PLACEHOLDER = "${STOP_URL}";
+
+    /**
+     * Basisadresse fuer den anonymen Stopp-Link ohne abschliessenden Schraegstrich,
+     * oder null, wenn die Funktion aus ist bzw. keine Adresse eingetragen ist.
+     */
+    public String stopUrlBase() {
+        if (!anonymousStopEnabled || publicUrl == null || publicUrl.isBlank()) return null;
+        return publicUrl.trim().replaceAll("/+$", "");
+    }
+
+    /** Warnmeldung ohne Stopp-Link. */
     public String buildWarnMessage(String marker) {
+        return buildWarnMessage(marker, null);
+    }
+
+    /**
+     * Warnmeldung mit eingesetztem Stop-Befehl, optionalem Stopp-Link und
+     * angehaengtem Session-Marker.
+     *
+     * <p>Der Link landet an der Stelle von {@code ${STOP_URL}}. Fehlt der
+     * Platzhalter (z.B. in einer frueher angepassten Meldung), wird er als
+     * eigener Satz angehaengt - sonst ginge der Link stillschweigend verloren.
+     * Ohne Link verschwindet der Platzhalter.
+     */
+    public String buildWarnMessage(String marker, String stopUrl) {
         String msg = warnMessage
                 .replace("${STOP}", chatStopCommand)
                 .replace("${CHAT_STOP_MESSAGE}", chatStopCommand)
                 .replace("${START}", chatStartCommand);
+        if (stopUrl == null) {
+            if (msg.contains(STOP_URL_PLACEHOLDER)) {
+                msg = msg.replace(STOP_URL_PLACEHOLDER, "").replaceAll(" {2,}", " ").trim();
+            }
+        } else if (msg.contains(STOP_URL_PLACEHOLDER)) {
+            msg = msg.replace(STOP_URL_PLACEHOLDER, stopUrl);
+        } else {
+            msg = msg + " Ohne Chat-Nachricht beenden und verwerfen: " + stopUrl;
+        }
         return msg + " [" + marker + "]";
     }
 }

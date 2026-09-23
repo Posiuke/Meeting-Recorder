@@ -124,6 +124,7 @@ export const en: typeof de = {
     cardAudioTracks: 'Audio tracks',
     cardMode: 'Mode',
     cardStarted: 'Started',
+    cardScheduledStop: 'Leaves the room',
     cardRecording: 'Recording',
     cardRecordingLink: 'Go to the running recording',
     modeVideo: 'Video',
@@ -138,6 +139,14 @@ export const en: typeof de = {
     stopRecording: 'Stop recording',
     discard: 'Discard',
     stopBot: 'Stop bot',
+    startRecordingHint:
+      'Starts a new recording in this room now. The bot stays in the room until you stop it.',
+    stopRecordingHint:
+      'Stops the recording and saves it – it appears under "Recordings" and is analysed if AI analysis is enabled. The bot stays in the room and only records again when you press "Start recording".',
+    discardHint:
+      'Stops the recording and deletes it irrevocably – nothing is saved. The bot stays in the room.',
+    stopBotHint:
+      'The bot leaves the room. A running recording is saved as well (same as "Stop recording").',
     confirmDiscardTitle: 'Discard recording',
     confirmDiscardMessage:
       'The running recording will be stopped and irrevocably discarded. Continue?',
@@ -166,6 +175,44 @@ export const en: typeof de = {
     confirmDeleteTitle: 'Delete bot template',
     confirmDeleteMessage:
       'The template "{{name}}" will be deleted. Running bots and recordings already created are not affected. Continue?',
+    schedule: {
+      legend: 'Schedule',
+      enabled: 'Start the bot automatically on a schedule',
+      days: 'Weekdays',
+      start: 'Joins at',
+      end: 'Leaves at',
+      hint: 'On the selected days the bot joins at the start time and leaves the room at the end time; a running recording is finished normally.',
+      overnightHint: 'The end time is before the start time – the session ends the following day.',
+      timeZone: 'Time zone: {{zone}}.',
+      invalid: 'For the schedule, choose at least one weekday and different start and end times.',
+      next: 'Next session: {{date}}',
+      running: 'Session running – bot stays until {{time}}',
+      off: 'Schedule paused',
+      dayShort: {
+        MONDAY: 'Mon',
+        TUESDAY: 'Tue',
+        WEDNESDAY: 'Wed',
+        THURSDAY: 'Thu',
+        FRIDAY: 'Fri',
+        SATURDAY: 'Sat',
+        SUNDAY: 'Sun',
+      },
+      dayLong: {
+        MONDAY: 'Monday',
+        TUESDAY: 'Tuesday',
+        WEDNESDAY: 'Wednesday',
+        THURSDAY: 'Thursday',
+        FRIDAY: 'Friday',
+        SATURDAY: 'Saturday',
+        SUNDAY: 'Sunday',
+      },
+    },
+    presetLabel: 'Analysis template',
+    presetHelp:
+      'The bot\'s recordings are analysed with this template afterwards – starting with the very first analysis. "Meeting (default)" follows the administrator\'s setting. An own template is read fresh on every start, so changes to it apply here too.',
+    presetMissing:
+      'The selected own template "{{name}}" has been deleted – the bot analyses with its last saved state.',
+    presetShort: 'Analysis: {{name}}',
   },
 
   dialogs: {
@@ -829,6 +876,26 @@ export const en: typeof de = {
       'The download, the API, the share view and summary.md then follow this version; the other one is kept.',
   },
 
+  stopPage: {
+    loading: 'Loading…',
+    title: 'Stop recording',
+    room: 'Meeting:',
+    intro:
+      'Here you can stop the running recording of this meeting. The recording is deleted completely and the recording bot leaves the room.',
+    anonymous:
+      'This is anonymous: nobody in the meeting can see who stopped the recording. Nothing about you is stored.',
+    submit: 'Stop and discard recording',
+    confirm: 'Really stop? The recording cannot be restored afterwards.',
+    confirmYes: 'Yes, stop recording',
+    stopping: 'Stopping…',
+    doneTitle: 'Recording stopped',
+    done: 'The recording has been stopped and deleted. The bot is leaving the room.',
+    doneHint: 'You can close this window now.',
+    invalidTitle: 'Link no longer valid',
+    invalid:
+      'This link is not (or no longer) valid – the recording has already ended or the link has already been used.',
+  },
+
   sharePage: {
     loading: 'Loading shared recording…',
     intro:
@@ -990,6 +1057,12 @@ export const en: typeof de = {
     usersRunningNone: 'No recording is running – maintenance is safe.',
     usersUntitled: 'untitled',
     keyHelp: {
+      botWarnMessage:
+        'Notice the bot posts to the chat when a recording starts. Placeholders: ${STOP} (command to discard), ${START} (command to start), ${STOP_URL} (anonymous stop link, if enabled). Without ${STOP_URL} the bot appends the link as a separate sentence.',
+      botAnonymousStopEnabled:
+        'Anonymous stop link: the bot adds a one-time link to its recording notice. Through it, a participant can discard the recording and send the bot out of the room without revealing themselves in the chat. Requires bot.publicUrl and bot.sendChatWarning = true.',
+      botPublicUrl:
+        'Address at which meeting participants reach this application (e.g. https://recorder.intern). The bot builds the stop link from it. Empty = no stop link.',
       whisperProvider:
         'Where speech recognition runs: "local" sends the audio segments to your own Whisper server on the intranet, "openai" to a cloud API in OpenAI format (e.g. OpenAI, Groq).',
       whisperUrl: 'Address of the Whisper ASR web service on the intranet (only for provider = local).',

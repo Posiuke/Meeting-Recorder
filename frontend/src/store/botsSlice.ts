@@ -46,6 +46,18 @@ export const createBot = createAsyncThunk<BotView, CreateBotRequest, { rejectVal
   },
 );
 
+/** Bot aus einer eigenen Bot-Vorlage starten – der Server liest die Vorlage selbst. */
+export const createBotFromTemplate = createAsyncThunk<BotView, string, { rejectValue: string }>(
+  'bots/createFromTemplate',
+  async (templateId, { rejectWithValue }) => {
+    try {
+      return await api<BotView>(`/api/bots/from-template/${templateId}`, { method: 'POST' });
+    } catch (e) {
+      return rejectWithValue(errorMessage(e));
+    }
+  },
+);
+
 export const stopBot = createAsyncThunk<string, string, { rejectValue: string }>(
   'bots/stop',
   async (sessionId, { rejectWithValue }) => {
@@ -117,6 +129,14 @@ const botsSlice = createSlice({
         state.error = action.payload ?? translate('errors.botsLoad');
       })
       .addCase(createBot.fulfilled, (state, action) => {
+        const idx = state.items.findIndex((b) => b.sessionId === action.payload.sessionId);
+        if (idx >= 0) {
+          state.items[idx] = action.payload;
+        } else {
+          state.items.unshift(action.payload);
+        }
+      })
+      .addCase(createBotFromTemplate.fulfilled, (state, action) => {
         const idx = state.items.findIndex((b) => b.sessionId === action.payload.sessionId);
         if (idx >= 0) {
           state.items[idx] = action.payload;

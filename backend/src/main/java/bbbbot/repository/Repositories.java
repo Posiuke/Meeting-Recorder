@@ -58,6 +58,9 @@ public interface Repositories {
         List<BotSession> findByStatusIn(List<BotSession.Status> statuses);
         List<BotSession> findTop50ByOrderByCreatedAtDesc();
         List<BotSession> findTop50ByCreatedByOrderByCreatedAtDesc(UUID createdBy);
+        /** Sessions einer Bot-Vorlage seit Beginn eines Termins, neueste zuerst. */
+        List<BotSession> findByBotTemplateIdAndCreatedAtGreaterThanEqualOrderByCreatedAtDesc(
+                UUID botTemplateId, java.time.Instant since);
     }
 
     interface RecordingRepo extends JpaRepository<Recording, UUID> {
@@ -175,6 +178,8 @@ public interface Repositories {
         List<BotTemplate> findByOwnerIdOrderByNameAsc(UUID ownerId);
         long countByOwnerId(UUID ownerId);
         boolean existsByOwnerIdAndNameIgnoreCase(UUID ownerId, String name);
+        /** Vorlagen mit aktivem Zeitplan - die Arbeitsliste des BotScheduler. */
+        List<BotTemplate> findByScheduleEnabledTrue();
     }
 
     interface PromptTemplateRepo extends JpaRepository<PromptTemplate, UUID> {

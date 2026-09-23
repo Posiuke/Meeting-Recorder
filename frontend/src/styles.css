@@ -891,6 +891,78 @@ tbody tr:hover {
   gap: 0.4rem;
 }
 
+.bot-template-schedule {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.bot-template-schedule.active {
+  color: var(--green);
+}
+
+/* Zeitplan im Vorlagen-Dialog */
+.schedule-fields {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem 0.8rem;
+  margin: 0.75rem 0 0.25rem;
+  min-width: 0;
+}
+
+.schedule-fields legend {
+  font-weight: 600;
+  padding: 0 0.3rem;
+}
+
+.weekday-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.4rem 0 0.6rem;
+}
+
+.weekday-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.6rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+  background: var(--card-bg);
+}
+
+.weekday-chip input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.weekday-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.weekday-chip.disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.weekday-chip:focus-within {
+  outline: 2px solid var(--accent-hover);
+  outline-offset: 1px;
+}
+
+.schedule-hint {
+  display: block;
+  font-size: 0.85rem;
+  margin-top: 0.3rem;
+}
+
 /* ===== Aufklappbereiche ===== */
 .collapse-toggle {
   background: none;
@@ -2532,4 +2604,25 @@ tbody tr:hover {
 
 .share-page h1 {
   margin-bottom: 0.35rem;
+}
+
+/* Anonymer Stopp-Link: schmale, ruhige Seite mit genau einer Aktion */
+.stop-page {
+  max-width: 560px;
+}
+
+.stop-page-room {
+  margin: 0.25rem 0 0.75rem;
+}
+
+.stop-page-confirm {
+  border-top: 1px solid var(--border);
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+}
+
+.stop-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
