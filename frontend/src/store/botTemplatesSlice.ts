@@ -70,8 +70,13 @@ export const deleteBotTemplate = createAsyncThunk<string, string, { rejectValue:
   },
 );
 
+/** Eigene Vorlagen zuerst, danach die geteilten – jeweils nach Name (wie der Server). */
 const sortByName = (items: BotTemplateView[]) =>
-  [...items].sort((a, b) => a.name.localeCompare(b.name, 'de', { sensitivity: 'base' }));
+  [...items].sort(
+    (a, b) =>
+      Number(b.mine) - Number(a.mine) ||
+      a.name.localeCompare(b.name, 'de', { sensitivity: 'base' }),
+  );
 
 const botTemplatesSlice = createSlice({
   name: 'botTemplates',

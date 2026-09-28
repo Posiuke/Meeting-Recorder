@@ -39,6 +39,10 @@ class BotTemplateControllerTest {
     private BotTemplateRepo templateRepo;
     private SettingsService settings;
     private PromptTemplateRepo promptTemplateRepo;
+    private bbbbot.repository.Repositories.BotTemplateShareRepo shareRepo;
+    private bbbbot.sharing.BotTemplateAccess access;
+    private bbbbot.repository.Repositories.AppUserRepo userRepo;
+    private bbbbot.repository.Repositories.UserGroupRepo groupRepo;
     private BotTemplateController controller;
 
     private AppUser user;
@@ -50,7 +54,12 @@ class BotTemplateControllerTest {
         // Keine Allowlist konfiguriert = jeder Host erlaubt (Standard).
         when(settings.get(SettingsService.BOT_ALLOWED_URL_HOSTS)).thenReturn("");
         promptTemplateRepo = mock(PromptTemplateRepo.class);
-        controller = new BotTemplateController(templateRepo, settings, promptTemplateRepo);
+        shareRepo = mock(bbbbot.repository.Repositories.BotTemplateShareRepo.class);
+        access = mock(bbbbot.sharing.BotTemplateAccess.class);
+        userRepo = mock(bbbbot.repository.Repositories.AppUserRepo.class);
+        groupRepo = mock(bbbbot.repository.Repositories.UserGroupRepo.class);
+        controller = new BotTemplateController(templateRepo, settings, promptTemplateRepo,
+                shareRepo, access, userRepo, groupRepo);
 
         user = AppUser.create("m.mustermann", "Mustermann", "m@example.org");
         SecurityContextHolder.getContext().setAuthentication(
@@ -322,5 +331,81 @@ class BotTemplateControllerTest {
         assertThatThrownBy(() -> controller.create(withSummary("tpl:kaputt", "Prompt", "X")))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("ungueltig");
+    }
+
+    // ------------------------------------------------------- Teilen
+
+    private BotTemplate eigeneVorlage() {
+        BotTemplate t = BotTemplate.create(user.getId(), "Jour fixe", "https://bbb.example.org/b/jf", "RecorderBot");
+        when(templateRepo.findById(t.getId())).thenReturn(java.util.Optional.of(t));
+        return t;
+    }
+
+    @Test
+    void besitzerTeiltMitNutzer() {
+        BotTemplate t = eigeneVorlage();
+        AppUser kollege = AppUser.create("k.kollege", "Kollege", "k@example.org");
+        when(userRepo.findById(kollege.getId())).thenReturn(java.util.Optional.of(kollege));
+
+        Dtos.BotTemplateShareView view = controller.share(t.getId(), new Dtos.ShareRequest(kollege.getId(), null));
+
+        assertThat(view.user().id()).isEqualTo(kollege.getId());
+        verify(shareRepo).save(any(bbbbot.domain.BotTemplateShare.class));
+    }
+
+    @Test
+    void doppelteFreigabeErgibt409() {
+        BotTemplate t = eigeneVorlage();
+        AppUser kollege = AppUser.create("k.kollege", "Kollege", "k@example.org");
+        when(userRepo.findById(kollege.getId())).thenReturn(java.util.Optional.of(kollege));
+        when(shareRepo.existsByBotTemplateIdAndGranteeUserId(t.getId(), kollege.getId())).thenReturn(true);
+
+        assertThatThrownBy(() -> controller.share(t.getId(), new Dtos.ShareRequest(kollege.getId(), null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
+    }
+
+    @Test
+    void mitSichSelbstTeilenErgibt400() {
+        BotTemplate t = eigeneVorlage();
+        when(userRepo.findById(user.getId())).thenReturn(java.util.Optional.of(user));
+
+        assertThatThrownBy(() -> controller.share(t.getId(), new Dtos.ShareRequest(user.getId(), null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("400");
+    }
+
+    /** Empfaenger duerfen die Vorlage nutzen, aber nicht weiterteilen, aendern oder loeschen. */
+    @Test
+    void empfaengerDarfNichtTeilenAendernOderLoeschen() {
+        AppUser besitzer = AppUser.create("b.besitzer", "Besitzer", "b@example.org");
+        BotTemplate fremd = BotTemplate.create(besitzer.getId(), "Fremd", "https://bbb.example.org/b/x", "RecorderBot");
+        when(templateRepo.findById(fremd.getId())).thenReturn(java.util.Optional.of(fremd));
+        when(access.sharedTemplateIds(user)).thenReturn(java.util.Set.of(fremd.getId()));
+
+        assertThatThrownBy(() -> controller.share(fremd.getId(), new Dtos.ShareRequest(UUID.randomUUID(), null)))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("404");
+        assertThatThrownBy(() -> controller.delete(fremd.getId()))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("404");
+        assertThatThrownBy(() -> controller.shares(fremd.getId()))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("404");
+    }
+
+    @Test
+    void listeEnthaeltGeteilteVorlagenNachDenEigenen() {
+        BotTemplate eigene = BotTemplate.create(user.getId(), "Zeta", "https://bbb.example.org/b/z", "RecorderBot");
+        AppUser besitzer = AppUser.create("b.besitzer", "Besitzerin", "b@example.org");
+        BotTemplate geteilt = BotTemplate.create(besitzer.getId(), "Alpha", "https://bbb.example.org/b/a", "RecorderBot");
+        when(templateRepo.findByOwnerIdOrderByNameAsc(user.getId())).thenReturn(List.of(eigene));
+        when(access.sharedTemplateIds(user)).thenReturn(java.util.Set.of(geteilt.getId()));
+        when(templateRepo.findAllById(any())).thenReturn(List.of(geteilt));
+        when(userRepo.findAllById(any())).thenReturn(List.of(besitzer));
+
+        List<Dtos.BotTemplateView> list = controller.list();
+
+        assertThat(list).extracting(Dtos.BotTemplateView::name).containsExactly("Zeta", "Alpha");
+        assertThat(list.get(0).mine()).isTrue();
+        assertThat(list.get(1).mine()).isFalse();
+        assertThat(list.get(1).ownerName()).isEqualTo("Besitzerin");
     }
 }

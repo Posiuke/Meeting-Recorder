@@ -636,6 +636,24 @@ tbody tr:hover {
   margin-top: auto;
 }
 
+/* Auswahl "Bot verlaengern" */
+.bot-extend-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.5rem;
+}
+
+.bot-extend-options .btn {
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.bot-extend-until {
+  font-size: 0.8em;
+  font-weight: normal;
+  opacity: 0.85;
+}
+
 /* ===== Fortschrittskette und "Wie geht es weiter?" ===== */
 .progress-chain {
   list-style: none;
@@ -871,6 +889,12 @@ tbody tr:hover {
   padding: 0.65rem 0.8rem;
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+
+.bot-template-shared {
+  margin-left: 0.5rem;
+  vertical-align: middle;
+  font-weight: normal;
 }
 
 .bot-template-info {
@@ -1871,6 +1895,16 @@ tbody tr:hover {
 }
 
 /* Nutzerverwaltung: Aktivitaetszustand und laufende Aufnahmen */
+/* Aktionsspalte der Admin-Gruppenliste: Knoepfe nebeneinander, rechtsbuendig. */
+.cell-actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.cell-actions .btn + .btn {
+  margin-left: 0.4rem;
+}
+
 .admin-users-head {
   display: flex;
   align-items: center;

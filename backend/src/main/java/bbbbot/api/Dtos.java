@@ -107,6 +107,9 @@ public final class Dtos {
      * @param diarize      Wunsch des Nutzers; ob die Sprechererkennung wirklich
      *                     laeuft, entscheidet beim Start {@code whisper.diarize}
      * @param sttLanguage  null = Admin-Standard, "auto" = selbst erkennen
+     * @param mine         eigene Vorlage (false = mit mir geteilt)
+     * @param ownerName    Anzeigename des Besitzers; nur bei geteilten Vorlagen gesetzt
+     * @param shareCount   Anzahl der Freigaben; nur bei eigenen Vorlagen gesetzt
      */
     public record BotTemplateView(UUID id, String name, String meetingUrl, String botName,
                                   boolean autoRecord, boolean recordVideo, boolean aiAnalysis,
@@ -114,16 +117,25 @@ public final class Dtos {
                                   BotScheduleView schedule, String summaryPreset,
                                   String summaryPrompt, String summaryTemplateName,
                                   String summaryModel, Double summaryTemperature,
-                                  Instant createdAt, Instant updatedAt) {
+                                  Instant createdAt, Instant updatedAt,
+                                  boolean mine, String ownerName, long shareCount) {
         public static BotTemplateView of(BotTemplate t, Instant now) {
+            return of(t, now, true, null, 0);
+        }
+
+        public static BotTemplateView of(BotTemplate t, Instant now, boolean mine,
+                                         String ownerName, long shareCount) {
             var summary = t.getSummaryChoice();
             return new BotTemplateView(t.getId(), t.getName(), t.getMeetingUrl(), t.getBotName(),
                     t.isAutoRecord(), t.isRecordVideo(), t.isAiAnalysis(), t.isDiarize(),
                     t.getSttLanguage(), BotScheduleView.of(t, now), t.getSummaryPreset(),
                     summary.prompt(), summary.templateName(), summary.model(), summary.temperature(),
-                    t.getCreatedAt(), t.getUpdatedAt());
+                    t.getCreatedAt(), t.getUpdatedAt(), mine, ownerName, shareCount);
         }
     }
+
+    /** Freigabe einer Bot-Vorlage: genau eines von user/group ist gesetzt. */
+    public record BotTemplateShareView(UUID id, UserView user, GroupView group, Instant createdAt) {}
 
     /**
      * Zeitplan einer Bot-Vorlage.
@@ -182,7 +194,16 @@ public final class Dtos {
                           String botName, boolean autoRecord, boolean recordVideo, boolean aiAnalysis,
                           UUID recordingId, int participants, int audioTracks,
                           String lastError, Instant createdAt, boolean mine,
-                          UUID botTemplateId, Instant scheduledStopAt) {}
+                          UUID botTemplateId, Instant scheduledStopAt,
+                          String ownerName) {}
+
+    /**
+     * Verlaengerung eines Bots, der nach Zeitplan laeuft.
+     *
+     * @param minutes      so viele Minuten laenger (ab dem bisherigen Ende)
+     * @param untilStopped true = kein geplantes Ende mehr; minutes wird ignoriert
+     */
+    public record ExtendBotScheduleRequest(Integer minutes, Boolean untilStopped) {}
 
     /**
      * @param hasAudio wirklich abspielbar: Der Pfad steht nicht nur in der
@@ -589,6 +610,14 @@ public final class Dtos {
                     g.getOwnerId().equals(currentUserId), g.getCreatedAt());
         }
     }
+
+    /** Gruppe in der Admin-Verwaltung: mit Besitzer und Umfang. */
+    public record AdminGroupView(UUID id, String name, UUID ownerId, String ownerUsername,
+                                 String ownerDisplayName, long memberCount, long shareCount,
+                                 Instant createdAt) {}
+
+    /** Aenderung einer Gruppe durch einen Admin; null = Feld bleibt, wie es ist. */
+    public record AdminGroupUpdateRequest(String name, UUID ownerId) {}
 
     public record GroupMemberView(UUID userId, String username, String displayName, Instant addedAt) {}
 

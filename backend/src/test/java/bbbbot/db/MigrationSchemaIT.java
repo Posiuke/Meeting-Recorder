@@ -104,6 +104,9 @@ class MigrationSchemaIT {
     private ProcessingJobRepo jobRepo;
 
     @Autowired
+    private bbbbot.repository.Repositories.BotTemplateShareRepo templateShareRepo;
+
+    @Autowired
     private EntityManager em;
 
     @Test
@@ -407,6 +410,37 @@ class MigrationSchemaIT {
         assertThat(recordingRepo.findByVideoStatusIn(List.of(Recording.VideoStatus.MUXING)))
                 .extracting(Recording::getId)
                 .doesNotContain(recording.getId());
+    }
+
+    /**
+     * Geteilte Bot-Vorlagen (V30): Sichtbar direkt, ueber eine Gruppe als
+     * Mitglied oder als Gruppenbesitzer; doppelte Freigaben verhindert der Index.
+     */
+    @Test
+    void geteilteBotVorlagenSindFuerEmpfaengerSichtbar() {
+        UUID owner = ownerId();
+        UUID direkt = ownerId();
+        UUID mitglied = ownerId();
+        UUID gruppenBesitzer = ownerId();
+        UUID fremd = ownerId();
+        BotTemplate vorlage = BotTemplate.create(owner, "Jour fixe", "https://bbb.example.org/b/jf", "RecorderBot");
+        botTemplateRepo.saveAndFlush(vorlage);
+        bbbbot.domain.UserGroup gruppe = bbbbot.domain.UserGroup.create("Team-" + UUID.randomUUID(), gruppenBesitzer);
+        em.persist(gruppe);
+        em.persist(bbbbot.domain.GroupMember.create(gruppe.getId(), mitglied));
+        templateShareRepo.saveAndFlush(bbbbot.domain.BotTemplateShare.forUser(vorlage.getId(), direkt, owner));
+        templateShareRepo.saveAndFlush(bbbbot.domain.BotTemplateShare.forGroup(vorlage.getId(), gruppe.getId(), owner));
+
+        for (UUID empfaenger : List.of(direkt, mitglied, gruppenBesitzer)) {
+            assertThat(templateShareRepo.findTemplateIdsSharedWith(empfaenger)).containsExactly(vorlage.getId());
+        }
+        assertThat(templateShareRepo.findTemplateIdsSharedWith(fremd)).isEmpty();
+        assertThat(templateShareRepo.countByTemplate(List.of(vorlage.getId())))
+                .singleElement().satisfies(row -> assertThat(((Number) row[1]).longValue()).isEqualTo(2));
+
+        assertThatThrownBy(() -> templateShareRepo.saveAndFlush(
+                bbbbot.domain.BotTemplateShare.forUser(vorlage.getId(), direkt, owner)))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     /** Aufnahmen verweisen per Fremdschluessel auf app_user - Nutzer also zuerst anlegen. */

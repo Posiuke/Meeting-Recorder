@@ -142,6 +142,52 @@ public class BotManager {
         }
     }
 
+    /** Laengste Verlaengerung auf einmal - wer mehr braucht, verlaengert erneut. */
+    public static final java.time.Duration MAX_EXTENSION = java.time.Duration.ofHours(12);
+
+    /**
+     * Verlaengert das geplante Ende eines Bots, der nach Zeitplan laeuft: Die
+     * Verlaengerung zaehlt ab dem bisherigen Ende (bzw. ab jetzt, falls es schon
+     * verstrichen ist). {@code extension == null} hebt das geplante Ende ganz auf -
+     * der Bot bleibt dann, bis ihn jemand stoppt oder das Meeting endet.
+     *
+     * <p>Das neue Ende wird auch an der Session gespeichert. Der Scheduler startet
+     * waehrenddessen keinen zweiten Bot fuer die Vorlage, weil dieser noch laeuft.
+     *
+     * @return das neue geplante Ende (null = keins mehr)
+     * @throws IllegalStateException wenn der Bot kein geplantes Ende hat oder
+     *                               schon den Raum verlaesst
+     */
+    public Instant extendScheduledStop(UUID sessionId, java.time.Duration extension, Instant now) {
+        BotInstance instance = instances.get(sessionId);
+        if (instance == null) throw new java.util.NoSuchElementException("Bot laeuft nicht");
+        synchronized (instance) {
+            Instant current = instance.getScheduledStopAt();
+            if (current == null) {
+                throw new IllegalStateException("Dieser Bot hat kein geplantes Ende");
+            }
+            if (instance.isShuttingDown()) {
+                throw new IllegalStateException("Der Bot verlaesst den Raum bereits");
+            }
+            Instant next = null;
+            if (extension != null) {
+                if (extension.isNegative() || extension.isZero() || extension.compareTo(MAX_EXTENSION) > 0) {
+                    throw new IllegalArgumentException("Ungueltige Verlaengerung");
+                }
+                next = (current.isAfter(now) ? current : now).plus(extension);
+            }
+            instance.setScheduledStopAt(next);
+            final Instant stored = next;
+            sessionRepo.findById(sessionId).ifPresent(s -> {
+                s.setScheduledStopAt(stored);
+                sessionRepo.save(s);
+            });
+            log.info("Bot-Session {}: geplantes Ende von {} auf {} geaendert", sessionId, current,
+                    next == null ? "kein Ende" : next);
+            return next;
+        }
+    }
+
     public void startRecording(UUID sessionId) {
         instances.computeIfPresent(sessionId, (id, instance) -> {
             instance.requestRecordingStart();

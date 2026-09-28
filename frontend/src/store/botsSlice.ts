@@ -70,6 +70,25 @@ export const stopBot = createAsyncThunk<string, string, { rejectValue: string }>
   },
 );
 
+/**
+ * Bot, der nach Zeitplan läuft, verlängern: minutes ab dem bisherigen Ende,
+ * minutes = null hebt das geplante Ende auf (Bot bleibt, bis man ihn stoppt).
+ */
+export const extendBotSchedule = createAsyncThunk<
+  BotView,
+  { sessionId: string; minutes: number | null },
+  { rejectValue: string }
+>('bots/extendSchedule', async ({ sessionId, minutes }, { rejectWithValue }) => {
+  try {
+    return await api<BotView>(`/api/bots/${sessionId}/schedule/extend`, {
+      method: 'POST',
+      body: minutes === null ? { untilStopped: true } : { minutes },
+    });
+  } catch (e) {
+    return rejectWithValue(errorMessage(e));
+  }
+});
+
 export const startBotRecording = createAsyncThunk<void, string, { rejectValue: string }>(
   'bots/startRecording',
   async (sessionId, { rejectWithValue }) => {

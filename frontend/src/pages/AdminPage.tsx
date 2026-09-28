@@ -17,6 +17,7 @@ import Alert from '../components/Alert';
 import HelpTip from '../components/HelpTip';
 import { api, errorMessage } from '../api/client';
 import StatusBadge from '../components/StatusBadge';
+import AdminGroupsTab from './AdminGroupsTab';
 import { formatDateTime, formatShortDuration, formatTime } from '../utils/format';
 import { useI18n } from '../i18n';
 import type { TranslationKey, translate } from '../i18n';
@@ -112,7 +113,7 @@ const KEY_HELP: Record<string, TranslationKey> = {
   'bot.publicUrl': 'admin.keyHelp.botPublicUrl',
 };
 
-type AdminTab = 'settings' | 'auth' | 'users' | 'processing';
+type AdminTab = 'settings' | 'auth' | 'users' | 'groups' | 'processing';
 
 /** Nachladeintervall des Betriebsbildes – kurz, weil sich die Schlange bewegt. */
 const PROCESSING_REFRESH_MS = 10_000;
@@ -153,6 +154,13 @@ export default function AdminPage() {
         </button>
         <button
           type="button"
+          className={`tab${tab === 'groups' ? ' active' : ''}`}
+          onClick={() => setTab('groups')}
+        >
+          {t('admin.tabGroups')}
+        </button>
+        <button
+          type="button"
           className={`tab${tab === 'processing' ? ' active' : ''}`}
           onClick={() => setTab('processing')}
         >
@@ -162,6 +170,7 @@ export default function AdminPage() {
       {tab === 'settings' && <SettingsTab />}
       {tab === 'auth' && <AuthTab />}
       {tab === 'users' && <UsersTab />}
+      {tab === 'groups' && <AdminGroupsTab />}
       {tab === 'processing' && <ProcessingTab />}
     </div>
   );

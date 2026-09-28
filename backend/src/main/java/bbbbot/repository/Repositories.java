@@ -5,6 +5,7 @@ import bbbbot.domain.AppSetting;
 import bbbbot.domain.AppUser;
 import bbbbot.domain.BotSession;
 import bbbbot.domain.BotTemplate;
+import bbbbot.domain.BotTemplateShare;
 import bbbbot.domain.GlossaryEntry;
 import bbbbot.domain.GroupMember;
 import bbbbot.domain.Participant;
@@ -52,6 +53,10 @@ public interface Repositories {
         Optional<GroupMember> findByGroupIdAndUserId(UUID groupId, UUID userId);
         List<GroupMember> findByUserId(UUID userId);
         void deleteByGroupIdAndUserId(UUID groupId, UUID userId);
+
+        /** Mitglieder je Gruppe als [groupId, Anzahl] - fuer die Admin-Uebersicht. */
+        @Query("select m.groupId, count(m) from GroupMember m group by m.groupId")
+        List<Object[]> countByGroup();
     }
 
     interface BotSessionRepo extends JpaRepository<BotSession, UUID> {
@@ -135,6 +140,10 @@ public interface Repositories {
         boolean existsByRecordingIdAndGranteeUserId(UUID recordingId, UUID userId);
         boolean existsByRecordingIdAndGranteeGroupId(UUID recordingId, UUID groupId);
 
+        /** Freigaben je Gruppe als [groupId, Anzahl] - fuer die Admin-Uebersicht. */
+        @Query("select s.granteeGroupId, count(s) from ShareGrant s where s.granteeGroupId is not null group by s.granteeGroupId")
+        List<Object[]> countByGroup();
+
         @Query("""
             select count(s) > 0 from ShareGrant s where s.recordingId = :recordingId and
               (s.granteeUserId = :userId
@@ -180,6 +189,28 @@ public interface Repositories {
         boolean existsByOwnerIdAndNameIgnoreCase(UUID ownerId, String name);
         /** Vorlagen mit aktivem Zeitplan - die Arbeitsliste des BotScheduler. */
         List<BotTemplate> findByScheduleEnabledTrue();
+    }
+
+    interface BotTemplateShareRepo extends JpaRepository<BotTemplateShare, UUID> {
+        List<BotTemplateShare> findByBotTemplateIdOrderByCreatedAtAsc(UUID botTemplateId);
+        boolean existsByBotTemplateIdAndGranteeUserId(UUID botTemplateId, UUID userId);
+        boolean existsByBotTemplateIdAndGranteeGroupId(UUID botTemplateId, UUID groupId);
+
+        /**
+         * Vorlagen, die mit dem Nutzer geteilt sind - direkt oder ueber eine
+         * Gruppe, in der er Mitglied oder Besitzer ist (wie bei den Aufnahmen).
+         */
+        @Query("""
+            select distinct s.botTemplateId from BotTemplateShare s where
+              s.granteeUserId = :userId
+              or s.granteeGroupId in (select m.groupId from GroupMember m where m.userId = :userId)
+              or s.granteeGroupId in (select g.id from UserGroup g where g.ownerId = :userId)
+            """)
+        List<UUID> findTemplateIdsSharedWith(@Param("userId") UUID userId);
+
+        /** Freigaben je Vorlage als [templateId, Anzahl] - fuer die Anzeige beim Besitzer. */
+        @Query("select s.botTemplateId, count(s) from BotTemplateShare s where s.botTemplateId in :ids group by s.botTemplateId")
+        List<Object[]> countByTemplate(@Param("ids") java.util.Collection<UUID> ids);
     }
 
     interface PromptTemplateRepo extends JpaRepository<PromptTemplate, UUID> {

@@ -9,8 +9,10 @@ import bbbbot.domain.BotSession;
 import bbbbot.domain.BotTemplate;
 import bbbbot.domain.SummaryChoice;
 import bbbbot.repository.Repositories.BotSessionRepo;
+import bbbbot.repository.Repositories.AppUserRepo;
 import bbbbot.repository.Repositories.BotTemplateRepo;
 import bbbbot.settings.SettingsService;
+import bbbbot.sharing.BotTemplateAccess;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,6 +29,7 @@ import java.net.URISyntaxException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -51,22 +54,33 @@ public class BotController {
     private final SettingsService settings;
     private final BotTemplateRepo templateRepo;
     private final BotTemplateLauncher launcher;
+    private final BotTemplateAccess templateAccess;
+    private final AppUserRepo userRepo;
 
     public BotController(BotManager botManager, BotSessionRepo sessionRepo, SettingsService settings,
-                         BotTemplateRepo templateRepo, BotTemplateLauncher launcher) {
+                         BotTemplateRepo templateRepo, BotTemplateLauncher launcher,
+                         BotTemplateAccess templateAccess, AppUserRepo userRepo) {
         this.botManager = botManager;
         this.sessionRepo = sessionRepo;
         this.settings = settings;
         this.templateRepo = templateRepo;
         this.launcher = launcher;
+        this.templateAccess = templateAccess;
+        this.userRepo = userRepo;
     }
 
+    /**
+     * Nutzer sehen ihre eigenen Bots (inkl. Meeting-URL) und die Bots von
+     * Vorlagen, die mit ihnen geteilt sind - auch die vom Zeitplan gestarteten.
+     * Admins sehen alle.
+     */
     @GetMapping
     public List<Dtos.BotView> listActive() {
         AppUser user = CurrentUser.get();
-        // Nutzer sehen nur ihre eigenen Bots (inkl. Meeting-URL); Admins alle.
+        Set<UUID> shared = templateAccess.sharedTemplateIds(user);
         return botManager.listActive().stream()
-                .filter(b -> user.isAdmin() || b.getOwnerId().equals(user.getId()))
+                .filter(b -> user.isAdmin() || b.getOwnerId().equals(user.getId())
+                        || (b.getBotTemplateId() != null && shared.contains(b.getBotTemplateId())))
                 .map(b -> toView(b, user))
                 .toList();
     }
@@ -111,15 +125,17 @@ public class BotController {
     }
 
     /**
-     * Startet den Bot einer eigenen Bot-Vorlage - der kurze Weg "Vorlage
-     * waehlen, Bot starten". Laeuft gerade ein Termin ihres Zeitplans, endet der
-     * Bot zu dessen Endzeit.
+     * Startet den Bot einer eigenen oder mit mir geteilten Bot-Vorlage - der
+     * kurze Weg "Vorlage waehlen, Bot starten". Laeuft gerade ein Termin ihres
+     * Zeitplans, endet der Bot zu dessen Endzeit. Der Bot laeuft immer im Namen
+     * des Besitzers der Vorlage, seine Aufnahmen gehoeren also ihm (und werden
+     * an die Empfaenger der Vorlage freigegeben).
      */
     @PostMapping("/from-template/{templateId}")
     public Dtos.BotView startFromTemplate(@PathVariable UUID templateId) {
         AppUser user = CurrentUser.get();
         BotTemplate template = templateRepo.findById(templateId)
-                .filter(t -> t.getOwnerId().equals(user.getId()))
+                .filter(t -> templateAccess.canUse(t, user))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Bot-Vorlage nicht gefunden"));
         try {
@@ -153,15 +169,52 @@ public class BotController {
         botManager.stopRecording(sessionId, discard);
     }
 
-    /** Nur der Ersteller des Bots (oder ein Admin) darf ihn steuern. */
+    /**
+     * Verlaengert einen Bot, der nach dem Zeitplan einer Vorlage laeuft - fuer
+     * Termine, die laenger dauern als geplant. Nur fuer laufende Bots mit
+     * geplantem Ende.
+     */
+    @PostMapping("/{sessionId}/schedule/extend")
+    public Dtos.BotView extendSchedule(@PathVariable UUID sessionId,
+                                       @RequestBody Dtos.ExtendBotScheduleRequest request) {
+        requireControl(sessionId);
+        java.time.Duration extension = null;
+        if (request == null || !Boolean.TRUE.equals(request.untilStopped())) {
+            Integer minutes = request == null ? null : request.minutes();
+            if (minutes == null || minutes < 1 || minutes > BotManager.MAX_EXTENSION.toMinutes()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Verlaengerung muss zwischen 1 und " + BotManager.MAX_EXTENSION.toMinutes()
+                                + " Minuten liegen");
+            }
+            extension = java.time.Duration.ofMinutes(minutes);
+        }
+        try {
+            botManager.extendScheduledStop(sessionId, extension, Instant.now());
+        } catch (java.util.NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        }
+        return toView(botManager.get(sessionId).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Bot laeuft nicht")), CurrentUser.get());
+    }
+
+    /**
+     * Steuern darf der Ersteller des Bots, ein Admin - und wer die Vorlage,
+     * aus der der Bot stammt, geteilt bekommen hat.
+     */
     private void requireControl(UUID sessionId) {
         AppUser user = CurrentUser.get();
-        UUID ownerId = botManager.get(sessionId).map(BotInstance::getOwnerId)
+        var instance = botManager.get(sessionId);
+        UUID ownerId = instance.map(BotInstance::getOwnerId)
                 .or(() -> sessionRepo.findById(sessionId).map(BotSession::getCreatedBy))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Bot-Session nicht gefunden"));
-        if (!user.isAdmin() && !ownerId.equals(user.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Nur der Ersteller darf diesen Bot steuern");
-        }
+        if (user.isAdmin() || ownerId.equals(user.getId())) return;
+        UUID templateId = instance.map(BotInstance::getBotTemplateId)
+                .or(() -> sessionRepo.findById(sessionId).map(BotSession::getBotTemplateId))
+                .orElse(null);
+        if (templateId != null && templateAccess.sharedTemplateIds(user).contains(templateId)) return;
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Nur der Ersteller darf diesen Bot steuern");
     }
 
     /**
@@ -247,7 +300,9 @@ public class BotController {
                 session == null ? null : session.getCreatedAt(),
                 instance.getOwnerId().equals(user.getId()),
                 instance.getBotTemplateId(),
-                instance.getScheduledStopAt()
+                instance.getScheduledStopAt(),
+                instance.getOwnerId().equals(user.getId()) ? null
+                        : userRepo.findById(instance.getOwnerId()).map(AppUser::getDisplayName).orElse(null)
         );
     }
 }

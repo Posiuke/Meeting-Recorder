@@ -545,6 +545,14 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
   "$BBB/api/bots/$SID/recording/stop"`,
         },
         {
+          method: 'POST',
+          path: '/api/bots/{sessionId}/schedule/extend',
+          summary:
+            'Extend a bot running on a schedule: {"minutes":30} from the previous end (1–720) or {"untilStopped":true} for no scheduled end. Applies to this session only.',
+          example: `curl -s -X POST -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
+  -d '{"minutes":30}' "$BBB/api/bots/$SID/schedule/extend"`,
+        },
+        {
           method: 'DELETE',
           path: '/api/bots/{sessionId}',
           summary: 'Stop the bot; a running recording is finalised.',
@@ -558,7 +566,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
           method: 'GET',
           path: '/api/bot-templates',
           summary:
-            'List your own bot templates: named meeting rooms including their settings. Yours only – templates are per user.',
+            'List bot templates: named meeting rooms including their settings. Your own first, then those shared with you (mine=false, ownerName = owner). Shared ones can be started but not changed.',
           example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/bot-templates"`,
         },
         {
@@ -584,6 +592,22 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
         },
         { method: 'PUT', path: '/api/bot-templates/{id}', summary: 'Change a bot template.' },
         { method: 'DELETE', path: '/api/bot-templates/{id}', summary: 'Delete a bot template.' },
+        {
+          method: 'GET',
+          path: '/api/bot-templates/{id}/shares',
+          summary: 'Shares of one of your bot templates.',
+        },
+        {
+          method: 'POST',
+          path: '/api/bot-templates/{id}/shares',
+          summary:
+            'Share one of your bot templates: {"userId":"…"} or {"groupId":"…"}. Recipients see the template and its running bots (including scheduled ones), may start and control them; new recordings are shared with them automatically.',
+        },
+        {
+          method: 'DELETE',
+          path: '/api/bot-templates/{id}/shares/{shareId}',
+          summary: 'Remove a bot template share (existing recording shares stay).',
+        },
         {
           method: 'POST',
           path: '/api/bots/from-template/{id}',
@@ -806,6 +830,25 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
    "lastSeenAt": "2026-08-13T09:12:44Z",
    "activeRecordings": [{ "id": "5d34…", "status": "RECORDING",
                           "source": "CAPTURE", "startedAt": "2026-08-13T09:03:00Z" }] }]`,
+        },
+        {
+          method: 'GET',
+          path: '/api/admin/groups',
+          summary:
+            'All groups with owner, member and share count – admin only. Admins manage members via /api/groups/{groupId}/members.',
+          response: `[{ "id": "8a1f…", "name": "Technik", "ownerUsername": "m.mustermann",
+   "memberCount": 4, "shareCount": 12, "createdAt": "2026-08-01T10:00:00Z" }]`,
+        },
+        {
+          method: 'PUT',
+          path: '/api/admin/groups/{groupId}',
+          summary:
+            'Rename a group and/or transfer ownership: {"name":"…"}, {"ownerId":"…"} (missing fields stay as they are). The previous owner stays in the group as a member.',
+        },
+        {
+          method: 'DELETE',
+          path: '/api/admin/groups/{groupId}',
+          summary: 'Delete a group – memberships and shares to the group are removed.',
         },
         {
           method: 'GET',

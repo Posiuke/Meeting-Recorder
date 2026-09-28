@@ -548,6 +548,14 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
   "$BBB/api/bots/$SID/recording/stop"`,
         },
         {
+          method: 'POST',
+          path: '/api/bots/{sessionId}/schedule/extend',
+          summary:
+            'Bot, der nach Zeitplan läuft, verlängern: {"minutes":30} ab dem bisherigen Ende (1–720) oder {"untilStopped":true} für kein geplantes Ende. Gilt nur für diesen Termin.',
+          example: `curl -s -X POST -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
+  -d '{"minutes":30}' "$BBB/api/bots/$SID/schedule/extend"`,
+        },
+        {
           method: 'DELETE',
           path: '/api/bots/{sessionId}',
           summary: 'Bot stoppen; eine laufende Aufnahme wird abgeschlossen.',
@@ -561,7 +569,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           method: 'GET',
           path: '/api/bot-templates',
           summary:
-            'Eigene Bot-Vorlagen auflisten: benannte Meetingräume samt Einstellungen. Nur Ihre eigenen – Vorlagen sind benutzerbezogen.',
+            'Bot-Vorlagen auflisten: benannte Meetingräume samt Einstellungen. Erst die eigenen, dann die mit Ihnen geteilten (mine=false, ownerName = Besitzer). Geteilte lassen sich starten, aber nicht ändern.',
           example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/bot-templates"`,
         },
         {
@@ -587,6 +595,22 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
         },
         { method: 'PUT', path: '/api/bot-templates/{id}', summary: 'Bot-Vorlage ändern.' },
         { method: 'DELETE', path: '/api/bot-templates/{id}', summary: 'Bot-Vorlage löschen.' },
+        {
+          method: 'GET',
+          path: '/api/bot-templates/{id}/shares',
+          summary: 'Freigaben einer eigenen Bot-Vorlage.',
+        },
+        {
+          method: 'POST',
+          path: '/api/bot-templates/{id}/shares',
+          summary:
+            'Eigene Bot-Vorlage teilen: {"userId":"…"} oder {"groupId":"…"}. Empfänger sehen die Vorlage und ihre laufenden Bots (auch die vom Zeitplan), dürfen daraus starten und die Bots steuern; neue Aufnahmen werden automatisch an sie freigegeben.',
+        },
+        {
+          method: 'DELETE',
+          path: '/api/bot-templates/{id}/shares/{shareId}',
+          summary: 'Freigabe einer Bot-Vorlage entfernen (bestehende Aufnahme-Freigaben bleiben).',
+        },
         {
           method: 'POST',
           path: '/api/bots/from-template/{id}',
@@ -810,6 +834,25 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
    "lastSeenAt": "2026-08-13T09:12:44Z",
    "activeRecordings": [{ "id": "5d34…", "status": "RECORDING",
                           "source": "CAPTURE", "startedAt": "2026-08-13T09:03:00Z" }] }]`,
+        },
+        {
+          method: 'GET',
+          path: '/api/admin/groups',
+          summary:
+            'Alle Gruppen mit Besitzer, Mitglieder- und Freigabenzahl – nur mit Admin-Recht. Mitglieder pflegen Admins über /api/groups/{groupId}/members.',
+          response: `[{ "id": "8a1f…", "name": "Technik", "ownerUsername": "m.mustermann",
+   "memberCount": 4, "shareCount": 12, "createdAt": "2026-08-01T10:00:00Z" }]`,
+        },
+        {
+          method: 'PUT',
+          path: '/api/admin/groups/{groupId}',
+          summary:
+            'Gruppe umbenennen und/oder den Besitzer übertragen: {"name":"…"}, {"ownerId":"…"} (fehlende Felder bleiben). Der bisherige Besitzer bleibt als Mitglied in der Gruppe.',
+        },
+        {
+          method: 'DELETE',
+          path: '/api/admin/groups/{groupId}',
+          summary: 'Gruppe löschen – Mitgliedschaften und Freigaben an die Gruppe entfallen.',
         },
         {
           method: 'GET',

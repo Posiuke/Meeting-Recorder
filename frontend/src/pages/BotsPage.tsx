@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
   createBot,
   createBotFromTemplate,
+  extendBotSchedule,
   fetchBotHistory,
   fetchBots,
   startBotRecording,
@@ -19,9 +20,11 @@ import StatusBadge from '../components/StatusBadge';
 import Spinner from '../components/Spinner';
 import Alert from '../components/Alert';
 import ConfirmDialog from '../components/ConfirmDialog';
+import Modal from '../components/Modal';
 import HelpTip from '../components/HelpTip';
 import SttLanguageSelect, { sttLanguageLabel } from '../components/SttLanguageSelect';
 import BotTemplateDialog from '../components/BotTemplateDialog';
+import BotTemplateShareDialog from '../components/BotTemplateShareDialog';
 import type { BotTemplateSettings } from '../components/BotTemplateDialog';
 import { scheduleSummary } from '../components/BotScheduleFields';
 import PromptPresetSelect, { resolveSummarySelection } from '../components/PromptPresetSelect';
@@ -31,6 +34,9 @@ import { formatDateTime, formatTime } from '../utils/format';
 import { useI18n } from '../i18n';
 import type { translate } from '../i18n';
 import type { BotTemplateView, BotView } from '../types';
+
+/** Auswahl beim Verlängern eines Bots, der nach Zeitplan läuft (in Minuten). */
+const EXTEND_OPTIONS = [15, 30, 60, 120];
 
 /** Serverseitige Grenzen (BotTemplateController, BotController). */
 const MAX_BOT_TEMPLATES = 100;
@@ -73,6 +79,8 @@ export default function BotsPage() {
   const { items, loading, loaded, error, history, historyLoading, historyError } =
     useAppSelector((s) => s.bots);
   const templates = useAppSelector((s) => s.botTemplates);
+  /** Das Limit zählt nur eigene Vorlagen, nicht die mit mir geteilten. */
+  const ownTemplateCount = templates.items.filter((tpl) => tpl.mine).length;
   const promptTemplates = useAppSelector((s) => s.promptTemplates);
 
   const [meetingUrl, setMeetingUrl] = useState('');
@@ -95,6 +103,7 @@ export default function BotsPage() {
     { template: BotTemplateView | null; prefill?: BotTemplateSettings } | null
   >(null);
   const [confirmDeleteTemplate, setConfirmDeleteTemplate] = useState<BotTemplateView | null>(null);
+  const [sharingTemplate, setSharingTemplate] = useState<BotTemplateView | null>(null);
   /** Vorlage, aus der gerade ein Bot startet bzw. die gerade gelöscht wird. */
   const [templateBusyId, setTemplateBusyId] = useState<string | null>(null);
   const [templateError, setTemplateError] = useState<string | null>(null);
@@ -211,9 +220,9 @@ export default function BotsPage() {
           <button
             type="button"
             className="btn btn-sm"
-            disabled={templates.items.length >= MAX_BOT_TEMPLATES}
+            disabled={ownTemplateCount >= MAX_BOT_TEMPLATES}
             title={
-              templates.items.length >= MAX_BOT_TEMPLATES
+              ownTemplateCount >= MAX_BOT_TEMPLATES
                 ? t('botTemplates.limitReached', { max: MAX_BOT_TEMPLATES })
                 : undefined
             }
@@ -236,7 +245,19 @@ export default function BotsPage() {
             {templates.items.map((template) => (
               <li key={template.id} className="bot-template-row">
                 <div className="bot-template-info">
-                  <strong>{template.name}</strong>
+                  <strong>
+                    {template.name}
+                    {!template.mine && (
+                      <span className="tag tag-muted bot-template-shared">
+                        {t('botTemplates.sharedBy', { name: template.ownerName ?? '–' })}
+                      </span>
+                    )}
+                    {template.mine && template.shareCount > 0 && (
+                      <span className="tag bot-template-shared">
+                        {t('botTemplates.sharedCount', { count: template.shareCount })}
+                      </span>
+                    )}
+                  </strong>
                   <span className="muted url-wrap" title={template.meetingUrl}>
                     {template.meetingUrl}
                   </span>
@@ -258,29 +279,43 @@ export default function BotsPage() {
                   >
                     {templateBusyId === template.id ? t('bots.submitting') : t('bots.submit')}
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    title={t('botTemplates.applyHint')}
-                    onClick={() => applyTemplate(template)}
-                  >
-                    {t('botTemplates.apply')}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    onClick={() => setEditing({ template })}
-                  >
-                    {t('common.edit')}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-danger-text"
-                    disabled={templateBusyId !== null}
-                    onClick={() => setConfirmDeleteTemplate(template)}
-                  >
-                    {t('common.delete')}
-                  </button>
+                  {/* Geteilte Vorlagen nur starten: Ins Formular übernommen käme
+                      eine fremde eigene Promptvorlage nicht mit. */}
+                  {template.mine && (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        title={t('botTemplates.applyHint')}
+                        onClick={() => applyTemplate(template)}
+                      >
+                        {t('botTemplates.apply')}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        title={t('botTemplates.share.hint')}
+                        onClick={() => setSharingTemplate(template)}
+                      >
+                        {t('botTemplates.share.button')}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() => setEditing({ template })}
+                      >
+                        {t('common.edit')}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-danger-text"
+                        disabled={templateBusyId !== null}
+                        onClick={() => setConfirmDeleteTemplate(template)}
+                      >
+                        {t('common.delete')}
+                      </button>
+                    </>
+                  )}
                 </div>
               </li>
             ))}
@@ -386,10 +421,10 @@ export default function BotsPage() {
             disabled={
               creating ||
               !meetingUrl.trim() ||
-              templates.items.length >= MAX_BOT_TEMPLATES
+              ownTemplateCount >= MAX_BOT_TEMPLATES
             }
             title={
-              templates.items.length >= MAX_BOT_TEMPLATES
+              ownTemplateCount >= MAX_BOT_TEMPLATES
                 ? t('botTemplates.limitReached', { max: MAX_BOT_TEMPLATES })
                 : t('botTemplates.saveAsHint')
             }
@@ -488,6 +523,16 @@ export default function BotsPage() {
         />
       )}
 
+      {sharingTemplate && (
+        <BotTemplateShareDialog
+          template={sharingTemplate}
+          onClose={() => {
+            setSharingTemplate(null);
+            void dispatch(fetchBotTemplates());
+          }}
+        />
+      )}
+
       {confirmDeleteTemplate && (
         <ConfirmDialog
           title={t('botTemplates.confirmDeleteTitle')}
@@ -508,7 +553,7 @@ function BotCard({ bot }: { bot: BotView }) {
   const dispatch = useAppDispatch();
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<'stopBot' | 'discard' | null>(null);
+  const [confirm, setConfirm] = useState<'stopBot' | 'discard' | 'extend' | null>(null);
 
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
@@ -525,6 +570,13 @@ function BotCard({ bot }: { bot: BotView }) {
   };
 
   const canStartRecording = bot.status === 'JOINED' && !bot.recordingId;
+  const extend = (minutes: number | null) =>
+    run(() => dispatch(extendBotSchedule({ sessionId: bot.sessionId, minutes })).unwrap());
+  /** Neues Ende für die Vorschau: ab dem bisherigen Ende, war es schon vorbei, ab jetzt. */
+  const extendedEnd = (minutes: number): string => {
+    const base = Math.max(new Date(bot.scheduledStopAt ?? 0).getTime(), Date.now());
+    return new Date(base + minutes * 60_000).toISOString();
+  };
   const isRecording = bot.status === 'RECORDING';
 
   return (
@@ -555,6 +607,12 @@ function BotCard({ bot }: { bot: BotView }) {
             {bot.aiAnalysis ? t('bots.modeWithAi') : t('bots.modeWithoutAi')}
           </span>
         </div>
+        {bot.ownerName && (
+          <div className="meta-row">
+            <span className="meta-label">{t('bots.cardOwner')}</span>
+            <span className="meta-value">{t('bots.cardOwnerShared', { name: bot.ownerName })}</span>
+          </div>
+        )}
         <div className="meta-row">
           <span className="meta-label">{t('bots.cardStarted')}</span>
           <span className="meta-value">{formatDateTime(bot.createdAt)}</span>
@@ -616,6 +674,17 @@ function BotCard({ bot }: { bot: BotView }) {
             </button>
           </>
         )}
+        {bot.scheduledStopAt && (
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={busy}
+            title={t('bots.extendHint')}
+            onClick={() => setConfirm('extend')}
+          >
+            {t('bots.extend')}
+          </button>
+        )}
         <button
           type="button"
           className="btn btn-danger btn-sm"
@@ -641,6 +710,46 @@ function BotCard({ bot }: { bot: BotView }) {
           }
           onCancel={() => setConfirm(null)}
         />
+      )}
+      {confirm === 'extend' && bot.scheduledStopAt && (
+        <Modal
+          title={t('bots.extendTitle')}
+          onClose={() => setConfirm(null)}
+          footer={
+            <button type="button" className="btn" onClick={() => setConfirm(null)} disabled={busy}>
+              {t('common.cancel')}
+            </button>
+          }
+        >
+          <p>{t('bots.extendMessage', { time: formatTime(bot.scheduledStopAt) })}</p>
+          <div className="bot-extend-options">
+            {EXTEND_OPTIONS.map((minutes) => (
+              <button
+                key={minutes}
+                type="button"
+                className="btn btn-primary"
+                disabled={busy}
+                onClick={() => void extend(minutes)}
+              >
+                {minutes < 60
+                  ? t('bots.extendMinutes', { n: minutes })
+                  : t('bots.extendHours', { n: minutes / 60 })}
+                <span className="bot-extend-until">
+                  {t('bots.extendUntil', { time: formatTime(extendedEnd(minutes)) })}
+                </span>
+              </button>
+            ))}
+            <button
+              type="button"
+              className="btn"
+              disabled={busy}
+              title={t('bots.extendOpenEndHint')}
+              onClick={() => void extend(null)}
+            >
+              {t('bots.extendOpenEnd')}
+            </button>
+          </div>
+        </Modal>
       )}
       {confirm === 'stopBot' && (
         <ConfirmDialog

@@ -123,6 +123,8 @@ export const en: typeof de = {
     cardParticipants: 'Participants',
     cardAudioTracks: 'Audio tracks',
     cardMode: 'Mode',
+    cardOwner: 'Template',
+    cardOwnerShared: 'shared by {{name}}',
     cardStarted: 'Started',
     cardScheduledStop: 'Leaves the room',
     cardRecording: 'Recording',
@@ -147,6 +149,18 @@ export const en: typeof de = {
       'Stops the recording and deletes it irrevocably – nothing is saved. The bot stays in the room.',
     stopBotHint:
       'The bot leaves the room. A running recording is saved as well (same as "Stop recording").',
+    extend: 'Extend',
+    extendHint:
+      'The meeting runs longer? The bot then stays in the room accordingly and keeps recording.',
+    extendTitle: 'Extend bot',
+    extendMessage:
+      'According to the schedule, the bot leaves the room at {{time}}. How much longer should it stay?',
+    extendMinutes: '+{{n}} min',
+    extendHours: '+{{n}} h',
+    extendUntil: 'until {{time}}',
+    extendOpenEnd: 'No end',
+    extendOpenEndHint:
+      'The bot stays until you stop it or the meeting ends.',
     confirmDiscardTitle: 'Discard recording',
     confirmDiscardMessage:
       'The running recording will be stopped and irrevocably discarded. Continue?',
@@ -158,7 +172,17 @@ export const en: typeof de = {
   botTemplates: {
     section: 'Bot templates',
     intro:
-      'A room you record regularly does not need to be typed in every time: save the meeting URL and settings once as a template, then "Start bot" is all it takes. Your templates are visible to you only.',
+      'A room you record regularly does not need to be typed in every time: save the meeting URL and settings once as a template, then "Start bot" is all it takes. Your templates are visible to you only until you share them.',
+    sharedBy: 'shared by {{name}}',
+    sharedCount: 'shared ({{count}})',
+    share: {
+      button: 'Share',
+      hint: 'Share the template with users or groups.',
+      title: 'Share bot template "{{name}}"',
+      intro:
+        'Recipients see the template including meeting URL and schedule, can start a bot from it and control the running bots of the template (extend, start/stop recording, stop) – including those started by the schedule. New recordings of these bots are shared with them automatically. Editing, deleting and sharing further stays with you.',
+      empty: 'This template has not been shared with anyone yet.',
+    },
     new: 'New template',
     loading: 'Loading templates…',
     empty: 'No bot template saved yet.',
@@ -913,11 +937,38 @@ export const en: typeof de = {
       'Please ask the person who sent you the link – it may have been revoked or have expired.',
   },
 
+  adminGroups: {
+    loading: 'Loading groups…',
+    intro:
+      'All groups of the application – including those you neither own nor belong to. You can rename them, change the owner, manage members and delete them.',
+    filterPlaceholder: 'Filter by group or owner…',
+    empty: 'There are no groups yet.',
+    name: 'Group',
+    owner: 'Owner',
+    ownerUnknown: 'unknown (account deleted)',
+    members: 'Members',
+    shares: 'Shares',
+    created: 'Created',
+    manage: 'Manage',
+    manageTitle: 'Manage group "{{name}}"',
+    renameHeading: 'Name',
+    rename: 'Rename',
+    ownerHeading: 'Owner',
+    currentOwner: 'Current owner: {{owner}}',
+    newOwner: 'New owner: {{owner}}',
+    changeOwner: 'Transfer ownership',
+    ownerHint:
+      'The previous owner stays in the group as a member and so keeps access to the shared recordings.',
+    confirmDeleteMessage:
+      'The group "{{name}}" owned by {{owner}} will be deleted. Its {{members}} members lose access through {{shares}} share(s) to this group. Continue?',
+  },
+
   admin: {
     heading: 'Administration',
     tabSettings: 'Settings',
     tabAuth: 'Authentication',
     tabUsers: 'Users',
+    tabGroups: 'Groups',
     tabProcessing: 'Processing',
 
     processingLoading: 'Loading the queue…',

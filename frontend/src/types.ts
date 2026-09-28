@@ -143,6 +143,8 @@ export interface BotView {
   botTemplateId: string | null;
   /** Ende laut Zeitplan der Vorlage; null = kein geplantes Ende. */
   scheduledStopAt: string | null;
+  /** Besitzer, wenn der Bot aus einer mit mir geteilten Vorlage stammt; sonst null. */
+  ownerName: string | null;
 }
 
 /**
@@ -200,6 +202,20 @@ export interface BotTemplateView {
   summaryTemperature: number | null;
   createdAt: string;
   updatedAt: string | null;
+  /** Eigene Vorlage; false = mit mir geteilt (nur starten, nicht bearbeiten). */
+  mine: boolean;
+  /** Anzeigename des Besitzers – nur bei geteilten Vorlagen. */
+  ownerName: string | null;
+  /** Anzahl der Freigaben – nur bei eigenen Vorlagen. */
+  shareCount: number;
+}
+
+/** Freigabe einer Bot-Vorlage: genau eines von user/group ist gesetzt. */
+export interface BotTemplateShareView {
+  id: string;
+  user: UserView | null;
+  group: GroupView | null;
+  createdAt: string;
 }
 
 /** ISO-Wochentag, wie Java ihn als `DayOfWeek` schreibt. */
@@ -550,6 +566,19 @@ export interface GroupView {
   name: string;
   ownerId: string;
   mine: boolean;
+  createdAt: string;
+}
+
+/** Gruppe in der Admin-Verwaltung (/api/admin/groups). */
+export interface AdminGroupView {
+  id: string;
+  name: string;
+  ownerId: string;
+  /** null = Besitzerkonto gibt es nicht mehr */
+  ownerUsername: string | null;
+  ownerDisplayName: string | null;
+  memberCount: number;
+  shareCount: number;
   createdAt: string;
 }
 

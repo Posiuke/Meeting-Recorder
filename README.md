@@ -284,6 +284,18 @@ Nebenbei: Die **Segmentliste** ist eingeklappt, sobald ein Transkript existiert.
 Ohne Transkript bleibt sie offen — dann ist sie der einzige Weg, die Aufnahme
 anzuhören.
 
+## Gruppen verwalten (Admin-Tab „Gruppen")
+
+Gruppen legt jeder Nutzer selbst an; auf der Seite „Gruppen" sieht er aber nur
+eigene und solche, in denen er Mitglied ist. Admins sehen im Tab „Gruppen" alle
+Gruppen mit Besitzer, Mitglieder- und Freigabenzahl und können sie umbenennen,
+Mitglieder hinzufügen/entfernen, den **Besitz übertragen** (z.B. wenn der
+Besitzer das Haus verlassen hat) und Gruppen löschen. Beim Besitzwechsel bleibt
+der bisherige Besitzer als Mitglied in der Gruppe, damit er den Zugriff auf die
+freigegebenen Aufnahmen nicht stillschweigend verliert. Beim Löschen entfallen
+Mitgliedschaften und Freigaben an die Gruppe (die Aufnahmen selbst bleiben).
+API: `GET/PUT/DELETE /api/admin/groups[/{groupId}]`.
+
 ## Verarbeitungs-Warteschlange im Blick (Admin-Tab „Verarbeitung")
 
 Bei einer GPU, einem nächtlichen Zeitfenster und mehreren Bots entscheidet sich
@@ -341,10 +353,30 @@ eingetragen ist) und **Bearbeiten** an einer bestehenden. Umgekehrt holt
 Termin etwas abweichen soll.
 
 **Vorlagen sind benutzerbezogen.** In der Meeting-URL steckt der Zugang zum
-Raum, deshalb sieht eine Vorlage nur ihr Besitzer — auch Admins bekommen unter
-`/api/bot-templates` ausschließlich ihre eigenen. Namen sind pro Nutzer
-eindeutig (case-insensitive, DB-seitig über `uq_bot_template_owner_name`); zwei
-Nutzer dürfen denselben Namen verwenden.
+Raum, deshalb sieht eine Vorlage zunächst nur ihr Besitzer — auch Admins
+bekommen unter `/api/bot-templates` nur eigene und mit ihnen geteilte. Namen
+sind pro Nutzer eindeutig (case-insensitive, DB-seitig über
+`uq_bot_template_owner_name`); zwei Nutzer dürfen denselben Namen verwenden.
+
+### Vorlagen teilen
+
+Über **Teilen** an der Vorlage gibt der Besitzer sie an Nutzer oder Gruppen
+frei (`/api/bot-templates/{id}/shares`, Tabelle `bot_template_share`, V30).
+Empfänger — direkt, als Gruppenmitglied oder Gruppenbesitzer —
+
+- sehen die Vorlage samt Meeting-URL und Zeitplan (Kennzeichen „geteilt von …"),
+- können daraus einen Bot starten,
+- sehen die **laufenden Bots der Vorlage** auf der Bots-Seite, auch die vom
+  Zeitplan gestarteten, und steuern sie: verlängern, Aufnahme starten/beenden,
+  verwerfen, Bot stoppen.
+
+Bearbeiten, Löschen und Weiterteilen bleibt beim Besitzer. Ein Bot aus der
+Vorlage läuft immer im Namen des Besitzers — auch wenn ihn ein Empfänger
+startet —, seine Aufnahmen gehören also dem Besitzer. Jede **neue Aufnahme**
+eines solchen Bots wird beim Anlegen automatisch an dieselben Nutzer und
+Gruppen freigegeben wie die Vorlage (Stand der Freigaben beim Aufnahmestart;
+ältere Aufnahmen und das spätere Entziehen einer Vorlagen-Freigabe ändern an
+bestehenden Aufnahme-Freigaben nichts).
 
 Gestartet wird über `POST /api/bots/from-template/{id}` — der Server liest die
 Vorlage selbst (dieselbe Logik nutzt der Zeitplan). Damit eine Vorlage nicht erst beim Starten scheitert, prüfen Vorlage
@@ -392,6 +424,12 @@ regulär abgeschlossen und ausgewertet.
 - **Start von Hand im Termin**: Wird eine Vorlage während eines laufenden Termins
   per „Bot starten" gestartet, gilt das als dieser Termin — der Bot verlässt den
   Raum zur geplanten Endzeit, und der Scheduler startet keinen zweiten.
+- **Verlängern**: Dauert ein Termin länger, lässt sich der laufende Bot auf der
+  Bots-Seite per „Verlängern" um 15/30/60/120 Minuten (ab dem bisherigen Ende)
+  oder ganz ohne Ende weiterlaufen lassen
+  (`POST /api/bots/{sessionId}/schedule/extend`, Body `{"minutes": 30}` bzw.
+  `{"untilStopped": true}`, höchstens 12 h auf einmal). Das gilt nur für diesen
+  einen Termin; der Zeitplan der Vorlage bleibt unverändert.
 - Ein **pausierter** Zeitplan behält Tage und Zeiten, damit er nach den Ferien
   nur wieder eingeschaltet werden muss.
 

@@ -32,16 +32,72 @@ public class GroupService {
         return groupRepo.findAllVisibleTo(user.getId());
     }
 
+    /** Alle Gruppen - nur fuer die Admin-Verwaltung. */
+    public List<UserGroup> listAll() {
+        return groupRepo.findAll();
+    }
+
     @Transactional
     public UserGroup create(String name, AppUser owner) {
+        return groupRepo.save(UserGroup.create(requireFreeName(name, null), owner.getId()));
+    }
+
+    /** Umbenennen - durch den Besitzer oder einen Admin. */
+    @Transactional
+    public UserGroup rename(UUID groupId, String name, AppUser actor) {
+        UserGroup group = requireGroup(groupId);
+        requireOwner(group, actor);
+        group.setName(requireFreeName(name, group));
+        return groupRepo.save(group);
+    }
+
+    /**
+     * Besitz uebertragen - nur Admins, z.B. wenn der Besitzer das Haus
+     * verlassen hat. Der bisherige Besitzer bleibt als Mitglied in der Gruppe,
+     * damit er die freigegebenen Aufnahmen nicht stillschweigend verliert; der
+     * neue wird als Mitglied ausgetragen, weil er als Besitzer ohnehin alles sieht.
+     */
+    @Transactional
+    public UserGroup changeOwner(UUID groupId, UUID newOwnerId, AppUser actor) {
+        if (!actor.isAdmin()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Nur Admins duerfen den Besitzer aendern");
+        }
+        UserGroup group = requireGroup(groupId);
+        AppUser target = userRepo.findById(newOwnerId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Nutzer nicht gefunden"));
+        UUID previous = group.getOwnerId();
+        if (previous.equals(target.getId())) return group;
+        group.setOwnerId(target.getId());
+        memberRepo.deleteByGroupIdAndUserId(groupId, target.getId());
+        if (memberRepo.findByGroupIdAndUserId(groupId, previous).isEmpty()
+                && userRepo.existsById(previous)) {
+            memberRepo.save(GroupMember.create(groupId, previous));
+        }
+        return groupRepo.save(group);
+    }
+
+    /**
+     * Aenderung durch einen Admin in einem Zug: Name und/oder Besitzer
+     * (null = bleibt). Scheitert ein Teil, bleibt auch der andere unveraendert.
+     */
+    @Transactional
+    public UserGroup adminUpdate(UUID groupId, String name, UUID ownerId, AppUser actor) {
+        UserGroup group = requireGroup(groupId);
+        if (name != null) group = rename(groupId, name, actor);
+        if (ownerId != null) group = changeOwner(groupId, ownerId, actor);
+        return group;
+    }
+
+    private String requireFreeName(String name, UserGroup self) {
         String trimmed = name == null ? "" : name.trim();
         if (trimmed.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Gruppenname darf nicht leer sein");
         }
-        if (groupRepo.existsByNameIgnoreCase(trimmed)) {
+        boolean unchanged = self != null && self.getName().equalsIgnoreCase(trimmed);
+        if (!unchanged && groupRepo.existsByNameIgnoreCase(trimmed)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Gruppenname bereits vergeben");
         }
-        return groupRepo.save(UserGroup.create(trimmed, owner.getId()));
+        return trimmed;
     }
 
     @Transactional

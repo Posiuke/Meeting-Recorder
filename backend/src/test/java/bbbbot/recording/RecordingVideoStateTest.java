@@ -57,7 +57,8 @@ class RecordingVideoStateTest {
         when(recordingRepo.findByVideoStatusIn(anyList())).thenReturn(List.of());
 
         service = new RecordingService(props, ffmpeg, settings, recordingRepo,
-                mock(RecordingSegmentRepo.class), mock(ProcessingJobRepo.class), sessionRepo);
+                mock(RecordingSegmentRepo.class), mock(ProcessingJobRepo.class), sessionRepo,
+                mock(bbbbot.sharing.BotTemplateAccess.class));
     }
 
     /** Aufnahme mit eigenem Verzeichnis, die vor {@code endeVorMinuten} beendet wurde. */

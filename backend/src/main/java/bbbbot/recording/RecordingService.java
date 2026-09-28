@@ -55,6 +55,7 @@ public class RecordingService {
     private final RecordingSegmentRepo segmentRepo;
     private final ProcessingJobRepo jobRepo;
     private final BotSessionRepo sessionRepo;
+    private final bbbbot.sharing.BotTemplateAccess templateAccess;
 
     private final ExecutorService transcodePool = Executors.newFixedThreadPool(2, r -> {
         Thread t = new Thread(r, "transcode");
@@ -87,7 +88,8 @@ public class RecordingService {
 
     public RecordingService(AppProperties props, FfmpegService ffmpeg, SettingsService settings,
                             RecordingRepo recordingRepo, RecordingSegmentRepo segmentRepo,
-                            ProcessingJobRepo jobRepo, BotSessionRepo sessionRepo) {
+                            ProcessingJobRepo jobRepo, BotSessionRepo sessionRepo,
+                            bbbbot.sharing.BotTemplateAccess templateAccess) {
         this.props = props;
         this.ffmpeg = ffmpeg;
         this.settings = settings;
@@ -95,6 +97,7 @@ public class RecordingService {
         this.segmentRepo = segmentRepo;
         this.jobRepo = jobRepo;
         this.sessionRepo = sessionRepo;
+        this.templateAccess = templateAccess;
     }
 
     /**
@@ -126,7 +129,25 @@ public class RecordingService {
         recordingRepo.save(recording);
         log.info("Aufnahme {} angelegt (Verzeichnis {}, Video={}, Analyse={})",
                 recording.getId(), dir, recordVideo, aiAnalysis);
+        shareWithTemplateRecipients(recording, botSessionId);
         return recording;
+    }
+
+    /**
+     * Stammt der Bot aus einer geteilten Bot-Vorlage, sehen deren Empfaenger
+     * auch die Aufnahme. Eine gescheiterte Freigabe darf die Aufnahme nicht
+     * verhindern - sie laesst sich von Hand nachholen.
+     */
+    private void shareWithTemplateRecipients(Recording recording, UUID botSessionId) {
+        if (botSessionId == null) return;
+        try {
+            sessionRepo.findById(botSessionId)
+                    .map(BotSession::getBotTemplateId)
+                    .ifPresent(templateId -> templateAccess.shareRecording(recording.getId(), templateId));
+        } catch (RuntimeException e) {
+            log.warn("Aufnahme {}: Freigabe an die Empfaenger der Bot-Vorlage fehlgeschlagen: {}",
+                    recording.getId(), e.getMessage());
+        }
     }
 
     /**

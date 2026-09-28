@@ -125,6 +125,8 @@ export const de = {
     cardParticipants: 'Teilnehmer',
     cardAudioTracks: 'Audiotracks',
     cardMode: 'Modus',
+    cardOwner: 'Vorlage',
+    cardOwnerShared: 'geteilt von {{name}}',
     cardStarted: 'Gestartet',
     cardScheduledStop: 'Verlässt den Raum',
     cardRecording: 'Aufnahme',
@@ -150,6 +152,18 @@ export const de = {
       'Beendet die Aufnahme und löscht sie unwiderruflich – es wird nichts gespeichert. Der Bot bleibt im Raum.',
     stopBotHint:
       'Der Bot verlässt den Raum. Eine laufende Aufnahme wird dabei ebenfalls gespeichert (wie bei „Aufnahme beenden").',
+    extend: 'Verlängern',
+    extendHint:
+      'Der Termin dauert länger? Der Bot bleibt dann entsprechend länger im Raum und nimmt weiter auf.',
+    extendTitle: 'Bot verlängern',
+    extendMessage:
+      'Der Bot verlässt den Raum laut Zeitplan um {{time}}. Um wie viel soll er länger bleiben?',
+    extendMinutes: '+{{n}} Min.',
+    extendHours: '+{{n}} Std.',
+    extendUntil: 'bis {{time}}',
+    extendOpenEnd: 'Ohne Ende',
+    extendOpenEndHint:
+      'Der Bot bleibt, bis Sie ihn stoppen oder das Meeting endet.',
     confirmDiscardTitle: 'Aufnahme verwerfen',
     confirmDiscardMessage:
       'Die laufende Aufnahme wird beendet und unwiderruflich verworfen. Fortfahren?',
@@ -162,7 +176,17 @@ export const de = {
   botTemplates: {
     section: 'Bot-Vorlagen',
     intro:
-      'Ein regelmäßig aufgezeichneter Raum muss nicht jedes Mal neu eingetragen werden: Meeting-URL und Einstellungen einmal als Vorlage speichern, danach genügt „Bot starten". Ihre Vorlagen sind nur für Sie sichtbar.',
+      'Ein regelmäßig aufgezeichneter Raum muss nicht jedes Mal neu eingetragen werden: Meeting-URL und Einstellungen einmal als Vorlage speichern, danach genügt „Bot starten". Ihre Vorlagen sind nur für Sie sichtbar, bis Sie sie teilen.',
+    sharedBy: 'geteilt von {{name}}',
+    sharedCount: 'geteilt ({{count}})',
+    share: {
+      button: 'Teilen',
+      hint: 'Vorlage an Nutzer oder Gruppen freigeben.',
+      title: 'Bot-Vorlage „{{name}}" teilen',
+      intro:
+        'Empfänger sehen die Vorlage samt Meeting-URL und Zeitplan, können daraus einen Bot starten und die laufenden Bots der Vorlage steuern (verlängern, Aufnahme starten/beenden, stoppen) – auch die vom Zeitplan gestarteten. Neue Aufnahmen dieser Bots werden automatisch an sie freigegeben. Bearbeiten, Löschen und Weiterteilen bleibt bei Ihnen.',
+      empty: 'Diese Vorlage ist bisher mit niemandem geteilt.',
+    },
     new: 'Neue Vorlage',
     loading: 'Vorlagen werden geladen…',
     empty: 'Noch keine Bot-Vorlage gespeichert.',
@@ -936,11 +960,38 @@ export const de = {
       'Bitte bei der Person nachfragen, die den Link geschickt hat – möglicherweise wurde er widerrufen oder ist abgelaufen.',
   },
 
+  adminGroups: {
+    loading: 'Gruppen werden geladen…',
+    intro:
+      'Alle Gruppen der Anwendung – auch die, in denen Sie weder Besitzer noch Mitglied sind. Sie können sie umbenennen, den Besitzer wechseln, Mitglieder pflegen und löschen.',
+    filterPlaceholder: 'Nach Gruppe oder Besitzer filtern…',
+    empty: 'Es gibt noch keine Gruppen.',
+    name: 'Gruppe',
+    owner: 'Besitzer',
+    ownerUnknown: 'unbekannt (Konto gelöscht)',
+    members: 'Mitglieder',
+    shares: 'Freigaben',
+    created: 'Angelegt',
+    manage: 'Verwalten',
+    manageTitle: 'Gruppe „{{name}}" verwalten',
+    renameHeading: 'Name',
+    rename: 'Umbenennen',
+    ownerHeading: 'Besitzer',
+    currentOwner: 'Aktueller Besitzer: {{owner}}',
+    newOwner: 'Neuer Besitzer: {{owner}}',
+    changeOwner: 'Besitzer übertragen',
+    ownerHint:
+      'Der bisherige Besitzer bleibt als Mitglied in der Gruppe und behält so den Zugriff auf die freigegebenen Aufnahmen.',
+    confirmDeleteMessage:
+      'Die Gruppe „{{name}}" von {{owner}} wird gelöscht. Ihre {{members}} Mitglieder verlieren den Zugriff über {{shares}} Freigabe(n) an diese Gruppe. Fortfahren?',
+  },
+
   admin: {
     heading: 'Administration',
     tabSettings: 'Einstellungen',
     tabAuth: 'Authentifizierung',
     tabUsers: 'Benutzer',
+    tabGroups: 'Gruppen',
     tabProcessing: 'Verarbeitung',
 
     // Admin-Tab "Verarbeitung": das Betriebsbild der Warteschlange

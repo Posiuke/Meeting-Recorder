@@ -79,8 +79,12 @@ public class BotInstance {
     private final bbbbot.domain.SummaryChoice summaryChoice;
     /** Bot-Vorlage, aus der die Session stammt (null = von Hand gestartet). */
     private final UUID botTemplateId;
-    /** Ende laut Zeitplan (null = kein geplantes Ende). */
-    private final Instant scheduledStopAt;
+    /**
+     * Ende laut Zeitplan (null = kein geplantes Ende). Veraenderlich, weil es
+     * sich im laufenden Termin verlaengern laesst (siehe
+     * {@link BotManager#extendScheduledStop}).
+     */
+    private volatile Instant scheduledStopAt;
     private final BotConfig config;
     private final AppProperties.Bots botProps;
     private final RecordingService recordingService;
@@ -333,6 +337,7 @@ public class BotInstance {
     public UUID getOwnerId() { return ownerId; }
     public UUID getBotTemplateId() { return botTemplateId; }
     public Instant getScheduledStopAt() { return scheduledStopAt; }
+    void setScheduledStopAt(Instant scheduledStopAt) { this.scheduledStopAt = scheduledStopAt; }
     /** Wurde der Bot bereits zum Beenden aufgefordert? */
     public boolean isShuttingDown() { return shuttingDown; }
 
