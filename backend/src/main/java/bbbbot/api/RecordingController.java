@@ -583,6 +583,20 @@ public class RecordingController {
     }
 
     /**
+     * Entfernt nur das Video (nur Besitzer). Tonspur, Transkript, Zusammenfassung
+     * und Freigaben der Aufnahme bleiben unveraendert.
+     */
+    @DeleteMapping("/{id}/video")
+    public Dtos.RecordingView deleteVideo(@PathVariable UUID id) {
+        AppUser user = CurrentUser.get();
+        Recording recording = access.requireOwner(id, user);
+        if (isCapturing(id) || !recordingService.deleteVideo(id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Video wird noch erstellt");
+        }
+        return toView(recordingRepo.findById(id).orElse(recording), user);
+    }
+
+    /**
      * Zusammengefuehrtes Gesamt-Transkript: alle Segment-Transkripte mit
      * fortlaufenden Zeitstempeln, sowohl als Text als auch strukturiert
      * (Startzeit/Sprecher/Text) fuer die Anzeige im Frontend.

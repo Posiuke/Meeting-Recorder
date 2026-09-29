@@ -799,6 +799,11 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           path: '/api/recordings/{id}/video/download',
           summary: 'Dasselbe Video mit Download-Namen.',
         },
+        {
+          method: 'DELETE',
+          path: '/api/recordings/{id}/video',
+          summary: 'Entfernt nur das Video; Tonspur, Transkript und Zusammenfassung bleiben (nur Besitzer, 409 solange das Video noch erstellt wird).',
+        },
       ],
     },
 

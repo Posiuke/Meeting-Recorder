@@ -258,6 +258,21 @@ export const deleteRecording = createAsyncThunk<string, string, { rejectValue: s
   },
 );
 
+/**
+ * Nur das Video einer Aufnahme entfernen; Tonspur, Transkript und
+ * Zusammenfassung bleiben erhalten.
+ */
+export const deleteRecordingVideo = createAsyncThunk<RecordingView, string, { rejectValue: string }>(
+  'recordings/deleteVideo',
+  async (id, { rejectWithValue }) => {
+    try {
+      return await api<RecordingView>(`/api/recordings/${id}/video`, { method: 'DELETE' });
+    } catch (e) {
+      return rejectWithValue(errorMessage(e));
+    }
+  },
+);
+
 export const cleanupCorrupt = createAsyncThunk<number, void, { rejectValue: string }>(
   'recordings/cleanupCorrupt',
   async (_, { rejectWithValue }) => {
@@ -663,6 +678,12 @@ const recordingsSlice = createSlice({
         // Die Gesamtzahl mitzählen, sonst behauptet die Liste weiter
         // "25 von 340", nachdem eine Aufnahme verschwunden ist.
         if (state.items.length < before) state.total = Math.max(0, state.total - 1);
+      })
+      .addCase(deleteRecordingVideo.fulfilled, (state, action) => {
+        if (state.detail?.recording.id === action.payload.id) {
+          state.detail.recording = action.payload;
+        }
+        state.items = state.items.map((r) => (r.id === action.payload.id ? action.payload : r));
       })
       .addCase(processRecording.fulfilled, (state, action) => {
         upsertJob(state, action.payload);

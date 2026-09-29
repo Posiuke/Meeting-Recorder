@@ -16,8 +16,12 @@ public class Recording {
 
     public enum Status { RECORDING, FINALIZING, RECORDED, PROCESSING, TRANSCRIBED, DONE, FAILED, DISCARDED }
 
-    /** Zustand der optionalen Video-Aufzeichnung (Browser-Ansicht -> MP4). */
-    public enum VideoStatus { NONE, RECORDING, MUXING, READY, FAILED }
+    /**
+     * Zustand der optionalen Video-Aufzeichnung (Browser-Ansicht -> MP4).
+     * DELETED = vom Besitzer nachtraeglich entfernt; Tonspur, Transkript und
+     * Zusammenfassung der Aufnahme bleiben erhalten.
+     */
+    public enum VideoStatus { NONE, RECORDING, MUXING, READY, FAILED, DELETED }
 
     /**
      * Woher die Aufnahme stammt: BOT = Bot-Session im Meeting, UPLOAD = vom Nutzer
