@@ -783,6 +783,7 @@ export const de = {
 
   recordingDetail: {
     fallbackTitle: 'Aufnahme vom {{date}}',
+    titleLabel: 'Name der Aufnahme',
     loading: 'Aufnahme wird geladen…',
     backToList: 'Zurück zu den Aufnahmen',
     sourceBot: 'Bot im Meeting',

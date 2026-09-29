@@ -141,6 +141,13 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
           example: `curl -s -X DELETE -H "X-API-Key: $KEY" "$BBB/api/recordings/$ID"`,
         },
         {
+          method: 'PUT',
+          path: '/api/recordings/{id}/title',
+          summary: 'Aufnahme umbenennen (nur Besitzer, 1–512 Zeichen). Antwort: die geänderte Aufnahme.',
+          example: `curl -s -X PUT -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
+  -d '{"title":"Jour fixe KW 40"}' "$BBB/api/recordings/$ID/title"`,
+        },
+        {
           method: 'GET',
           path: '/api/recordings/tags',
           summary: 'Alle sichtbaren Schlagworte mit Anzahl der Aufnahmen.',

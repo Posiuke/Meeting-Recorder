@@ -762,6 +762,7 @@ export const en: typeof de = {
 
   recordingDetail: {
     fallbackTitle: 'Recording from {{date}}',
+    titleLabel: 'Recording name',
     loading: 'Loading recording…',
     backToList: 'Back to recordings',
     sourceBot: 'Bot in the meeting',

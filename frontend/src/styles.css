@@ -1067,6 +1067,34 @@ tbody tr:hover {
   margin: 0;
 }
 
+.title-show {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.title-show h1 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.title-edit {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.title-edit input {
+  flex: 1;
+  min-width: 12rem;
+  font-size: 1.25rem;
+}
+
 .detail-actions {
   display: flex;
   flex-wrap: wrap;

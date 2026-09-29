@@ -146,6 +146,9 @@ public class RecordingController {
     /** Wie die Namensspalte der Vorlagen - der Name kommt von dort. */
     private static final int MAX_TEMPLATE_NAME_LENGTH = 200;
 
+    /** Breite der Spalte {@code recording.title}. */
+    static final int MAX_TITLE_LENGTH = 512;
+
     /**
      * Normalisiert einen Auswertungs-Prompt: leer bedeutet "Admin-Standard
      * verwenden" (null), zu lang wird abgelehnt.
@@ -185,6 +188,22 @@ public class RecordingController {
         return name.length() > MAX_TEMPLATE_NAME_LENGTH
                 ? name.substring(0, MAX_TEMPLATE_NAME_LENGTH)
                 : name;
+    }
+
+    /**
+     * Prueft einen neuen Aufnahmenamen: getrimmt, nicht leer und hoechstens so
+     * lang wie die Spalte {@code recording.title}.
+     */
+    static String requireTitle(String raw) {
+        String title = raw == null ? "" : raw.trim();
+        if (title.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Name darf nicht leer sein");
+        }
+        if (title.length() > MAX_TITLE_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Name ist zu lang (max. " + MAX_TITLE_LENGTH + " Zeichen)");
+        }
+        return title;
     }
 
     /**
@@ -458,6 +477,19 @@ public class RecordingController {
         AppUser user = CurrentUser.get();
         access.requireOwner(id, user);
         return tagService.removeTag(id, name);
+    }
+
+    /**
+     * Aufnahme umbenennen (nur Besitzer). Der Name wird ueberall live gelesen
+     * (Listen, Freigaben, Dateinamen beim Herunterladen) - gespeicherte Dateien
+     * muessen nicht neu geschrieben werden.
+     */
+    @PutMapping("/{id}/title")
+    public Dtos.RecordingView rename(@PathVariable UUID id, @RequestBody Dtos.TitleRequest request) {
+        AppUser user = CurrentUser.get();
+        Recording recording = access.requireOwner(id, user);
+        recording.setTitle(requireTitle(request.title()));
+        return toView(recordingRepo.save(recording), user);
     }
 
     @GetMapping("/{id}")

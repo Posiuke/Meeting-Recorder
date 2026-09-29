@@ -11,6 +11,7 @@ import {
   fetchRecordingDetail,
   fetchTranscript,
   processRecording,
+  renameRecording,
   reprocessRecording,
   retranscribeRecording,
   setCurrentSummary,
@@ -124,6 +125,9 @@ export default function RecordingDetailPage() {
   const [segmentsOpen, setSegmentsOpen] = useState<boolean | null>(null);
   /** Transkript-Tab: geglättete Fassung (Standard) oder Whisper-Original. */
   const [showOriginal, setShowOriginal] = useState(false);
+  /** Umbenennen im Kopf: null = Anzeige, sonst der Entwurf des neuen Namens. */
+  const [titleDraft, setTitleDraft] = useState<string | null>(null);
+  const [titleBusy, setTitleBusy] = useState(false);
   // Wiedergabe der Gesamt-Tonspur: Element für den Sprung, Zeile für die Anzeige
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -343,6 +347,20 @@ export default function RecordingDetailPage() {
     }
   };
 
+  const handleRename = async () => {
+    if (titleDraft === null || !titleDraft.trim()) return;
+    setActionError(null);
+    setTitleBusy(true);
+    try {
+      await dispatch(renameRecording({ recordingId: id, title: titleDraft.trim() })).unwrap();
+      setTitleDraft(null);
+    } catch (e) {
+      setActionError(errorMessage(e));
+    } finally {
+      setTitleBusy(false);
+    }
+  };
+
   return (
     <div className="page">
       <div className="breadcrumb">
@@ -352,10 +370,57 @@ export default function RecordingDetailPage() {
 
       <div className="card detail-head">
         <div className="detail-head-top">
-          <h1>
-            {rec.title ??
-              t('recordingDetail.fallbackTitle', { date: formatDateTime(rec.startedAt) })}
-          </h1>
+          {titleDraft !== null ? (
+            <form
+              className="title-edit"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleRename();
+              }}
+            >
+              <input
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setTitleDraft(null);
+                }}
+                maxLength={512}
+                aria-label={t('recordingDetail.titleLabel')}
+                autoFocus
+              />
+              <button
+                type="submit"
+                className="btn btn-primary btn-sm"
+                disabled={titleBusy || !titleDraft.trim()}
+              >
+                {titleBusy ? t('recordingDetail.saving') : t('common.save')}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setTitleDraft(null)}
+                disabled={titleBusy}
+              >
+                {t('common.cancel')}
+              </button>
+            </form>
+          ) : (
+            <div className="title-show">
+              <h1>
+                {rec.title ??
+                  t('recordingDetail.fallbackTitle', { date: formatDateTime(rec.startedAt) })}
+              </h1>
+              {rec.mine && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setTitleDraft(rec.title ?? '')}
+                >
+                  {t('recordingDetail.rename')}
+                </button>
+              )}
+            </div>
+          )}
           <StatusBadge status={rec.status} />
         </div>
         <RecordingProgress steps={progress.steps} />

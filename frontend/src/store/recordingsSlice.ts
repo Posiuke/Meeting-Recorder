@@ -234,6 +234,22 @@ export const removeRecordingTag = createAsyncThunk<
   }
 });
 
+/** Aufnahme umbenennen (nur Besitzer). */
+export const renameRecording = createAsyncThunk<
+  RecordingView,
+  { recordingId: string; title: string },
+  { rejectValue: string }
+>('recordings/rename', async ({ recordingId, title }, { rejectWithValue }) => {
+  try {
+    return await api<RecordingView>(`/api/recordings/${recordingId}/title`, {
+      method: 'PUT',
+      body: { title },
+    });
+  } catch (e) {
+    return rejectWithValue(errorMessage(e));
+  }
+});
+
 export const fetchRecordingDetail = createAsyncThunk<
   RecordingDetail,
   { id: string; silent?: boolean },
@@ -642,6 +658,11 @@ const recordingsSlice = createSlice({
       })
       .addCase(removeRecordingTag.fulfilled, (state, action) => {
         applyTags(state, action.payload.recordingId, action.payload.tags);
+      })
+      .addCase(renameRecording.fulfilled, (state, action) => {
+        const { id, title } = action.payload;
+        if (state.detail?.recording.id === id) state.detail.recording.title = title;
+        state.items = state.items.map((r) => (r.id === id ? { ...r, title } : r));
       })
       .addCase(fetchRecordingDetail.pending, (state, action) => {
         if (!action.meta.arg.silent) {

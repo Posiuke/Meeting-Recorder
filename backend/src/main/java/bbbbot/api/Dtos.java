@@ -438,6 +438,8 @@ public final class Dtos {
 
     public record TagRequest(String name) {}
 
+    public record TitleRequest(String title) {}
+
     /**
      * Pro-Aufnahme-Einstellungen fuer Spracherkennung und Zusammenfassung
      * (null = Admin-Standard). Die Defaults werden mitgeliefert, damit das
