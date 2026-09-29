@@ -819,6 +819,11 @@ export const en: typeof de = {
     videoDownload: 'Download video',
     videoFailed: 'The video could not be created.',
     videoProcessing: 'The video is being processed and will be available here afterwards.',
+    videoDelete: 'Delete video',
+    videoDeleted: 'The video has been deleted. Audio, transcript and summary are still available.',
+    confirmDeleteVideoTitle: 'Delete video?',
+    confirmDeleteVideoMessage:
+      'Only the video is removed permanently. The audio, transcript, summary and shares of the recording stay unchanged.',
     segmentsHeading: 'Segments',
     segmentsEmpty: 'No segments available.',
     segmentsCount: '({{count}})',

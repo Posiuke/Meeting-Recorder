@@ -802,6 +802,11 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
           path: '/api/recordings/{id}/video/download',
           summary: 'The same video with a download file name.',
         },
+        {
+          method: 'DELETE',
+          path: '/api/recordings/{id}/video',
+          summary: 'Removes only the video; audio, transcript and summary stay (owner only, 409 while the video is still being created).',
+        },
       ],
     },
 

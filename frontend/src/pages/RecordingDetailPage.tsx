@@ -6,6 +6,7 @@ import {
   clearDetail,
   deleteRecording,
   deleteRecordingDocument,
+  deleteRecordingVideo,
   deleteSummary,
   extractRecordingDocument,
   fetchRecordingDetail,
@@ -111,6 +112,8 @@ export default function RecordingDetailPage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [confirmDeleteVideo, setConfirmDeleteVideo] = useState(false);
+  const [deleteVideoBusy, setDeleteVideoBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [processBusy, setProcessBusy] = useState(false);
   const [transcribeBusy, setTranscribeBusy] = useState(false);
@@ -334,6 +337,19 @@ export default function RecordingDetailPage() {
     else void handleProcess();
   };
 
+  const handleDeleteVideo = async () => {
+    setActionError(null);
+    setDeleteVideoBusy(true);
+    try {
+      await dispatch(deleteRecordingVideo(id)).unwrap();
+    } catch (e) {
+      setActionError(errorMessage(e));
+    } finally {
+      setDeleteVideoBusy(false);
+      setConfirmDeleteVideo(false);
+    }
+  };
+
   const handleDelete = async () => {
     setActionError(null);
     setDeleteBusy(true);
@@ -555,10 +571,21 @@ export default function RecordingDetailPage() {
                 <a className="btn btn-ghost btn-sm" href={videoDownloadUrl(id)} download>
                   {t('recordingDetail.videoDownload')}
                 </a>
+                {rec.mine && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setConfirmDeleteVideo(true)}
+                  >
+                    {t('recordingDetail.videoDelete')}
+                  </button>
+                )}
               </div>
             </div>
           ) : rec.videoStatus === 'FAILED' ? (
             <Alert kind="error">{t('recordingDetail.videoFailed')}</Alert>
+          ) : rec.videoStatus === 'DELETED' ? (
+            <p className="muted">{t('recordingDetail.videoDeleted')}</p>
           ) : (
             <p className="muted">{t('recordingDetail.videoProcessing')}</p>
           )}
@@ -827,6 +854,17 @@ export default function RecordingDetailPage() {
           busy={retranscribeBusy}
           onConfirm={handleRetranscribe}
           onCancel={() => setConfirmRetranscribe(false)}
+        />
+      )}
+      {confirmDeleteVideo && (
+        <ConfirmDialog
+          title={t('recordingDetail.confirmDeleteVideoTitle')}
+          message={t('recordingDetail.confirmDeleteVideoMessage')}
+          confirmLabel={t('recordingDetail.videoDelete')}
+          danger
+          busy={deleteVideoBusy}
+          onConfirm={handleDeleteVideo}
+          onCancel={() => setConfirmDeleteVideo(false)}
         />
       )}
       {confirmDelete && (

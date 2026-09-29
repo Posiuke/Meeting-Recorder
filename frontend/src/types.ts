@@ -281,7 +281,8 @@ export type RecordingStatus =
   | 'FAILED'
   | 'DISCARDED';
 
-export type VideoStatus = 'NONE' | 'RECORDING' | 'MUXING' | 'READY' | 'FAILED';
+/** DELETED = vom Besitzer nachträglich entfernt, Tonspur und Auswertung bleiben. */
+export type VideoStatus = 'NONE' | 'RECORDING' | 'MUXING' | 'READY' | 'FAILED' | 'DELETED';
 
 /** Woher eine Aufnahme stammt. */
 export type RecordingSource = 'BOT' | 'UPLOAD' | 'CAPTURE';

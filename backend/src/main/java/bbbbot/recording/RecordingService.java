@@ -666,6 +666,59 @@ public class RecordingService {
         }
     }
 
+    /**
+     * Entfernt nachtraeglich das Video einer Aufnahme und behaelt alles andere:
+     * Die Tonspur liegt unabhaengig davon in den MP3-Segmenten, Transkript und
+     * Zusammenfassung haengen nur an diesen.
+     *
+     * <p>Geloescht werden das abspielbare meeting.mp4 und - bei Uploads und
+     * Bildschirmaufnahmen - die aufbewahrte Quelldatei, sofern sie einen
+     * Video-Stream enthaelt; sonst laege das Bild dort weiter auf der Platte.
+     * Bot-Segmente (webm) sind reine Tonspuren und bleiben unangetastet.
+     *
+     * @return false, wenn das Video gerade noch entsteht (RECORDING/MUXING)
+     */
+    public boolean deleteVideo(UUID recordingId) {
+        Recording recording = recordingRepo.findById(recordingId).orElse(null);
+        if (recording == null) return false;
+        Recording.VideoStatus status = recording.getVideoStatus();
+        if (status == Recording.VideoStatus.RECORDING || status == Recording.VideoStatus.MUXING
+                || activeMuxes.contains(recordingId)) {
+            return false;
+        }
+        Path dir = Path.of(recording.getDirectory()).toAbsolutePath().normalize();
+        List<Path> files = new ArrayList<>();
+        if (recording.getVideoPath() != null) files.add(Path.of(recording.getVideoPath()));
+        files.add(dir.resolve("meeting.mp4"));
+        List<RecordingSegment> segments = segmentRepo.findByRecordingIdOrderBySeq(recordingId);
+        if (recording.getSource() == Recording.Source.UPLOAD || recording.getSource() == Recording.Source.CAPTURE) {
+            segments.stream()
+                    .map(RecordingSegment::getWebmPath)
+                    .filter(Objects::nonNull)
+                    .map(Path::of)
+                    .filter(p -> Files.exists(p) && hasVideoStream(p))
+                    .forEach(files::add);
+        }
+        // Die Tonspur bleibt in jedem Fall stehen.
+        Set<Path> audio = segments.stream()
+                .map(RecordingSegment::getMp3Path)
+                .filter(Objects::nonNull)
+                .map(p -> Path.of(p).toAbsolutePath().normalize())
+                .collect(java.util.stream.Collectors.toSet());
+        for (Path file : files.stream().distinct().toList()) {
+            Path abs = file.toAbsolutePath().normalize();
+            // Nur im eigenen Aufnahme-Verzeichnis loeschen, nie die Tonspur.
+            if (!abs.startsWith(dir) || audio.contains(abs)) continue;
+            try {
+                if (Files.deleteIfExists(abs)) log.info("Video von Aufnahme {} geloescht: {}", recordingId, abs.getFileName());
+            } catch (IOException e) {
+                log.warn("Videodatei {} konnte nicht geloescht werden: {}", abs, e.getMessage());
+            }
+        }
+        recordingRepo.updateVideoState(recordingId, Recording.VideoStatus.DELETED, null);
+        return true;
+    }
+
     /** Video als fehlgeschlagen kennzeichnen, ohne andere Felder der Aufnahme anzufassen. */
     private void markVideoFailed(UUID recordingId) {
         try {

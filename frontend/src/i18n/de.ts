@@ -840,6 +840,12 @@ export const de = {
     videoDownload: 'Video herunterladen',
     videoFailed: 'Das Video konnte nicht erstellt werden.',
     videoProcessing: 'Das Video wird verarbeitet und steht anschließend hier zur Verfügung.',
+    videoDelete: 'Video löschen',
+    videoDeleted:
+      'Das Video wurde gelöscht. Tonspur, Transkript und Zusammenfassung sind weiterhin vorhanden.',
+    confirmDeleteVideoTitle: 'Video löschen?',
+    confirmDeleteVideoMessage:
+      'Nur das Video wird endgültig entfernt. Tonspur, Transkript, Zusammenfassung und Freigaben der Aufnahme bleiben unverändert.',
     segmentsHeading: 'Segmente',
     segmentsEmpty: 'Keine Segmente vorhanden.',
     segmentsCount: '({{count}})',
