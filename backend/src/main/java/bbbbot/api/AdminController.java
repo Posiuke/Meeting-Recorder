@@ -101,10 +101,21 @@ public class AdminController {
         long duration = System.currentTimeMillis() - start;
         if (result.success()) {
             return new Dtos.ConnectionTestResult(true,
-                    "LLM erreichbar - Modell \"" + settings.get(SettingsService.LLM_MODEL)
+                    "LLM erreichbar - Modell \"" + settings.llmModel()
                             + "\" hat geantwortet (" + duration + " ms)", duration);
         }
         return new Dtos.ConnectionTestResult(false, result.error(), duration);
+    }
+
+    /**
+     * Liest die Modelle des Cloud-LLM-Anbieters aus, damit der Admin eines
+     * auswaehlen kann statt den Namen abzutippen. Adresse und Key duerfen noch
+     * ungespeichert sein; fehlen sie, gelten die gespeicherten Werte.
+     */
+    @PostMapping("/settings/llm-models")
+    public LlmClient.ModelList listLlmModels(@RequestBody(required = false) Map<String, String> request) {
+        Map<String, String> params = request != null ? request : Map.of();
+        return llm.listModels(params.get("baseUrl"), params.get("apiKey"));
     }
 
     /**

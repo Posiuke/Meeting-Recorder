@@ -31,9 +31,25 @@ public class SettingsService {
     public static final String WHISPER_RETRY_ATTEMPTS = "whisper.retryAttempts";
     public static final String WHISPER_RETRY_BASE_MS = "whisper.retryBaseMs";
 
+    /**
+     * LLM-Anbieter: "local" = eigener OpenAI-kompatibler Server im Intranet (vLLM,
+     * llama.cpp), "openai" = oeffentliche Cloud-API (OpenAI oder kompatibel). Die
+     * Cloud bekommt eigene Felder fuer Adresse, Key und Modell - so bleibt die
+     * lokale Konfiguration beim Hin- und Herschalten erhalten.
+     */
+    public static final String LLM_PROVIDER = "llm.provider";
     public static final String LLM_BASE_URL = "llm.baseUrl";
     public static final String LLM_MODEL = "llm.model";
     public static final String LLM_API_KEY = "llm.apiKey";
+    public static final String LLM_OPENAI_URL = "llm.openaiUrl";
+    public static final String LLM_OPENAI_API_KEY = "llm.openaiApiKey";
+    public static final String LLM_OPENAI_MODEL = "llm.openaiModel";
+    /**
+     * Denkaufwand ({@code reasoning_effort}) fuer Reasoning-Modelle der Cloud.
+     * "off" = nicht mitschicken (fuer Modelle ohne Nachdenken). Lehnt ein Modell
+     * den Parameter ab, laesst der Client ihn von selbst weg.
+     */
+    public static final String LLM_OPENAI_REASONING_EFFORT = "llm.openaiReasoningEffort";
     public static final String LLM_TEMPERATURE = "llm.temperature";
     public static final String LLM_MAX_TOKENS = "llm.maxTokens";
     /**
@@ -183,6 +199,10 @@ public class SettingsService {
     private static final java.util.Set<String> OCR_STRATEGIES =
             java.util.Set.of("auto", "no_ocr", "ocr_only", "ocr_and_text_extraction");
 
+    /** Werte fuer reasoning_effort; "off" = Parameter nicht senden. */
+    private static final java.util.Set<String> REASONING_EFFORTS =
+            java.util.Set.of("off", "none", "minimal", "low", "medium", "high");
+
     private static final Map<String, String> DEFAULTS = new LinkedHashMap<>();
     static {
         DEFAULTS.put(WHISPER_PROVIDER, "local");
@@ -201,9 +221,16 @@ public class SettingsService {
         DEFAULTS.put(WHISPER_RETRY_ATTEMPTS, "2");
         DEFAULTS.put(WHISPER_RETRY_BASE_MS, "2000");
 
+        DEFAULTS.put(LLM_PROVIDER, "local");
         DEFAULTS.put(LLM_BASE_URL, "http://localhost:11434/v1");
         DEFAULTS.put(LLM_MODEL, "Qwen3.5-122B");
         DEFAULTS.put(LLM_API_KEY, "");
+        DEFAULTS.put(LLM_OPENAI_URL, "https://api.openai.com/v1");
+        DEFAULTS.put(LLM_OPENAI_API_KEY, "");
+        DEFAULTS.put(LLM_OPENAI_MODEL, "gpt-4o-mini");
+        // Niedrig: Glaetten und Zusammenfassen brauchen kein langes Nachdenken, und
+        // das Nachdenken zehrt am selben Token-Budget wie die Antwort.
+        DEFAULTS.put(LLM_OPENAI_REASONING_EFFORT, "low");
         DEFAULTS.put(LLM_TEMPERATURE, "0.3");
         DEFAULTS.put(LLM_MAX_TOKENS, "2048");
         DEFAULTS.put(LLM_DISABLE_THINKING, "true");
@@ -289,6 +316,19 @@ public class SettingsService {
         return repo.findById(key).map(AppSetting::getValue).filter(v -> v != null && !v.isBlank()).orElse(def);
     }
 
+    /** true, wenn das LLM in der Cloud laeuft ({@code llm.provider = openai}). */
+    public boolean isLlmCloud() {
+        return "openai".equalsIgnoreCase(get(LLM_PROVIDER).trim());
+    }
+
+    /**
+     * Standardmodell des gerade gewaehlten Anbieters - das, was ohne Vorgabe der
+     * Vorlage verwendet und an der Zusammenfassung vermerkt wird.
+     */
+    public String llmModel() {
+        return get(isLlmCloud() ? LLM_OPENAI_MODEL : LLM_MODEL);
+    }
+
     public int getInt(String key) { return Integer.parseInt(get(key).trim()); }
     public long getLong(String key) { return Long.parseLong(get(key).trim()); }
     public double getDouble(String key) { return Double.parseDouble(get(key).trim()); }
@@ -357,6 +397,16 @@ public class SettingsService {
                                 || !("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))) {
                             throw new IllegalArgumentException("erwartet http(s)://host");
                         }
+                    }
+                }
+                case LLM_PROVIDER -> {
+                    if (!value.trim().equalsIgnoreCase("local") && !value.trim().equalsIgnoreCase("openai")) {
+                        throw new IllegalArgumentException("erwartet local/openai");
+                    }
+                }
+                case LLM_OPENAI_REASONING_EFFORT -> {
+                    if (!REASONING_EFFORTS.contains(value.trim().toLowerCase(java.util.Locale.ROOT))) {
+                        throw new IllegalArgumentException("erwartet " + String.join("/", REASONING_EFFORTS));
                     }
                 }
                 case WHISPER_PROVIDER -> {

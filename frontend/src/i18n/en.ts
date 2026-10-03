@@ -1041,7 +1041,7 @@ export const en: typeof de = {
       'provider "local" uses the Whisper server on the intranet (setting url). provider "openai" uses an OpenAI-compatible cloud API (settings openaiUrl, openaiApiKey, openaiModel) – e.g. OpenAI or Groq. Caution: with cloud APIs the audio data leaves your own network; speaker recognition (diarisation) is not supported there.',
     groupLlm: 'AI model (LLM)',
     groupLlmNote:
-      'Any OpenAI-compatible chat endpoint works – locally (e.g. vLLM, Ollama) or as a cloud API. Examples for baseUrl: OpenAI https://api.openai.com/v1 · Anthropic https://api.anthropic.com/v1 · Google Gemini https://generativelanguage.googleapis.com/v1beta/openai · Groq https://api.groq.com/openai/v1 · Mistral https://api.mistral.ai/v1. Add the provider apiKey and model as well. Caution: with cloud APIs the transcript and chat log leave your own network.',
+      'provider "local" uses your own LLM server (baseUrl, apiKey, model). provider "openai" uses a public cloud API (openaiUrl, openaiApiKey, openaiModel) – the model is picked from the provider\'s list ("Fetch models"). Besides OpenAI (https://api.openai.com/v1), compatible providers work too, e.g. Groq https://api.groq.com/openai/v1 or Mistral https://api.mistral.ai/v1. Parameters a model rejects are dropped automatically. Caution: with cloud APIs the transcript and chat log leave your own network.',
     groupCorrection: 'Transcript smoothing',
     groupCorrectionNote:
       'Intermediate step between speech recognition and analysis: the LLM smooths the raw transcript (filler words, punctuation, recognition errors) and receives the personal glossary of the recording owner. Smoothing happens sentence by sentence in steps of chunkChars characters – a sentence is never split across two steps. The original is kept; you can switch in the transcript tab. A failure is harmless: the analysis then continues with the original.',
@@ -1068,6 +1068,17 @@ export const en: typeof de = {
     ocrBoth: 'ocr_and_text_extraction – both, merged',
     providerLocal: 'local – Whisper server on the intranet',
     providerOpenai: 'openai – OpenAI-compatible cloud API',
+    llmProviderLocal: 'local – own LLM server (vLLM, llama.cpp, Ollama)',
+    llmProviderOpenai: 'openai – public cloud API (OpenAI or compatible)',
+    reasoningOff: 'off – do not send',
+    reasoningNone: 'none – no reasoning',
+    reasoningMinimal: 'minimal',
+    reasoningLow: 'low – recommended',
+    reasoningMedium: 'medium',
+    reasoningHigh: 'high',
+    llmModelsLoad: 'Fetch models',
+    llmModelsLoading: 'Fetching…',
+    llmModelsCount: '{{count}} models available',
     authLoading: 'Loading authentication…',
     authHeading: 'LDAP / Active Directory',
     authNote:
@@ -1134,6 +1145,16 @@ export const en: typeof de = {
       llmApiKey: 'API key of the provider. Leave empty for local servers without authentication.',
       llmDisableThinking:
         'Turns off the internal "thinking" of reasoning models (Qwen3 and relatives). Thinking runs on the same token budget as the answer: with it enabled, the model spends its budget while smoothing transcripts and returns an empty answer. It adds nothing for smoothing or summarising. Servers that do not know the switch ignore it.',
+      llmProvider:
+        'Where the AI model runs: "local" sends requests to your own LLM server on the intranet, "openai" to a public cloud API. The settings of the other provider are kept.',
+      llmOpenaiUrl:
+        'Base URL of the cloud API without /chat/completions (provider = openai only). For OpenAI: https://api.openai.com/v1.',
+      llmOpenaiApiKey:
+        'API key of the cloud provider (provider = openai only). Also used to fetch the model list – this works before saving.',
+      llmOpenaiModel:
+        'Default model in the cloud. "Fetch models" reads the provider\'s models; embedding, audio and image models are hidden. Templates may choose a different model.',
+      llmOpenaiReasoningEffort:
+        'How long reasoning models (e.g. GPT-5, o series) think. Reasoning counts toward the token budget – "low" is enough for smoothing and summarising. Models without reasoning reject the parameter; the bot then drops it automatically.',
       llmModel:
         'Model name at the provider, e.g. gpt-4o-mini (OpenAI), claude-sonnet-5 (Anthropic) or the name of the locally loaded model. This is the default: templates and individual recordings may pick a different model (same for the temperature).',
       documentsEnabled:

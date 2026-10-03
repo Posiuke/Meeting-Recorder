@@ -1904,6 +1904,19 @@ tbody tr:hover {
   font-weight: 500;
 }
 
+/* Modellauswahl der Cloud-LLM: Liste + "Modelle abrufen" in einer Zeile. */
+.model-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.model-picker select {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
 .field-default {
   font-size: 0.78rem;
   color: var(--text-muted);

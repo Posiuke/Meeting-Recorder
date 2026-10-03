@@ -57,7 +57,52 @@ const MULTILINE_KEYS = new Set([
 ]);
 
 /** API-Schlüssel werden maskiert dargestellt (Wert bleibt editierbar). */
-const SECRET_KEYS = new Set(['llm.apiKey', 'whisper.openaiApiKey']);
+const SECRET_KEYS = new Set(['llm.apiKey', 'llm.openaiApiKey', 'whisper.openaiApiKey']);
+
+/**
+ * Gruppen mit Anbieter-Umschalter: Es werden nur die Felder des gewählten
+ * Anbieters gezeigt. Die anderen bleiben gespeichert – beim Zurückschalten ist
+ * die alte Konfiguration wieder da.
+ */
+const PROVIDER_FIELDS: Record<string, { providerKey: string; only: Record<string, string[]> }> = {
+  'whisper.': {
+    providerKey: 'whisper.provider',
+    only: {
+      local: ['whisper.url'],
+      openai: ['whisper.openaiUrl', 'whisper.openaiApiKey', 'whisper.openaiModel'],
+    },
+  },
+  'llm.': {
+    providerKey: 'llm.provider',
+    only: {
+      local: ['llm.baseUrl', 'llm.apiKey', 'llm.model', 'llm.disableThinking'],
+      openai: [
+        'llm.openaiUrl',
+        'llm.openaiApiKey',
+        'llm.openaiModel',
+        'llm.openaiReasoningEffort',
+      ],
+    },
+  },
+};
+
+/** Ist das Feld beim aktuell gewählten Anbieter seiner Gruppe sichtbar? */
+function visibleForProvider(key: string, values: Record<string, string>): boolean {
+  for (const def of Object.values(PROVIDER_FIELDS)) {
+    const provider = values[def.providerKey] ?? '';
+    for (const [name, keys] of Object.entries(def.only)) {
+      if (keys.includes(key)) return name === provider;
+    }
+  }
+  return true;
+}
+
+/** Modellliste des Cloud-LLM-Anbieters (GET /models über das Backend). */
+interface LlmModelList {
+  success: boolean;
+  models: string[];
+  error: string | null;
+}
 
 /** Gruppen mit „Verbindung testen"-Button (testet die gespeicherten Einstellungen). */
 const TEST_ENDPOINTS: Record<string, string> = {
@@ -71,6 +116,18 @@ const SELECT_OPTIONS: Record<string, { value: string; labelKey: TranslationKey }
   'whisper.provider': [
     { value: 'local', labelKey: 'admin.providerLocal' },
     { value: 'openai', labelKey: 'admin.providerOpenai' },
+  ],
+  'llm.provider': [
+    { value: 'local', labelKey: 'admin.llmProviderLocal' },
+    { value: 'openai', labelKey: 'admin.llmProviderOpenai' },
+  ],
+  'llm.openaiReasoningEffort': [
+    { value: 'off', labelKey: 'admin.reasoningOff' },
+    { value: 'none', labelKey: 'admin.reasoningNone' },
+    { value: 'minimal', labelKey: 'admin.reasoningMinimal' },
+    { value: 'low', labelKey: 'admin.reasoningLow' },
+    { value: 'medium', labelKey: 'admin.reasoningMedium' },
+    { value: 'high', labelKey: 'admin.reasoningHigh' },
   ],
   'documents.ocrStrategy': [
     { value: 'auto', labelKey: 'admin.ocrAuto' },
@@ -90,6 +147,11 @@ const KEY_HELP: Record<string, TranslationKey> = {
   'llm.baseUrl': 'admin.keyHelp.llmBaseUrl',
   'llm.apiKey': 'admin.keyHelp.llmApiKey',
   'llm.model': 'admin.keyHelp.llmModel',
+  'llm.provider': 'admin.keyHelp.llmProvider',
+  'llm.openaiUrl': 'admin.keyHelp.llmOpenaiUrl',
+  'llm.openaiApiKey': 'admin.keyHelp.llmOpenaiApiKey',
+  'llm.openaiModel': 'admin.keyHelp.llmOpenaiModel',
+  'llm.openaiReasoningEffort': 'admin.keyHelp.llmOpenaiReasoningEffort',
   'documents.enabled': 'admin.keyHelp.documentsEnabled',
   'documents.maxMegabytes': 'admin.keyHelp.documentsMaxMegabytes',
   'documents.tikaUrl': 'admin.keyHelp.documentsTikaUrl',
@@ -359,10 +421,38 @@ function SettingsTab() {
   >({});
   const [savingGroup, setSavingGroup] = useState<string | null>(null);
   const [testingGroup, setTestingGroup] = useState<string | null>(null);
+  const [llmModels, setLlmModels] = useState<LlmModelList | null>(null);
+  const [llmModelsLoading, setLlmModelsLoading] = useState(false);
 
   useEffect(() => {
     dispatch(fetchSettings());
   }, [dispatch]);
+
+  // Adresse und Key dürfen noch ungespeichert sein: So lässt sich ein neuer Key
+  // ausprobieren, bevor er gespeichert wird.
+  const loadLlmModels = async (baseUrl: string, apiKey: string) => {
+    setLlmModelsLoading(true);
+    try {
+      setLlmModels(
+        await api<LlmModelList>('/api/admin/settings/llm-models', {
+          method: 'POST',
+          body: { baseUrl, apiKey },
+        }),
+      );
+    } catch (e) {
+      setLlmModels({ success: false, models: [], error: errorMessage(e) });
+    } finally {
+      setLlmModelsLoading(false);
+    }
+  };
+
+  // Beim Umschalten auf die Cloud gleich einmal laden – dafür ist die Liste da.
+  const llmCloud = values['llm.provider'] === 'openai';
+  useEffect(() => {
+    if (llmCloud && llmModels === null && !llmModelsLoading) {
+      void loadLlmModels(values['llm.openaiUrl'] ?? '', values['llm.openaiApiKey'] ?? '');
+    }
+  }, [llmCloud]);
 
   useEffect(() => {
     if (settings) {
@@ -372,7 +462,13 @@ function SettingsTab() {
 
   const groupedKeys = useMemo(() => {
     if (!settings) return [];
-    const allKeys = Object.keys(settings).sort();
+    // Der Anbieter-Umschalter steht oben in seiner Gruppe: Er entscheidet,
+    // welche Felder darunter überhaupt gelten.
+    const allKeys = Object.keys(settings).sort((a, b) => {
+      const pa = a.endsWith('.provider') ? 0 : 1;
+      const pb = b.endsWith('.provider') ? 0 : 1;
+      return pa - pb || a.localeCompare(b);
+    });
     const used = new Set<string>();
     const result: { def: SettingsGroupDef; keys: string[] }[] = [];
     for (const def of SETTING_GROUPS) {
@@ -467,7 +563,7 @@ function SettingsTab() {
             {def.noteKey && <p className="settings-note">{t(def.noteKey)}</p>}
             {message && <Alert kind={message.kind}>{message.text}</Alert>}
             <div className="settings-fields">
-              {keys.map((key) => {
+              {keys.filter((key) => visibleForProvider(key, values)).map((key) => {
                 const dirty = isDirty(key);
                 const defaultValue = defaults?.[key];
                 const multiline = MULTILINE_KEYS.has(key);
@@ -494,6 +590,47 @@ function SettingsTab() {
                           setValues((v) => ({ ...v, [key]: e.target.value }))
                         }
                       />
+                    ) : key === 'llm.openaiModel' ? (
+                      <div className="model-picker">
+                        <select
+                          id={`setting-${key}`}
+                          value={values[key] ?? ''}
+                          onChange={(e) =>
+                            setValues((v) => ({ ...v, [key]: e.target.value }))
+                          }
+                        >
+                          {(values[key] ?? '') !== '' &&
+                            !(llmModels?.models ?? []).includes(values[key]) && (
+                              <option value={values[key]}>{values[key]}</option>
+                            )}
+                          {(llmModels?.models ?? []).map((m) => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          disabled={llmModelsLoading}
+                          onClick={() =>
+                            loadLlmModels(
+                              values['llm.openaiUrl'] ?? '',
+                              values['llm.openaiApiKey'] ?? '',
+                            )
+                          }
+                        >
+                          {llmModelsLoading ? t('admin.llmModelsLoading') : t('admin.llmModelsLoad')}
+                        </button>
+                        {llmModels && !llmModels.success && (
+                          <span className="field-error">{llmModels.error}</span>
+                        )}
+                        {llmModels?.success && (
+                          <span className="muted">
+                            {t('admin.llmModelsCount', { count: llmModels.models.length })}
+                          </span>
+                        )}
+                      </div>
                     ) : selectOptions ? (
                       <select
                         id={`setting-${key}`}

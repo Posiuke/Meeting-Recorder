@@ -16,9 +16,16 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Client fuer den OpenAI-kompatiblen LLM-Server (vLLM mit Qwen).
+ * Client fuer das LLM: lokal ein OpenAI-kompatibler Server (vLLM mit Qwen) oder
+ * die oeffentliche OpenAI-API (Einstellung llm.provider).
  * Ruft /chat/completions mit Retry und exponentiellem Backoff auf;
  * Modell, Temperatur, Token-Limit und Timeouts kommen aus den Einstellungen.
  */
@@ -28,7 +35,8 @@ public class LlmClient {
     private static final Logger log = LoggerFactory.getLogger(LlmClient.class);
 
     private final SettingsService settings;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private final ObjectMapper mapper = JSON;
 
     /**
      * EIN Client fuer alle Aufrufe. Vorher wurde je Anfrage ein neuer gebaut -
@@ -105,11 +113,12 @@ public class LlmClient {
     }
 
     public LlmResult chat(String systemPrompt, String userPrompt, Overrides overrides) {
-        String baseUrl = settings.get(SettingsService.LLM_BASE_URL);
+        boolean cloud = settings.isLlmCloud();
+        String baseUrl = settings.get(cloud ? SettingsService.LLM_OPENAI_URL : SettingsService.LLM_BASE_URL);
         String model = overrides.model() == null || overrides.model().isBlank()
-                ? settings.get(SettingsService.LLM_MODEL)
+                ? settings.llmModel()
                 : overrides.model().trim();
-        String apiKey = settings.get(SettingsService.LLM_API_KEY);
+        String apiKey = settings.get(cloud ? SettingsService.LLM_OPENAI_API_KEY : SettingsService.LLM_API_KEY);
         double temperature = overrides.temperature() == null
                 ? settings.getDouble(SettingsService.LLM_TEMPERATURE)
                 : overrides.temperature();
@@ -119,39 +128,45 @@ public class LlmClient {
         int timeoutSec = settings.getInt(SettingsService.LLM_TIMEOUT_SEC);
         int retryAttempts = Math.max(1, settings.getInt(SettingsService.LLM_RETRY_ATTEMPTS));
         long retryBaseMs = settings.getLong(SettingsService.LLM_RETRY_BASE_MS);
+        String reasoningEffort = cloud
+                ? settings.get(SettingsService.LLM_OPENAI_REASONING_EFFORT).trim().toLowerCase(Locale.ROOT)
+                : "off";
+        boolean disableThinking = !cloud && settings.getBool(SettingsService.LLM_DISABLE_THINKING);
 
-        ObjectNode body = mapper.createObjectNode();
-        body.put("model", model);
-        body.put("temperature", temperature);
-        body.put("max_tokens", maxTokens);
-        if (settings.getBool(SettingsService.LLM_DISABLE_THINKING)) {
-            // Reasoning-Modelle (Qwen3 & Co.) denken im SELBEN Token-Budget, aus dem
-            // auch die Antwort kommt. Beim Glaetten reicht das nicht: Das Modell
-            // verbraucht das Budget mit Nachdenken und liefert content = null. Der
-            // Schalter ist der dokumentierte Weg bei vLLM und llama.cpp; Server, die
-            // ihn nicht kennen, ignorieren ihn.
-            body.putObject("chat_template_kwargs").put("enable_thinking", false);
+        if (cloud && apiKey.isBlank()) {
+            return new LlmResult(false, null,
+                    "Kein API-Key fuer das Cloud-LLM hinterlegt (Einstellung llm.openaiApiKey)");
         }
-        ArrayNode messages = body.putArray("messages");
-        messages.addObject().put("role", "system").put("content", systemPrompt);
-        messages.addObject().put("role", "user").put("content", userPrompt);
 
         String url = baseUrl.replaceAll("/+$", "") + "/chat/completions";
+        Set<String> rejected = rejectedParams.computeIfAbsent(url + "|" + model,
+                k -> ConcurrentHashMap.newKeySet());
         String lastError = null;
 
         for (int attempt = 1; attempt <= retryAttempts; attempt++) {
             long begin = System.nanoTime();
             try {
-                HttpClient client = client();
-                HttpRequest.Builder request = HttpRequest.newBuilder()
-                        .uri(URI.create(url))
-                        .timeout(Duration.ofSeconds(timeoutSec))
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body), StandardCharsets.UTF_8));
-                if (!apiKey.isBlank()) {
-                    request.header("Authorization", "Bearer " + apiKey);
+                HttpResponse<String> response;
+                // Lehnt das Modell einen unserer optionalen Parameter ab, wird sofort
+                // ohne ihn wiederholt - das zaehlt nicht als Fehlversuch. Die Schleife
+                // endet sicher, weil jeder Parameter nur einmal wegfallen kann.
+                while (true) {
+                    ObjectNode body = buildBody(systemPrompt, userPrompt, model, temperature, maxTokens,
+                            cloud, reasoningEffort, disableThinking, rejected);
+                    HttpRequest.Builder request = HttpRequest.newBuilder()
+                            .uri(URI.create(url))
+                            .timeout(Duration.ofSeconds(timeoutSec))
+                            .header("Content-Type", "application/json")
+                            .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body), StandardCharsets.UTF_8));
+                    if (!apiKey.isBlank()) {
+                        request.header("Authorization", "Bearer " + apiKey);
+                    }
+                    response = client().send(request.build(), HttpResponse.BodyHandlers.ofString());
+                    if (response.statusCode() != 400) break;
+                    String param = rejectedParam(response.body());
+                    if (param == null || !rejected.add(param)) break;
+                    log.info("Modell {} lehnt Parameter {} ab - neuer Versuch ohne ihn", model, param);
                 }
-                HttpResponse<String> response = client.send(request.build(), HttpResponse.BodyHandlers.ofString());
                 if (response.statusCode() != 200) {
                     lastError = "LLM HTTP " + response.statusCode() + ": " + truncate(response.body(), 500);
                 } else {
@@ -186,6 +201,131 @@ public class LlmClient {
         }
         return new LlmResult(false, null, lastError);
     }
+
+    /**
+     * Parameter, die ein Modell ablehnen darf, ohne dass die Anfrage scheitert.
+     * Hintergrund: OpenAI weist unbekannte oder nicht unterstuetzte Parameter mit
+     * HTTP 400 zurueck, statt sie zu ignorieren - und welche ein Modell kennt,
+     * haengt vom Modell ab (Reasoning-Modelle: keine Temperatur, aeltere Modelle:
+     * kein reasoning_effort, manche kompatible Anbieter: kein max_completion_tokens).
+     */
+    static final Set<String> ADAPTABLE_PARAMS = Set.of(
+            "temperature", "reasoning_effort", "max_completion_tokens", "max_tokens", "chat_template_kwargs");
+
+    /** Je Endpunkt und Modell die Parameter, die dort schon abgelehnt wurden. */
+    private final Map<String, Set<String>> rejectedParams = new ConcurrentHashMap<>();
+
+    static ObjectNode buildBody(String systemPrompt, String userPrompt, String model, double temperature,
+                                int maxTokens, boolean cloud, String reasoningEffort,
+                                boolean disableThinking, Set<String> rejected) {
+        ObjectNode body = JSON.createObjectNode();
+        body.put("model", model);
+        if (!rejected.contains("temperature")) {
+            body.put("temperature", temperature);
+        }
+        // OpenAI hat max_tokens durch max_completion_tokens ersetzt; Reasoning-Modelle
+        // kennen nur noch das neue Feld. Lokale Server (vLLM) bleiben beim alten.
+        boolean newTokenField = cloud ? !rejected.contains("max_completion_tokens") : rejected.contains("max_tokens");
+        body.put(newTokenField ? "max_completion_tokens" : "max_tokens", maxTokens);
+        if (cloud && !"off".equals(reasoningEffort) && !reasoningEffort.isBlank()
+                && !rejected.contains("reasoning_effort")) {
+            body.put("reasoning_effort", reasoningEffort);
+        }
+        if (disableThinking && !rejected.contains("chat_template_kwargs")) {
+            // Reasoning-Modelle (Qwen3 & Co.) denken im SELBEN Token-Budget, aus dem
+            // auch die Antwort kommt. Beim Glaetten reicht das nicht: Das Modell
+            // verbraucht das Budget mit Nachdenken und liefert content = null. Der
+            // Schalter ist der dokumentierte Weg bei vLLM und llama.cpp.
+            body.putObject("chat_template_kwargs").put("enable_thinking", false);
+        }
+        ArrayNode messages = body.putArray("messages");
+        messages.addObject().put("role", "system").put("content", systemPrompt);
+        messages.addObject().put("role", "user").put("content", userPrompt);
+        return body;
+    }
+
+    /**
+     * Welcher unserer optionalen Parameter in einer HTTP-400-Antwort bemaengelt
+     * wird - {@code null}, wenn es um etwas anderes geht. Liest {@code error.param}
+     * (OpenAI) und sucht ersatzweise den Namen in der Fehlermeldung.
+     */
+    static String rejectedParam(String responseBody) {
+        if (responseBody == null) return null;
+        try {
+            JsonNode error = JSON.readTree(responseBody).path("error");
+            String param = error.path("param").asText("");
+            if (ADAPTABLE_PARAMS.contains(param)) return param;
+            String message = error.path("message").asText("");
+            // max_tokens vor max_completion_tokens pruefen: Die Meldung zum alten Feld
+            // nennt das neue als Ersatz ("Use 'max_completion_tokens' instead").
+            for (String candidate : List.of("chat_template_kwargs", "reasoning_effort", "temperature",
+                    "max_tokens", "max_completion_tokens")) {
+                if (message.contains("'" + candidate + "'") || message.contains("\"" + candidate + "\"")) {
+                    return candidate;
+                }
+            }
+        } catch (IOException ignored) {
+            // kein JSON - dann ist es kein Parameterfehler, den wir beheben koennen
+        }
+        return null;
+    }
+
+    public record ModelList(boolean success, List<String> models, String error) {}
+
+    /**
+     * Fragt die verfuegbaren Modelle beim Cloud-Anbieter ab ({@code GET /models}).
+     * Adresse und Key kommen vom Aufrufer, damit die Admin-Oberflaeche sie schon
+     * vor dem Speichern ausprobieren kann; leer = gespeicherte Cloud-Einstellung.
+     */
+    public ModelList listModels(String baseUrl, String apiKey) {
+        String base = baseUrl == null || baseUrl.isBlank() ? settings.get(SettingsService.LLM_OPENAI_URL) : baseUrl.trim();
+        String key = apiKey == null || apiKey.isBlank() ? settings.get(SettingsService.LLM_OPENAI_API_KEY) : apiKey.trim();
+        String url = base.replaceAll("/+$", "") + "/models";
+        try {
+            HttpRequest.Builder request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(30))
+                    .GET();
+            if (!key.isBlank()) {
+                request.header("Authorization", "Bearer " + key);
+            }
+            HttpResponse<String> response = client().send(request.build(), HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                return new ModelList(false, List.of(),
+                        "Modellliste HTTP " + response.statusCode() + ": " + truncate(response.body(), 300));
+            }
+            return new ModelList(true, chatModels(mapper.readTree(response.body())), null);
+        } catch (IllegalArgumentException e) {
+            return new ModelList(false, List.of(), "Ungueltige Adresse: " + url);
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            return new ModelList(false, List.of(), "Anbieter nicht erreichbar (" + url + "): "
+                    + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
+        }
+    }
+
+    /**
+     * Modell-IDs aus {@code {"data":[{"id":...}]}}, ohne die, die sicher keine
+     * Chat-Modelle sind (Embeddings, Sprache, Bilder, Moderation). Bleibt danach
+     * nichts uebrig, kommt die volle Liste - lieber zu viel als eine leere Auswahl.
+     */
+    static List<String> chatModels(JsonNode root) {
+        List<String> all = new ArrayList<>();
+        for (JsonNode entry : root.path("data")) {
+            String id = entry.path("id").asText("");
+            if (!id.isBlank()) all.add(id);
+        }
+        List<String> chat = all.stream()
+                .filter(id -> NON_CHAT_MARKERS.stream().noneMatch(id.toLowerCase(Locale.ROOT)::contains))
+                .toList();
+        List<String> result = new ArrayList<>(chat.isEmpty() ? all : chat);
+        result.sort(String.CASE_INSENSITIVE_ORDER);
+        return result;
+    }
+
+    private static final List<String> NON_CHAT_MARKERS = List.of(
+            "embedding", "whisper", "tts", "transcribe", "dall-e", "image", "moderation",
+            "realtime", "audio", "babbage", "davinci", "sora");
 
     /**
      * Inhalt einer Modellantwort - oder die Begruendung, warum nichts Verwertbares
@@ -235,8 +375,14 @@ public class LlmClient {
                     + " Abhilfe: Einstellung llm.disableThinking auf true setzen (oder das"
                     + " Nachdenken am LLM-Server abschalten); ersatzweise llm.maxTokens erhoehen.");
         }
+        // OpenAI gibt das Nachdenken nicht heraus, sondern zaehlt es nur mit: Ist
+        // das Budget erschoepft, bleibt content leer und finish_reason ist "length".
+        String hint = "length".equals(finishReason)
+                ? " Das Token-Budget war erschoepft - llm.maxTokens erhoehen oder bei"
+                        + " Cloud-Modellen llm.openaiReasoningEffort senken."
+                : "";
         return Answer.none("LLM-Antwort ohne Inhalt (Modell " + model + ", finish_reason="
-                + finishReason + "): " + truncate(root.toString(), 200));
+                + finishReason + ")." + hint + " " + truncate(root.toString(), 200));
     }
 
     /** Erster der genannten Felder, der Text enthaelt - Server benennen das unterschiedlich. */

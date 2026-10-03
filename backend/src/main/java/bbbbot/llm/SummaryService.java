@@ -105,7 +105,7 @@ public class SummaryService {
         // dasselbe Transkript mit zwei Modellen auswerten und vergleichen.
         String model = recording.getSummaryModel() != null && !recording.getSummaryModel().isBlank()
                 ? recording.getSummaryModel().trim()
-                : settings.get(SettingsService.LLM_MODEL);
+                : settings.llmModel();
         Double temperature = recording.getSummaryTemperature() != null
                 ? recording.getSummaryTemperature()
                 : settings.getDouble(SettingsService.LLM_TEMPERATURE);

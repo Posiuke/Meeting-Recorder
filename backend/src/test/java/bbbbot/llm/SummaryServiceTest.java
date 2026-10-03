@@ -190,7 +190,7 @@ class SummaryServiceTest {
         when(settings.get(SettingsService.SUMMARY_SYSTEM_PROMPT)).thenReturn("Fasse zusammen.");
         when(settings.get(SettingsService.SUMMARY_LANGUAGE)).thenReturn("de");
         when(settings.getInt(SettingsService.SUMMARY_CHUNK_CHARS)).thenReturn(12_000);
-        when(settings.get(SettingsService.LLM_MODEL)).thenReturn("standard-modell");
+        when(settings.llmModel()).thenReturn("standard-modell");
         when(settings.getDouble(SettingsService.LLM_TEMPERATURE)).thenReturn(0.3);
         when(llm.chat(anyString(), anyString(), any(LlmClient.Overrides.class)))
                 .thenReturn(new LlmClient.LlmResult(true, "# Ergebnis\n- Punkt", null));
@@ -218,7 +218,7 @@ class SummaryServiceTest {
         when(settings.get(SettingsService.SUMMARY_SYSTEM_PROMPT)).thenReturn("Fasse zusammen.");
         when(settings.get(SettingsService.SUMMARY_LANGUAGE)).thenReturn("de");
         when(settings.getInt(SettingsService.SUMMARY_CHUNK_CHARS)).thenReturn(12_000);
-        when(settings.get(SettingsService.LLM_MODEL)).thenReturn("standard-modell");
+        when(settings.llmModel()).thenReturn("standard-modell");
         when(settings.getDouble(SettingsService.LLM_TEMPERATURE)).thenReturn(0.3);
         when(llm.chat(anyString(), anyString(), any(LlmClient.Overrides.class)))
                 .thenReturn(new LlmClient.LlmResult(true, "# Ergebnis", null));
@@ -240,7 +240,7 @@ class SummaryServiceTest {
         when(settings.get(SettingsService.SUMMARY_LANGUAGE)).thenReturn("de");
         // Kleine Bloecke erzwingen mehrere Aufrufe plus einen Merge-Aufruf
         when(settings.getInt(SettingsService.SUMMARY_CHUNK_CHARS)).thenReturn(200);
-        when(settings.get(SettingsService.LLM_MODEL)).thenReturn("modell");
+        when(settings.llmModel()).thenReturn("modell");
         when(settings.getDouble(SettingsService.LLM_TEMPERATURE)).thenReturn(0.3);
         when(documentService.promptBlock(recording.getId()))
                 .thenReturn("# Beigefuegte Unterlagen\n## tagesordnung.md\n1. Projekt Nord\n\n");
@@ -264,7 +264,7 @@ class SummaryServiceTest {
         when(settings.get(SettingsService.SUMMARY_SYSTEM_PROMPT)).thenReturn("Fasse zusammen.");
         when(settings.get(SettingsService.SUMMARY_LANGUAGE)).thenReturn("de");
         when(settings.getInt(SettingsService.SUMMARY_CHUNK_CHARS)).thenReturn(12_000);
-        when(settings.get(SettingsService.LLM_MODEL)).thenReturn("modell");
+        when(settings.llmModel()).thenReturn("modell");
         when(settings.getDouble(SettingsService.LLM_TEMPERATURE)).thenReturn(0.3);
         when(llm.chat(anyString(), anyString(), any(LlmClient.Overrides.class)))
                 .thenReturn(new LlmClient.LlmResult(true, "# Ergebnis", null));

@@ -826,7 +826,7 @@ public class RecordingController {
                 settings.get(bbbbot.settings.SettingsService.SUMMARY_SYSTEM_PROMPT),
                 settings.get(bbbbot.settings.SettingsService.SUMMARY_LANGUAGE),
                 settings.get(bbbbot.settings.SettingsService.WHISPER_LANGUAGE),
-                settings.get(bbbbot.settings.SettingsService.LLM_MODEL),
+                settings.llmModel(),
                 settings.getDouble(bbbbot.settings.SettingsService.LLM_TEMPERATURE));
     }
 

@@ -1067,7 +1067,7 @@ export const de = {
       'provider „local" nutzt den Whisper-Server im Intranet (Einstellung url). provider „openai" nutzt eine OpenAI-kompatible Cloud-API (Einstellungen openaiUrl, openaiApiKey, openaiModel) – z. B. OpenAI oder Groq. Achtung: Bei Cloud-APIs verlassen die Audiodaten das eigene Netz; Sprechererkennung (Diarisierung) wird dort nicht unterstützt.',
     groupLlm: 'KI-Modell (LLM)',
     groupLlmNote:
-      'Es funktioniert jeder OpenAI-kompatible Chat-Endpoint – lokal (z. B. vLLM, Ollama) oder als Cloud-API. Beispiele für baseUrl: OpenAI https://api.openai.com/v1 · Anthropic https://api.anthropic.com/v1 · Google Gemini https://generativelanguage.googleapis.com/v1beta/openai · Groq https://api.groq.com/openai/v1 · Mistral https://api.mistral.ai/v1. Dazu apiKey und model des Anbieters eintragen. Achtung: Bei Cloud-APIs verlassen Transkript und Chat-Protokoll das eigene Netz.',
+      'provider „local" nutzt den eigenen LLM-Server (baseUrl, apiKey, model). provider „openai" nutzt eine öffentliche Cloud-API (openaiUrl, openaiApiKey, openaiModel) – das Modell wird aus der Liste des Anbieters gewählt („Modelle abrufen"). Neben OpenAI (https://api.openai.com/v1) gehen auch kompatible Anbieter, z. B. Groq https://api.groq.com/openai/v1 oder Mistral https://api.mistral.ai/v1. Parameter, die ein Modell ablehnt, lässt der Bot von selbst weg. Achtung: Bei Cloud-APIs verlassen Transkript und Chat-Protokoll das eigene Netz.',
     groupCorrection: 'Transkript-Glättung',
     groupCorrectionNote:
       'Zwischenschritt zwischen Spracherkennung und Auswertung: Das LLM glättet das Rohtranskript (Füllwörter, Satzzeichen, Erkennungsfehler) und bekommt dabei das persönliche Glossar des Aufnahme-Besitzers mit. Geglättet wird satzweise und in Schritten von chunkChars Zeichen – ein Satz wird nie über zwei Schritte zerschnitten. Das Original bleibt erhalten, im Transkript-Tab lässt sich umschalten. Ein Fehlschlag ist unkritisch: Dann wird mit dem Original weiter ausgewertet.',
@@ -1094,6 +1094,17 @@ export const de = {
     ocrBoth: 'ocr_and_text_extraction – beides und zusammenführen',
     providerLocal: 'local – Whisper-Server im Intranet',
     providerOpenai: 'openai – OpenAI-kompatible Cloud-API',
+    llmProviderLocal: 'local – eigener LLM-Server (vLLM, llama.cpp, Ollama)',
+    llmProviderOpenai: 'openai – öffentliche Cloud-API (OpenAI oder kompatibel)',
+    reasoningOff: 'off – nicht mitschicken',
+    reasoningNone: 'none – kein Nachdenken',
+    reasoningMinimal: 'minimal',
+    reasoningLow: 'low – empfohlen',
+    reasoningMedium: 'medium',
+    reasoningHigh: 'high',
+    llmModelsLoad: 'Modelle abrufen',
+    llmModelsLoading: 'Wird abgerufen…',
+    llmModelsCount: '{{count}} Modelle verfügbar',
     authLoading: 'Authentifizierung wird geladen…',
     authHeading: 'LDAP / Active Directory',
     authNote:
@@ -1162,6 +1173,16 @@ export const de = {
         'API-Schlüssel des Anbieters. Für lokale Server ohne Authentifizierung leer lassen.',
       llmDisableThinking:
         'Schaltet das interne „Nachdenken" von Reasoning-Modellen (Qwen3 und Verwandte) ab. Das Nachdenken läuft im selben Token-Budget wie die Antwort: Ist es an, verbraucht das Modell bei der Transkript-Glättung sein Budget und liefert eine leere Antwort. Für Glätten und Zusammenfassen bringt es nichts. Server, die den Schalter nicht kennen, ignorieren ihn.',
+      llmProvider:
+        'Wo das KI-Modell läuft: „local" schickt die Anfragen an den eigenen LLM-Server im Intranet, „openai" an eine öffentliche Cloud-API. Die Einstellungen des anderen Anbieters bleiben gespeichert.',
+      llmOpenaiUrl:
+        'Basis-URL der Cloud-API ohne /chat/completions (nur bei provider = openai). Für OpenAI: https://api.openai.com/v1.',
+      llmOpenaiApiKey:
+        'API-Schlüssel des Cloud-Anbieters (nur bei provider = openai). Wird auch zum Abrufen der Modellliste verwendet – das geht schon vor dem Speichern.',
+      llmOpenaiModel:
+        'Standardmodell bei der Cloud. „Modelle abrufen" liest die Modelle des Anbieters aus; Embedding-, Audio- und Bildmodelle sind ausgeblendet. Vorlagen dürfen ein anderes Modell wählen.',
+      llmOpenaiReasoningEffort:
+        'Wie lange Reasoning-Modelle (z. B. GPT-5, o-Serie) nachdenken. Das Nachdenken zählt zum Token-Budget – für Glätten und Zusammenfassen reicht „low". Modelle ohne Nachdenken lehnen den Parameter ab; der Bot lässt ihn dann von selbst weg.',
       llmModel:
         'Modellname beim Anbieter, z. B. gpt-4o-mini (OpenAI), claude-sonnet-5 (Anthropic) oder der Name des lokal geladenen Modells. Das ist die Vorgabe: Vorlagen und einzelne Aufnahmen dürfen ein anderes Modell wählen (Temperatur ebenso).',
       documentsEnabled:

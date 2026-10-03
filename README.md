@@ -666,6 +666,30 @@ Log samt `finish_reason` und Länge des Reasonings.
 Ein Hinweis zum Modell: Für deutsche Besprechungstexte ist ein **Instruct**-Modell
 die bessere Wahl als ein Coder-Modell (`llm.model`).
 
+### Lokal oder Cloud: `llm.provider`
+
+Wie bei der Spracherkennung gibt es zwei Anbieter mit getrennten Einstellungen —
+beim Umschalten bleibt die jeweils andere Konfiguration erhalten:
+
+| `llm.provider` | Adresse | Key | Modell |
+|---|---|---|---|
+| `local` (Standard) | `llm.baseUrl` | `llm.apiKey` | `llm.model` |
+| `openai` | `llm.openaiUrl` | `llm.openaiApiKey` | `llm.openaiModel` |
+
+Im Admin-Bereich zeigt die Gruppe nur die Felder des gewählten Anbieters. Das
+Cloud-Modell wird aus der Liste des Anbieters gewählt („Modelle abrufen", liest
+`GET /models`; Embedding-, Audio- und Bildmodelle sind ausgeblendet).
+
+Die Cloud-Anfrage unterscheidet sich von der lokalen: kein `chat_template_kwargs`
+(OpenAI lehnt unbekannte Parameter mit HTTP 400 ab, statt sie zu ignorieren),
+`max_completion_tokens` statt `max_tokens` und `reasoning_effort` aus
+`llm.openaiReasoningEffort` (Standard `low`, `off` = nicht senden). Welche
+Parameter ein Modell kennt, hängt vom Modell ab — Reasoning-Modelle etwa
+akzeptieren nur die Standard-Temperatur. Lehnt ein Modell `temperature`,
+`reasoning_effort` oder eines der Token-Felder ab, wiederholt der Client die
+Anfrage sofort ohne diesen Parameter und merkt sich das je Modell bis zum
+Neustart.
+
 ## Fassungen der Zusammenfassung
 
 Eine erneute Auswertung **ersetzt die Zusammenfassung nicht**, sondern legt eine
