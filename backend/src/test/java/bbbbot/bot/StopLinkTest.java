@@ -9,7 +9,7 @@ class StopLinkTest {
 
     private static BotConfig config(String warnMessage, boolean enabled, String publicUrl) {
         return new BotConfig("STARTRECORDING", "STOPRECORDING", true, warnMessage, 1, 5000,
-                true, 3, 1000, 2.0, 10, 1000, enabled, publicUrl);
+                true, 3, 1000, 2.0, 10, 1000, enabled, publicUrl, false);
     }
 
     @Test

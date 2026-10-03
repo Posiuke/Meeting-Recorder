@@ -876,6 +876,19 @@ export const en: typeof de = {
     participantsEmpty:
       'No speakers recognised. With speaker recognition (diarisation) enabled, speakers are added to the participant list automatically after transcription.',
     participantsLogHeading: 'Session log',
+    suggestNames: 'Suggest names',
+    suggestingNames: 'Suggesting names…',
+    suggestNamesHint:
+      'Suggests a name for every speaker that has not been named yet – from the BBB talking indicator for bot recordings, otherwise by AI from the conversation.',
+    suggestionLabel: 'Suggestion: {{name}}',
+    suggestionAccept: 'Accept',
+    suggestionDismiss: 'Dismiss',
+    suggestionConfidenceHIGH: 'certain',
+    suggestionConfidenceMEDIUM: 'likely',
+    suggestionConfidenceLOW: 'uncertain',
+    suggestionSourceBBB: 'talking indicator',
+    suggestionSourceLLM: 'AI',
+    suggestionsNone: 'No name could be derived for any further speaker.',
     jobKindTranscription: 'Transcription',
     jobKindAnalysis: 'Analysis',
     jobQueued: '{{kind}} queued…',
@@ -1061,6 +1074,21 @@ export const en: typeof de = {
       'Recording of the user\'s own screen directly in the browser. Requires an HTTPS connection and Chrome or Edge – details in docs/SCREEN_CAPTURE.md.',
     groupBot: 'Bot behaviour',
     groupCleanup: 'Clean-up',
+    groupSpeakers: 'Speaker names',
+    groupSpeakersNote:
+      'Assigns names to recognised speakers automatically – from the BBB talking indicator for bot recordings, otherwise by AI from the conversation. Requires speaker recognition (whisper → diarize).',
+    boolTrue: 'Yes',
+    boolFalse: 'No',
+    fieldRequired: 'Must not be empty.',
+    fieldInteger: 'Please enter a whole number.',
+    fieldNumber: 'Please enter a number.',
+    fieldMin: 'At least {{min}}.',
+    fieldMax: 'At most {{max}}.',
+    fieldUrl: 'Please enter an address starting with http:// or https://.',
+    fieldTime: 'Please enter a time as HH:MM.',
+    fieldChoice: 'Please pick a value from the list.',
+    fieldRange: 'Allowed: {{min}} to {{max}}',
+    fixInvalid: 'Please correct the highlighted fields first.',
     groupOther: 'Other',
     ocrAuto: 'auto – OCR only when little text is embedded',
     ocrNone: 'no_ocr – no OCR, embedded text only',
@@ -1125,6 +1153,16 @@ export const en: typeof de = {
     usersRunningNone: 'No recording is running – maintenance is safe.',
     usersUntitled: 'untitled',
     keyHelp: {
+      whisperDiarize:
+        'Enable speaker recognition: users can then choose it per recording, upload and bot. Locally it needs WhisperX, in the cloud the model from openaiDiarizeModel.',
+      whisperOpenaiDiarizeModel:
+        'Cloud model for recordings with speaker recognition (e.g. gpt-4o-transcribe-diarize). Recordings without speaker recognition keep using openaiModel.',
+      speakersNameSuggestions:
+        'Suggest names for the recognised speakers after transcription. Off = speakers stay “Speaker 1, 2, …” until someone renames them.',
+      speakersAutoApply:
+        'Apply high-confidence suggestions as names right away instead of only suggesting them. Uncertain suggestions always need confirmation.',
+      speakersBbbActivity:
+        'During recording the bot logs the BBB talking indicator (who is speaking). For bot recordings this is the most reliable source for names.',
       botWarnMessage:
         'Notice the bot posts to the chat when a recording starts. Placeholders: ${STOP} (command to discard), ${START} (command to start), ${STOP_URL} (anonymous stop link, if enabled). Without ${STOP_URL} the bot appends the link as a separate sentence.',
       botAnonymousStopEnabled:

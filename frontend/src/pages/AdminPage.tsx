@@ -26,7 +26,9 @@ import type {
   ConnectionTestResult,
   LdapTestResult,
   ProcessingJobView,
+  SettingSpec,
 } from '../types';
+import { STT_AUTO, STT_LANGUAGES, sttLanguageLabel } from '../components/SttLanguageSelect';
 
 interface SettingsGroupDef {
   /** Übersetzungsschlüssel der Überschrift. */
@@ -38,6 +40,7 @@ interface SettingsGroupDef {
 
 const SETTING_GROUPS: SettingsGroupDef[] = [
   { titleKey: 'admin.groupWhisper', prefix: 'whisper.', noteKey: 'admin.groupWhisperNote' },
+  { titleKey: 'admin.groupSpeakers', prefix: 'speakers.', noteKey: 'admin.groupSpeakersNote' },
   { titleKey: 'admin.groupLlm', prefix: 'llm.', noteKey: 'admin.groupLlmNote' },
   { titleKey: 'admin.groupCorrection', prefix: 'correction.', noteKey: 'admin.groupCorrectionNote' },
   { titleKey: 'admin.groupSummary', prefix: 'summary.' },
@@ -50,14 +53,47 @@ const SETTING_GROUPS: SettingsGroupDef[] = [
   { titleKey: 'admin.groupCleanup', prefix: 'cleanup.' },
 ];
 
-const MULTILINE_KEYS = new Set([
-  'summary.systemPrompt',
-  'correction.systemPrompt',
-  'bot.warnMessage',
-]);
+/** Ersatz, falls das Backend für einen Schlüssel (noch) keinen Typ liefert. */
+const TEXT_SPEC: SettingSpec = { type: 'TEXT', min: null, max: null, options: null, optional: true };
 
-/** API-Schlüssel werden maskiert dargestellt (Wert bleibt editierbar). */
-const SECRET_KEYS = new Set(['llm.apiKey', 'llm.openaiApiKey', 'whisper.openaiApiKey']);
+/**
+ * Prüft einen Wert gegen seine Typbeschreibung – dieselben Regeln wie im
+ * Backend (SettingsService#problemWith), damit Fehler schon beim Tippen
+ * auffallen und nicht erst beim Speichern.
+ */
+function settingProblem(spec: SettingSpec, raw: string, t: typeof translate): string | null {
+  const v = raw.trim();
+  if (v === '') {
+    if (spec.type === 'TEXT' || spec.type === 'MULTILINE' || spec.type === 'SECRET') return null;
+    return spec.optional ? null : t('admin.fieldRequired');
+  }
+  switch (spec.type) {
+    case 'INTEGER':
+    case 'DECIMAL': {
+      const pattern = spec.type === 'INTEGER' ? /^-?\d+$/ : /^-?\d+(\.\d+)?$/;
+      if (!pattern.test(v)) {
+        return t(spec.type === 'INTEGER' ? 'admin.fieldInteger' : 'admin.fieldNumber');
+      }
+      const n = Number(v);
+      if (spec.min !== null && n < spec.min) return t('admin.fieldMin', { min: spec.min });
+      if (spec.max !== null && n > spec.max) return t('admin.fieldMax', { max: spec.max });
+      return null;
+    }
+    case 'BOOLEAN':
+      return v === 'true' || v === 'false' ? null : t('admin.fieldChoice');
+    case 'CHOICE':
+      return spec.options?.includes(v.toLowerCase()) ? null : t('admin.fieldChoice');
+    case 'URL':
+      return /^https?:\/\/[^\s/]+/i.test(v) ? null : t('admin.fieldUrl');
+    case 'TIME':
+      return /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(v) ? null : t('admin.fieldTime');
+    default:
+      return null;
+  }
+}
+
+/** Sehr große Obergrenzen („praktisch unbegrenzt“) nicht als Bereich anzeigen. */
+const SHOWN_MAX_LIMIT = 1_000_000_000;
 
 /**
  * Gruppen mit Anbieter-Umschalter: Es werden nur die Felder des gewählten
@@ -69,7 +105,12 @@ const PROVIDER_FIELDS: Record<string, { providerKey: string; only: Record<string
     providerKey: 'whisper.provider',
     only: {
       local: ['whisper.url'],
-      openai: ['whisper.openaiUrl', 'whisper.openaiApiKey', 'whisper.openaiModel'],
+      openai: [
+        'whisper.openaiUrl',
+        'whisper.openaiApiKey',
+        'whisper.openaiModel',
+        'whisper.openaiDiarizeModel',
+      ],
     },
   },
   'llm.': {
@@ -144,6 +185,11 @@ const KEY_HELP: Record<string, TranslationKey> = {
   'whisper.openaiUrl': 'admin.keyHelp.whisperOpenaiUrl',
   'whisper.openaiApiKey': 'admin.keyHelp.whisperOpenaiApiKey',
   'whisper.openaiModel': 'admin.keyHelp.whisperOpenaiModel',
+  'whisper.openaiDiarizeModel': 'admin.keyHelp.whisperOpenaiDiarizeModel',
+  'whisper.diarize': 'admin.keyHelp.whisperDiarize',
+  'speakers.nameSuggestions': 'admin.keyHelp.speakersNameSuggestions',
+  'speakers.autoApply': 'admin.keyHelp.speakersAutoApply',
+  'speakers.bbbActivity': 'admin.keyHelp.speakersBbbActivity',
   'llm.baseUrl': 'admin.keyHelp.llmBaseUrl',
   'llm.apiKey': 'admin.keyHelp.llmApiKey',
   'llm.model': 'admin.keyHelp.llmModel',
@@ -414,7 +460,7 @@ function AuthTab() {
 function SettingsTab() {
   const { t } = useI18n();
   const dispatch = useAppDispatch();
-  const { settings, defaults, settingsLoading, settingsError } = useAppSelector((s) => s.admin);
+  const { settings, defaults, schema, settingsLoading, settingsError } = useAppSelector((s) => s.admin);
   const [values, setValues] = useState<Record<string, string>>({});
   const [messages, setMessages] = useState<
     Record<string, { kind: 'success' | 'error'; text: string }>
@@ -496,6 +542,11 @@ function SettingsTab() {
   }
 
   const isDirty = (key: string) => (values[key] ?? '') !== (settings[key] ?? '');
+  const specOf = (key: string): SettingSpec => schema?.[key] ?? TEXT_SPEC;
+  // Nur geänderte Felder prüfen: Ein schon gespeicherter Altwert soll das
+  // Speichern anderer Felder der Gruppe nicht blockieren.
+  const problemOf = (key: string) =>
+    isDirty(key) ? settingProblem(specOf(key), values[key] ?? '', t) : null;
 
   const handleSaveGroup = async (def: SettingsGroupDef, keys: string[]) => {
     const changed: Record<string, string> = {};
@@ -505,6 +556,10 @@ function SettingsTab() {
       }
     }
     if (Object.keys(changed).length === 0) return;
+    if (Object.keys(changed).some((key) => problemOf(key) !== null)) {
+      setMessages((m) => ({ ...m, [def.prefix]: { kind: 'error', text: t('admin.fixInvalid') } }));
+      return;
+    }
     setSavingGroup(def.prefix);
     setMessages((m) => {
       const next = { ...m };
@@ -556,6 +611,7 @@ function SettingsTab() {
     <div>
       {groupedKeys.map(({ def, keys }) => {
         const dirtyCount = keys.filter(isDirty).length;
+        const invalidCount = keys.filter((key) => problemOf(key) !== null).length;
         const message = messages[def.prefix];
         return (
           <section key={def.prefix} className="card settings-group">
@@ -566,15 +622,33 @@ function SettingsTab() {
               {keys.filter((key) => visibleForProvider(key, values)).map((key) => {
                 const dirty = isDirty(key);
                 const defaultValue = defaults?.[key];
-                const multiline = MULTILINE_KEYS.has(key);
-                const selectOptions = SELECT_OPTIONS[key];
+                const spec = specOf(key);
+                const multiline = spec.type === 'MULTILINE';
+                const problem = problemOf(key);
+                const setValue = (value: string) => setValues((v) => ({ ...v, [key]: value }));
+                // Auswahl mit übersetzten Beschriftungen, sonst die rohen Werte des Schemas.
+                const selectOptions: { value: string; label: string }[] | undefined =
+                  SELECT_OPTIONS[key]?.map((o) => ({ value: o.value, label: t(o.labelKey) })) ??
+                  (spec.type === 'BOOLEAN'
+                    ? [
+                        { value: 'true', label: t('admin.boolTrue') },
+                        { value: 'false', label: t('admin.boolFalse') },
+                      ]
+                    : spec.type === 'CHOICE'
+                      ? (spec.options ?? []).map((o) => ({ value: o, label: o }))
+                      : spec.type === 'LANGUAGE'
+                        ? [STT_AUTO, ...STT_LANGUAGES].map((code) => ({
+                            value: code,
+                            label: sttLanguageLabel(code, t),
+                          }))
+                        : undefined);
                 const label = def.prefix ? key.slice(def.prefix.length) : key;
                 return (
                   <div
                     key={key}
                     className={`form-field${dirty ? ' field-changed' : ''}${
                       multiline ? ' field-full' : ''
-                    }`}
+                    }${problem ? ' field-invalid' : ''}`}
                   >
                     <label htmlFor={`setting-${key}`} title={key}>
                       {label}
@@ -584,11 +658,9 @@ function SettingsTab() {
                     {multiline ? (
                       <textarea
                         id={`setting-${key}`}
-                        rows={6}
+                        rows={key.endsWith('Prompt') || key.endsWith('Message') ? 6 : 3}
                         value={values[key] ?? ''}
-                        onChange={(e) =>
-                          setValues((v) => ({ ...v, [key]: e.target.value }))
-                        }
+                        onChange={(e) => setValue(e.target.value)}
                       />
                     ) : key === 'llm.openaiModel' ? (
                       <div className="model-picker">
@@ -641,7 +713,7 @@ function SettingsTab() {
                       >
                         {selectOptions.map((o) => (
                           <option key={o.value} value={o.value}>
-                            {t(o.labelKey)}
+                            {o.label}
                           </option>
                         ))}
                         {(values[key] ?? '') !== '' &&
@@ -649,17 +721,44 @@ function SettingsTab() {
                             <option value={values[key]}>{values[key]}</option>
                           )}
                       </select>
+                    ) : spec.type === 'INTEGER' || spec.type === 'DECIMAL' ? (
+                      <input
+                        id={`setting-${key}`}
+                        type="number"
+                        inputMode={spec.type === 'INTEGER' ? 'numeric' : 'decimal'}
+                        step={spec.type === 'INTEGER' ? 1 : 'any'}
+                        min={spec.min ?? undefined}
+                        max={spec.max !== null && spec.max < SHOWN_MAX_LIMIT ? spec.max : undefined}
+                        value={values[key] ?? ''}
+                        onChange={(e) => setValue(e.target.value)}
+                      />
+                    ) : spec.type === 'TIME' ? (
+                      <input
+                        id={`setting-${key}`}
+                        type="time"
+                        value={values[key] ?? ''}
+                        onChange={(e) => setValue(e.target.value)}
+                      />
                     ) : (
                       <input
                         id={`setting-${key}`}
-                        type={SECRET_KEYS.has(key) ? 'password' : 'text'}
-                        autoComplete={SECRET_KEYS.has(key) ? 'new-password' : undefined}
+                        type={spec.type === 'SECRET' ? 'password' : spec.type === 'URL' ? 'url' : 'text'}
+                        autoComplete={spec.type === 'SECRET' ? 'new-password' : undefined}
+                        spellCheck={spec.type === 'URL' || spec.type === 'SECRET' ? false : undefined}
                         value={values[key] ?? ''}
-                        onChange={(e) =>
-                          setValues((v) => ({ ...v, [key]: e.target.value }))
-                        }
+                        onChange={(e) => setValue(e.target.value)}
                       />
                     )}
+                    {problem && <span className="field-error">{problem}</span>}
+                    {!problem &&
+                      (spec.type === 'INTEGER' || spec.type === 'DECIMAL') &&
+                      spec.min !== null &&
+                      spec.max !== null &&
+                      spec.max < SHOWN_MAX_LIMIT && (
+                        <span className="field-hint">
+                          {t('admin.fieldRange', { min: spec.min, max: spec.max })}
+                        </span>
+                      )}
                     {defaultValue !== undefined && (
                       <span className="field-default">
                         {t('admin.defaultPrefix', {
@@ -686,7 +785,7 @@ function SettingsTab() {
               <button
                 type="button"
                 className="btn btn-primary"
-                disabled={dirtyCount === 0 || savingGroup !== null}
+                disabled={dirtyCount === 0 || invalidCount > 0 || savingGroup !== null}
                 onClick={() => handleSaveGroup(def, keys)}
               >
                 {savingGroup === def.prefix

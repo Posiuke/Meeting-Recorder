@@ -429,6 +429,32 @@ public class FfmpegService {
         return new TranscodeResult(false, null, null, error);
     }
 
+    /**
+     * Schneidet einen kurzen Ausschnitt als WAV (16 kHz mono) heraus - z.B. als
+     * Stimmreferenz fuer die Sprechererkennung der Cloud.
+     *
+     * @return die WAV-Datei oder null, wenn ffmpeg scheitert
+     */
+    public Path extractWavClip(Path source, double startSeconds, double durationSeconds, Path wav) {
+        try {
+            ProcessResult result = run(List.of(
+                    props.getMedia().getFfmpegPath(), "-y",
+                    "-ss", String.format(java.util.Locale.ROOT, "%.3f", startSeconds),
+                    "-t", String.format(java.util.Locale.ROOT, "%.3f", durationSeconds),
+                    "-i", source.toString(),
+                    "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le",
+                    wav.toString()
+            ), 60);
+            if (result.exitCode() == 0 && Files.exists(wav) && Files.size(wav) > 44) return wav;
+            log.warn("Ausschnitt aus {} fehlgeschlagen: {}", source.getFileName(), tail(result.stderr(), 300));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (IOException e) {
+            log.warn("Ausschnitt aus {} fehlgeschlagen: {}", source.getFileName(), e.getMessage());
+        }
+        return null;
+    }
+
     public record ProcessResult(int exitCode, String stdout, String stderr) {}
 
     public ProcessResult run(List<String> command, int timeoutSeconds) throws IOException, InterruptedException {

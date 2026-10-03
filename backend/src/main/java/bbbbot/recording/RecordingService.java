@@ -500,6 +500,14 @@ public class RecordingService {
         }
     }
 
+    /** Haelt die Sprechanzeige des Bots an der Aufnahme fest (siehe Recording#getTalkLog). */
+    public void saveTalkLog(UUID recordingId, String talkLog) {
+        recordingRepo.findById(recordingId).ifPresent(r -> {
+            r.setTalkLog(talkLog);
+            recordingRepo.save(r);
+        });
+    }
+
     /**
      * Finalisiert eine Aufnahme asynchron: wartet auf alle Transkodierungen,
      * schreibt Protokolle, prueft ob sich eine Auswertung lohnt und legt den

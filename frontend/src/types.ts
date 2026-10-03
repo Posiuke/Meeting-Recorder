@@ -486,6 +486,13 @@ export interface ParticipantView {
   /** Rohes Diarisierungs-Label (z.B. SPEAKER_00), Zuordnung zum Transkript */
   speakerLabel: string | null;
   displayName: string;
+  /** Offener Namensvorschlag (null = keiner) – bestätigen oder verwerfen. */
+  suggestedName: string | null;
+  suggestionConfidence: 'HIGH' | 'MEDIUM' | 'LOW' | null;
+  /** BBB = Sprechanzeige des Bots, LLM = aus dem Gesprächsinhalt erschlossen */
+  suggestionSource: 'BBB' | 'LLM' | null;
+  /** Beleg, z.B. „[01:12] Hallo, ich bin Anna“ */
+  suggestionEvidence: string | null;
 }
 
 /**
@@ -664,4 +671,27 @@ export interface PublicShareView {
 export interface LoginResponse {
   token: string;
   user: UserView;
+}
+
+/** Art eines Einstellungswerts (vom Backend, /api/admin/settings/schema). */
+export type SettingType =
+  | 'BOOLEAN'
+  | 'INTEGER'
+  | 'DECIMAL'
+  | 'CHOICE'
+  | 'TIME'
+  | 'URL'
+  | 'LANGUAGE'
+  | 'SECRET'
+  | 'TEXT'
+  | 'MULTILINE';
+
+/** Typbeschreibung einer Einstellung: Grenzen für Zahlen, Werte für Auswahllisten. */
+export interface SettingSpec {
+  type: SettingType;
+  min: number | null;
+  max: number | null;
+  options: string[] | null;
+  /** Leerer Wert erlaubt (z.B. „keine Tika-Adresse“). */
+  optional: boolean;
 }

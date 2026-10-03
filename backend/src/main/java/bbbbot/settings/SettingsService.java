@@ -22,6 +22,12 @@ public class SettingsService {
     public static final String WHISPER_OPENAI_URL = "whisper.openaiUrl";
     public static final String WHISPER_OPENAI_API_KEY = "whisper.openaiApiKey";
     public static final String WHISPER_OPENAI_MODEL = "whisper.openaiModel";
+    /**
+     * Cloud-Modell fuer Aufnahmen MIT Sprechererkennung. Das normale Modell
+     * (whisper.openaiModel) kann keine Sprecher unterscheiden; ist die
+     * Sprechererkennung gewaehlt, geht die Datei an dieses Modell.
+     */
+    public static final String WHISPER_OPENAI_DIARIZE_MODEL = "whisper.openaiDiarizeModel";
     public static final String WHISPER_LANGUAGE = "whisper.language";
     public static final String WHISPER_OUTPUT = "whisper.output";
     public static final String WHISPER_VAD_FILTER = "whisper.vadFilter";
@@ -162,6 +168,19 @@ public class SettingsService {
      */
     public static final String SHARING_PUBLIC_LINKS = "sharing.publicLinks";
 
+    /**
+     * Namensvorschlaege fuer erkannte Sprecher (Sprechanzeige des Bots und/oder
+     * LLM-Auswertung des Gespraechs). Aus = Sprecher bleiben "Sprecher 1/2/...".
+     */
+    public static final String SPEAKERS_NAME_SUGGESTIONS = "speakers.nameSuggestions";
+    /** Sichere Vorschlaege (hohe Sicherheit) automatisch als Namen uebernehmen. */
+    public static final String SPEAKERS_AUTO_APPLY = "speakers.autoApply";
+    /**
+     * Der Bot protokolliert die Sprechanzeige von BBB (wer gerade spricht) - die
+     * zuverlaessigste Quelle fuer Namen bei Bot-Aufnahmen.
+     */
+    public static final String SPEAKERS_BBB_ACTIVITY = "speakers.bbbActivity";
+
     public static final String CLEANUP_ENABLED = "cleanup.enabled";
     public static final String CLEANUP_OLDER_THAN_DAYS = "cleanup.olderThanDays";
 
@@ -195,13 +214,6 @@ public class SettingsService {
         "Automatische Audioaufzeichnung wurde gestartet. Wenn Sie die Aufzeichnung verhindern moechten, "
         + "schreiben Sie folgendes in den Chat: ${STOP}";
 
-    /** Von Tika unterstuetzte PDF-OCR-Strategien (Kopfzeile X-Tika-PDFOcrStrategy). */
-    private static final java.util.Set<String> OCR_STRATEGIES =
-            java.util.Set.of("auto", "no_ocr", "ocr_only", "ocr_and_text_extraction");
-
-    /** Werte fuer reasoning_effort; "off" = Parameter nicht senden. */
-    private static final java.util.Set<String> REASONING_EFFORTS =
-            java.util.Set.of("off", "none", "minimal", "low", "medium", "high");
 
     private static final Map<String, String> DEFAULTS = new LinkedHashMap<>();
     static {
@@ -210,11 +222,13 @@ public class SettingsService {
         DEFAULTS.put(WHISPER_OPENAI_URL, "https://api.openai.com/v1/audio/transcriptions");
         DEFAULTS.put(WHISPER_OPENAI_API_KEY, "");
         DEFAULTS.put(WHISPER_OPENAI_MODEL, "whisper-1");
+        DEFAULTS.put(WHISPER_OPENAI_DIARIZE_MODEL, "gpt-4o-transcribe-diarize");
         DEFAULTS.put(WHISPER_LANGUAGE, "de");
         DEFAULTS.put(WHISPER_OUTPUT, "json");
         DEFAULTS.put(WHISPER_VAD_FILTER, "true");
         // Sprechererkennung FREISCHALTEN: Nutzer koennen sie dann pro Aufnahme/Upload
-        // waehlen. Benoetigt ASR_ENGINE=whisperx, siehe docs/WHISPER_DIARIZATION.md
+        // waehlen. Lokal benoetigt sie ASR_ENGINE=whisperx (docs/WHISPER_DIARIZATION.md),
+        // in der Cloud das Modell aus whisper.openaiDiarizeModel.
         DEFAULTS.put(WHISPER_DIARIZE, "false");
         DEFAULTS.put(WHISPER_INITIAL_PROMPT, "");
         DEFAULTS.put(WHISPER_TIMEOUT_SEC, "600");
@@ -295,8 +309,120 @@ public class SettingsService {
 
         DEFAULTS.put(SHARING_PUBLIC_LINKS, "true");
 
+        DEFAULTS.put(SPEAKERS_NAME_SUGGESTIONS, "true");
+        DEFAULTS.put(SPEAKERS_AUTO_APPLY, "false");
+        DEFAULTS.put(SPEAKERS_BBB_ACTIVITY, "true");
+
         DEFAULTS.put(CLEANUP_ENABLED, "true");
         DEFAULTS.put(CLEANUP_OLDER_THAN_DAYS, "90");
+    }
+
+    /** Art eines Einstellungswerts - steuert Validierung und Eingabefeld im Admin-Bereich. */
+    public enum SettingType { BOOLEAN, INTEGER, DECIMAL, CHOICE, TIME, URL, LANGUAGE, SECRET, TEXT, MULTILINE }
+
+    /**
+     * Beschreibung eines Einstellungswerts. min/max gelten fuer Zahlen, options
+     * fuer Auswahllisten; optional = ein leerer Wert ist erlaubt (z.B. "keine
+     * Tika-Adresse").
+     */
+    public record SettingSpec(SettingType type, Double min, Double max, java.util.List<String> options,
+                              boolean optional) {
+        static SettingSpec of(SettingType type) { return new SettingSpec(type, null, null, null, false); }
+        static SettingSpec integer(long min, long max) {
+            return new SettingSpec(SettingType.INTEGER, (double) min, (double) max, null, false);
+        }
+        static SettingSpec decimal(double min, double max) {
+            return new SettingSpec(SettingType.DECIMAL, min, max, null, false);
+        }
+        static SettingSpec choice(String... options) {
+            return new SettingSpec(SettingType.CHOICE, null, null, java.util.List.of(options), false);
+        }
+        static SettingSpec optionalUrl() { return new SettingSpec(SettingType.URL, null, null, null, true); }
+    }
+
+    private static final long NO_LIMIT = Integer.MAX_VALUE;
+    private static final Map<String, SettingSpec> SPECS = new LinkedHashMap<>();
+    static {
+        SPECS.put(WHISPER_PROVIDER, SettingSpec.choice("local", "openai"));
+        SPECS.put(WHISPER_URL, SettingSpec.of(SettingType.URL));
+        SPECS.put(WHISPER_OPENAI_URL, SettingSpec.of(SettingType.URL));
+        SPECS.put(WHISPER_OPENAI_API_KEY, SettingSpec.of(SettingType.SECRET));
+        SPECS.put(WHISPER_LANGUAGE, SettingSpec.of(SettingType.LANGUAGE));
+        SPECS.put(WHISPER_OUTPUT, SettingSpec.choice("json", "text", "vtt", "srt", "tsv"));
+        SPECS.put(WHISPER_VAD_FILTER, SettingSpec.of(SettingType.BOOLEAN));
+        SPECS.put(WHISPER_DIARIZE, SettingSpec.of(SettingType.BOOLEAN));
+        SPECS.put(WHISPER_INITIAL_PROMPT, SettingSpec.of(SettingType.MULTILINE));
+        SPECS.put(WHISPER_TIMEOUT_SEC, SettingSpec.integer(10, 7200));
+        SPECS.put(WHISPER_RETRY_ATTEMPTS, SettingSpec.integer(1, 10));
+        SPECS.put(WHISPER_RETRY_BASE_MS, SettingSpec.integer(0, 600_000));
+
+        SPECS.put(LLM_PROVIDER, SettingSpec.choice("local", "openai"));
+        SPECS.put(LLM_BASE_URL, SettingSpec.of(SettingType.URL));
+        SPECS.put(LLM_API_KEY, SettingSpec.of(SettingType.SECRET));
+        SPECS.put(LLM_OPENAI_URL, SettingSpec.of(SettingType.URL));
+        SPECS.put(LLM_OPENAI_API_KEY, SettingSpec.of(SettingType.SECRET));
+        // "off" = reasoning_effort nicht mitschicken
+        SPECS.put(LLM_OPENAI_REASONING_EFFORT,
+                SettingSpec.choice("off", "none", "minimal", "low", "medium", "high"));
+        SPECS.put(LLM_TEMPERATURE, SettingSpec.decimal(0, 2));
+        SPECS.put(LLM_MAX_TOKENS, SettingSpec.integer(64, 1_000_000));
+        SPECS.put(LLM_DISABLE_THINKING, SettingSpec.of(SettingType.BOOLEAN));
+        SPECS.put(LLM_TIMEOUT_SEC, SettingSpec.integer(10, 7200));
+        SPECS.put(LLM_RETRY_ATTEMPTS, SettingSpec.integer(1, 10));
+        SPECS.put(LLM_RETRY_BASE_MS, SettingSpec.integer(0, 600_000));
+
+        SPECS.put(SUMMARY_CHUNK_CHARS, SettingSpec.integer(1000, 2_000_000));
+        SPECS.put(SUMMARY_SYSTEM_PROMPT, SettingSpec.of(SettingType.MULTILINE));
+        SPECS.put(SUMMARY_MIN_AUDIO_MS, SettingSpec.integer(0, 86_400_000));
+        SPECS.put(SUMMARY_MIN_TRANSCRIPT_CHARS, SettingSpec.integer(0, NO_LIMIT));
+        SPECS.put(SUMMARY_MIN_CHAT_CHARS, SettingSpec.integer(0, NO_LIMIT));
+
+        SPECS.put(CORRECTION_ENABLED, SettingSpec.of(SettingType.BOOLEAN));
+        SPECS.put(CORRECTION_SYSTEM_PROMPT, SettingSpec.of(SettingType.MULTILINE));
+        SPECS.put(CORRECTION_CHUNK_CHARS, SettingSpec.integer(500, 200_000));
+        SPECS.put(CORRECTION_MAX_SENTENCE_CHARS, SettingSpec.integer(50, 20_000));
+        SPECS.put(CORRECTION_GLOSSARY_MAX_CHARS, SettingSpec.integer(0, NO_LIMIT));
+
+        SPECS.put(DOCUMENTS_ENABLED, SettingSpec.of(SettingType.BOOLEAN));
+        SPECS.put(DOCUMENTS_MAX_MEGABYTES, SettingSpec.integer(1, 4096));
+        SPECS.put(DOCUMENTS_TIKA_URL, SettingSpec.optionalUrl());
+        SPECS.put(DOCUMENTS_TIKA_TIMEOUT_SEC, SettingSpec.integer(10, 7200));
+        // Genau die Werte, die Tika als PDF-OCR-Strategie kennt (X-Tika-PDFOcrStrategy).
+        SPECS.put(DOCUMENTS_OCR_STRATEGY, SettingSpec.choice("auto", "no_ocr", "ocr_only", "ocr_and_text_extraction"));
+        SPECS.put(DOCUMENTS_MAX_CHARS_PER_DOCUMENT, SettingSpec.integer(0, NO_LIMIT));
+        SPECS.put(DOCUMENTS_PROMPT_MAX_CHARS, SettingSpec.integer(0, NO_LIMIT));
+
+        SPECS.put(PROCESSING_WINDOW_START, SettingSpec.of(SettingType.TIME));
+        SPECS.put(PROCESSING_WINDOW_END, SettingSpec.of(SettingType.TIME));
+
+        SPECS.put(RECORDING_SEGMENT_MINUTES, SettingSpec.integer(1, 120));
+        SPECS.put(RECORDING_MP3_BITRATE, SettingSpec.choice("64k", "96k", "128k", "160k", "192k", "256k", "320k"));
+        SPECS.put(RECORDING_MIN_AUDIO_BYTES, SettingSpec.integer(0, NO_LIMIT));
+
+        SPECS.put(BOT_SEND_CHAT_WARNING, SettingSpec.of(SettingType.BOOLEAN));
+        SPECS.put(BOT_WARN_MESSAGE, SettingSpec.of(SettingType.MULTILINE));
+        SPECS.put(BOT_RECORD_MIN_OTHERS, SettingSpec.integer(0, 1000));
+        SPECS.put(BOT_CHECK_INTERVAL_MS, SettingSpec.integer(1000, 600_000));
+        SPECS.put(BOT_AUTO_RECONNECT, SettingSpec.of(SettingType.BOOLEAN));
+        // -1 = unbegrenzt viele Versuche
+        SPECS.put(BOT_RECONNECT_MAX_ATTEMPTS, SettingSpec.integer(-1, 10_000));
+        SPECS.put(BOT_RECONNECT_BACKOFF_BASE_MS, SettingSpec.integer(0, 3_600_000));
+        SPECS.put(BOT_RECONNECT_BACKOFF_FACTOR, SettingSpec.decimal(1, 10));
+        SPECS.put(BOT_ANONYMOUS_STOP_ENABLED, SettingSpec.of(SettingType.BOOLEAN));
+        SPECS.put(BOT_PUBLIC_URL, SettingSpec.optionalUrl());
+
+        SPECS.put(CAPTURE_ENABLED, SettingSpec.of(SettingType.BOOLEAN));
+        SPECS.put(CAPTURE_MAX_MEGABYTES, SettingSpec.integer(1, 1_000_000));
+        SPECS.put(CAPTURE_STALE_MINUTES, SettingSpec.integer(1, 1440));
+
+        SPECS.put(SHARING_PUBLIC_LINKS, SettingSpec.of(SettingType.BOOLEAN));
+
+        SPECS.put(SPEAKERS_NAME_SUGGESTIONS, SettingSpec.of(SettingType.BOOLEAN));
+        SPECS.put(SPEAKERS_AUTO_APPLY, SettingSpec.of(SettingType.BOOLEAN));
+        SPECS.put(SPEAKERS_BBB_ACTIVITY, SettingSpec.of(SettingType.BOOLEAN));
+
+        SPECS.put(CLEANUP_ENABLED, SettingSpec.of(SettingType.BOOLEAN));
+        SPECS.put(CLEANUP_OLDER_THAN_DAYS, SettingSpec.integer(1, 36_500));
     }
 
     private final AppSettingRepo repo;
@@ -307,6 +433,15 @@ public class SettingsService {
 
     public static Map<String, String> defaults() {
         return Map.copyOf(DEFAULTS);
+    }
+
+    /** Typbeschreibung je Schluessel (ohne eigenen Eintrag: freier Text). */
+    public static Map<String, SettingSpec> schema() {
+        Map<String, SettingSpec> all = new LinkedHashMap<>();
+        for (String key : DEFAULTS.keySet()) {
+            all.put(key, SPECS.getOrDefault(key, SettingSpec.of(SettingType.TEXT)));
+        }
+        return all;
     }
 
     @Transactional(readOnly = true)
@@ -362,69 +497,65 @@ public class SettingsService {
 
     private void validate(String key, String value) {
         if (value == null) throw new IllegalArgumentException("Wert fuer " + key + " darf nicht null sein");
+        SettingSpec spec = SPECS.getOrDefault(key, SettingSpec.of(SettingType.TEXT));
+        String v = value.trim();
+        String problem = problemWith(spec, v);
+        if (problem != null) {
+            throw new IllegalArgumentException("Ungueltiger Wert fuer " + key + ": '" + value + "' (" + problem + ")");
+        }
+    }
+
+    /** Beschreibung des Problems oder null, wenn der Wert zur Spezifikation passt. */
+    static String problemWith(SettingSpec spec, String v) {
+        if (v.isEmpty()) {
+            // Leer heisst bei Freitext "Standard verwenden" (siehe get); bei
+            // typisierten Werten nur, wenn das ausdruecklich vorgesehen ist.
+            return switch (spec.type()) {
+                case TEXT, MULTILINE, SECRET -> null;
+                default -> spec.optional() ? null : "darf nicht leer sein";
+            };
+        }
         try {
-            switch (key) {
-                case WHISPER_TIMEOUT_SEC, WHISPER_RETRY_ATTEMPTS, WHISPER_RETRY_BASE_MS,
-                     LLM_MAX_TOKENS, LLM_TIMEOUT_SEC, LLM_RETRY_ATTEMPTS,
-                     LLM_RETRY_BASE_MS, SUMMARY_CHUNK_CHARS, SUMMARY_MIN_AUDIO_MS,
-                     SUMMARY_MIN_TRANSCRIPT_CHARS, SUMMARY_MIN_CHAT_CHARS,
-                     RECORDING_SEGMENT_MINUTES, RECORDING_MIN_AUDIO_BYTES,
-                     CORRECTION_CHUNK_CHARS, CORRECTION_MAX_SENTENCE_CHARS,
-                     CORRECTION_GLOSSARY_MAX_CHARS,
-                     BOT_RECORD_MIN_OTHERS, BOT_CHECK_INTERVAL_MS,
-                     BOT_RECONNECT_MAX_ATTEMPTS, BOT_RECONNECT_BACKOFF_BASE_MS,
-                     CAPTURE_MAX_MEGABYTES, CAPTURE_STALE_MINUTES,
-                     DOCUMENTS_MAX_MEGABYTES, DOCUMENTS_TIKA_TIMEOUT_SEC,
-                     DOCUMENTS_MAX_CHARS_PER_DOCUMENT, DOCUMENTS_PROMPT_MAX_CHARS,
-                     CLEANUP_OLDER_THAN_DAYS -> Long.parseLong(value.trim());
-                case LLM_TEMPERATURE, BOT_RECONNECT_BACKOFF_FACTOR -> Double.parseDouble(value.trim());
-                case WHISPER_VAD_FILTER, WHISPER_DIARIZE, LLM_DISABLE_THINKING,
-                     BOT_SEND_CHAT_WARNING, BOT_ANONYMOUS_STOP_ENABLED,
-                     BOT_AUTO_RECONNECT, CAPTURE_ENABLED, CORRECTION_ENABLED, CLEANUP_ENABLED,
-                     DOCUMENTS_ENABLED, SHARING_PUBLIC_LINKS -> {
-                    if (!value.trim().equalsIgnoreCase("true") && !value.trim().equalsIgnoreCase("false")) {
-                        throw new IllegalArgumentException("erwartet true/false");
+            switch (spec.type()) {
+                case BOOLEAN -> {
+                    if (!v.equalsIgnoreCase("true") && !v.equalsIgnoreCase("false")) return "erwartet true/false";
+                }
+                case INTEGER, DECIMAL -> {
+                    double number = spec.type() == SettingType.INTEGER ? Long.parseLong(v) : Double.parseDouble(v);
+                    if (Double.isNaN(number) || Double.isInfinite(number)) return "keine Zahl";
+                    if (spec.min() != null && number < spec.min()) return "Minimum " + formatLimit(spec.min());
+                    if (spec.max() != null && number > spec.max()) return "Maximum " + formatLimit(spec.max());
+                }
+                case CHOICE -> {
+                    if (!spec.options().contains(v.toLowerCase(java.util.Locale.ROOT))) {
+                        return "erwartet " + String.join("/", spec.options());
                     }
                 }
-                case PROCESSING_WINDOW_START, PROCESSING_WINDOW_END -> java.time.LocalTime.parse(value.trim());
-                // Leer = Stopp-Link aus; sonst eine vollstaendige http(s)-Adresse,
-                // denn der Bot schreibt sie woertlich in den Chat.
-                case BOT_PUBLIC_URL -> {
-                    String v = value.trim();
-                    if (!v.isEmpty()) {
-                        java.net.URI uri = java.net.URI.create(v);
-                        if (uri.getHost() == null
-                                || !("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))) {
-                            throw new IllegalArgumentException("erwartet http(s)://host");
-                        }
+                case TIME -> java.time.LocalTime.parse(v);
+                case URL -> {
+                    java.net.URI uri = java.net.URI.create(v);
+                    if (uri.getHost() == null
+                            || !("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))) {
+                        return "erwartet http(s)://host";
                     }
                 }
-                case LLM_PROVIDER -> {
-                    if (!value.trim().equalsIgnoreCase("local") && !value.trim().equalsIgnoreCase("openai")) {
-                        throw new IllegalArgumentException("erwartet local/openai");
-                    }
-                }
-                case LLM_OPENAI_REASONING_EFFORT -> {
-                    if (!REASONING_EFFORTS.contains(value.trim().toLowerCase(java.util.Locale.ROOT))) {
-                        throw new IllegalArgumentException("erwartet " + String.join("/", REASONING_EFFORTS));
-                    }
-                }
-                case WHISPER_PROVIDER -> {
-                    if (!value.trim().equalsIgnoreCase("local") && !value.trim().equalsIgnoreCase("openai")) {
-                        throw new IllegalArgumentException("erwartet local/openai");
-                    }
-                }
-                // Genau die Werte, die Tika als PDF-OCR-Strategie kennt. Ein Tippfehler
-                // wuerde sonst erst beim naechsten Scan als Tika-Fehler auffallen.
-                case DOCUMENTS_OCR_STRATEGY -> {
-                    if (!OCR_STRATEGIES.contains(value.trim().toLowerCase(java.util.Locale.ROOT))) {
-                        throw new IllegalArgumentException("erwartet " + String.join("/", OCR_STRATEGIES));
-                    }
-                }
+                case LANGUAGE -> bbbbot.stt.SttLanguage.normalize(v);
                 default -> { /* freie Textwerte */ }
             }
         } catch (RuntimeException ex) {
-            throw new IllegalArgumentException("Ungueltiger Wert fuer " + key + ": " + value);
+            return switch (spec.type()) {
+                case INTEGER -> "erwartet eine ganze Zahl";
+                case DECIMAL -> "erwartet eine Zahl";
+                case TIME -> "erwartet HH:MM";
+                case URL -> "erwartet http(s)://host";
+                case LANGUAGE -> "erwartet einen Sprachcode wie de, en oder auto";
+                default -> ex.getMessage();
+            };
         }
+        return null;
+    }
+
+    private static String formatLimit(double limit) {
+        return limit == Math.rint(limit) ? String.valueOf((long) limit) : String.valueOf(limit);
     }
 }

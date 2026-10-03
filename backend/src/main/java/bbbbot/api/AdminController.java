@@ -86,6 +86,12 @@ public class AdminController {
         return SettingsService.defaults();
     }
 
+    /** Typ je Einstellung (Ja/Nein, Zahl mit Grenzen, Auswahl ...) fuer passende Eingabefelder. */
+    @GetMapping("/settings/schema")
+    public Map<String, SettingsService.SettingSpec> getSchema() {
+        return SettingsService.schema();
+    }
+
     // ------------------------------------------------------ Verbindungstests
 
     /**

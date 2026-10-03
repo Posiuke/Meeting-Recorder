@@ -40,6 +40,7 @@ class WhisperClientOpenAiTest {
                 .thenReturn("http://127.0.0.1:" + server.getAddress().getPort() + "/v1/audio/transcriptions");
         when(settings.get(SettingsService.WHISPER_OPENAI_API_KEY)).thenReturn("sk-test-key");
         when(settings.get(SettingsService.WHISPER_OPENAI_MODEL)).thenReturn("whisper-1");
+        when(settings.get(SettingsService.WHISPER_OPENAI_DIARIZE_MODEL)).thenReturn("gpt-4o-transcribe-diarize");
         when(settings.get(SettingsService.WHISPER_LANGUAGE)).thenReturn("de");
         when(settings.get(SettingsService.WHISPER_INITIAL_PROMPT)).thenReturn("");
         when(settings.getInt(anyString())).thenAnswer(inv -> switch (inv.getArgument(0, String.class)) {
@@ -155,5 +156,104 @@ class WhisperClientOpenAiTest {
 
         assertThat(result.success()).isFalse();
         assertThat(result.error()).contains("whisper.openaiApiKey");
+    }
+
+    private static final String DIARIZED_RESPONSE = """
+            {"text":"...","segments":[
+              {"speaker":"A","start":0.0,"end":4.0,"text":"Hallo, ich bin Anna."},
+              {"speaker":"B","start":4.5,"end":9.0,"text":"Und ich bin Tom."},
+              {"speaker":"A","start":65.0,"end":66.0,"text":"Schoen."}]}
+            """;
+
+    @Test
+    void sprechererkennungNutztDasDiarisierungsModellUndStabileLabels() {
+        List<String> bodies = respondWith(DIARIZED_RESPONSE);
+
+        var result = new WhisperClient(settings).transcribe(audioFile, true, null, new WhisperClient.SpeakerContext());
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.text()).isEqualTo("""
+                SPEAKER_00:
+                [00:00] Hallo, ich bin Anna.
+
+                SPEAKER_01:
+                [00:04] Und ich bin Tom.
+
+                SPEAKER_00:
+                [01:05] Schoen.""");
+        assertThat(bodies.get(0))
+                .contains("gpt-4o-transcribe-diarize")
+                .contains("diarized_json")
+                .contains("name=\"chunking_strategy\"")
+                .doesNotContain("name=\"prompt\"");
+    }
+
+    @Test
+    void folgesegmenteBekommenStimmprobenDerBekanntenSprecher() throws IOException {
+        List<String> bodies = respondWith(DIARIZED_RESPONSE);
+        Path clip = Files.createTempFile("clip", ".wav");
+        Files.write(clip, "RIFF-fake-wav".getBytes(StandardCharsets.UTF_8));
+        List<Double> clipLengths = new ArrayList<>();
+        WhisperClient client = new WhisperClient(settings, (source, start, length, wav) -> {
+            clipLengths.add(length);
+            try {
+                Files.copy(clip, wav, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+            return wav;
+        });
+        var speakers = new WhisperClient.SpeakerContext();
+
+        client.transcribe(audioFile, true, null, speakers);
+        var second = client.transcribe(audioFile, true, null, speakers);
+
+        // Je neuem Sprecher die laengste Aeusserung von 2-10 s als Probe - bis zur
+        // Obergrenze von 4 bekannten Sprechern je Anfrage.
+        assertThat(clipLengths).containsExactly(4.0, 4.5, 4.0, 4.5);
+        assertThat(bodies.get(0)).doesNotContain("known_speaker_names");
+        assertThat(bodies.get(1))
+                .contains("name=\"known_speaker_names[]\"\r\n\r\nSPEAKER_00")
+                .contains("name=\"known_speaker_names[]\"\r\n\r\nSPEAKER_01")
+                .contains("data:audio/wav;base64,");
+        // Die Antwort nennt weiterhin A/B (unser Mock) - neue Stimmen bekommen
+        // fortlaufende Labels statt wieder bei SPEAKER_00 anzufangen.
+        assertThat(second.text()).contains("SPEAKER_02:").contains("SPEAKER_03:");
+        Files.deleteIfExists(clip);
+    }
+
+    @Test
+    void abgelehnteSprechererkennungFaelltAufTranskriptOhneSprecherZurueck() {
+        List<String> bodies = new ArrayList<>();
+        server.createContext("/v1/audio/transcriptions", exchange -> {
+            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            bodies.add(body);
+            boolean diarizeRequest = body.contains("diarized_json");
+            byte[] response = (diarizeRequest
+                    ? "{\"error\":{\"message\":\"model not found\"}}"
+                    : "{\"text\":\"Ohne Sprecher.\"}").getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(diarizeRequest ? 400 : 200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+
+        var result = new WhisperClient(settings).transcribe(audioFile, true);
+
+        assertThat(bodies).hasSize(2);
+        assertThat(result.success()).isTrue();
+        assertThat(result.text()).isEqualTo("Ohne Sprecher.");
+    }
+
+    /** Mock-Server antwortet immer mit {@code json}; liefert die Anfrage-Koerper. */
+    private List<String> respondWith(String json) {
+        List<String> bodies = new ArrayList<>();
+        server.createContext("/v1/audio/transcriptions", exchange -> {
+            bodies.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] response = json.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        return bodies;
     }
 }

@@ -88,6 +88,7 @@ public class RecordingController {
     private final bbbbot.recording.RecordingMediaService media;
     private final bbbbot.docs.RecordingDocumentService documentService;
     private final bbbbot.processing.ProcessingQueueService processingQueue;
+    private final bbbbot.recording.SpeakerNamingService speakerNaming;
 
     public RecordingController(AccessService access, RecordingRepo recordingRepo,
                                RecordingSegmentRepo segmentRepo, SummaryRepo summaryRepo,
@@ -104,7 +105,8 @@ public class RecordingController {
                                ShareLinkService shareLinkService,
                                bbbbot.recording.RecordingMediaService media,
                                bbbbot.docs.RecordingDocumentService documentService,
-                               bbbbot.processing.ProcessingQueueService processingQueue) {
+                               bbbbot.processing.ProcessingQueueService processingQueue,
+                               bbbbot.recording.SpeakerNamingService speakerNaming) {
         this.access = access;
         this.recordingRepo = recordingRepo;
         this.segmentRepo = segmentRepo;
@@ -127,6 +129,7 @@ public class RecordingController {
         this.media = media;
         this.documentService = documentService;
         this.processingQueue = processingQueue;
+        this.speakerNaming = speakerNaming;
     }
 
     // ---------------------------------------------------------------- Upload
@@ -717,9 +720,59 @@ public class RecordingController {
                 .filter(p -> p.getRecordingId().equals(id))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Teilnehmer nicht gefunden"));
         participant.setDisplayName(name);
+        // Von Hand benannt: ein offener Vorschlag ist damit erledigt.
+        participant.clearSuggestion();
         participantRepo.save(participant);
         processingService.rewriteTranscriptFile(recording);
         return Dtos.ParticipantView.of(participant);
+    }
+
+    /** Namensvorschlag uebernehmen: wird zum Anzeigenamen, der Vorschlag entfaellt (nur Besitzer). */
+    @PostMapping("/{id}/participants/{participantId}/suggestion/accept")
+    public Dtos.ParticipantView acceptNameSuggestion(@PathVariable UUID id, @PathVariable UUID participantId) {
+        Recording recording = access.requireOwner(id, CurrentUser.get());
+        Participant participant = requireParticipant(id, participantId);
+        if (participant.getSuggestedName() == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Kein offener Namensvorschlag");
+        }
+        participant.setDisplayName(participant.getSuggestedName());
+        participant.clearSuggestion();
+        participantRepo.save(participant);
+        processingService.rewriteTranscriptFile(recording);
+        return Dtos.ParticipantView.of(participant);
+    }
+
+    /** Namensvorschlag verwerfen; der Name bleibt wie er ist (nur Besitzer). */
+    @DeleteMapping("/{id}/participants/{participantId}/suggestion")
+    public Dtos.ParticipantView dismissNameSuggestion(@PathVariable UUID id, @PathVariable UUID participantId) {
+        access.requireOwner(id, CurrentUser.get());
+        Participant participant = requireParticipant(id, participantId);
+        participant.clearSuggestion();
+        participantRepo.save(participant);
+        return Dtos.ParticipantView.of(participant);
+    }
+
+    /**
+     * Namen fuer alle noch nicht benannten Sprecher (erneut) vorschlagen lassen -
+     * z.B. fuer Aufnahmen von vor der Einfuehrung der Vorschlaege. Laeuft
+     * synchron; das LLM braucht dafuer typischerweise einige Sekunden.
+     */
+    @PostMapping("/{id}/participants/suggest")
+    public List<Dtos.ParticipantView> suggestNames(@PathVariable UUID id) {
+        Recording recording = access.requireOwner(id, CurrentUser.get());
+        if (!speakerNaming.isEnabled()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Namensvorschlaege sind im Admin-Bereich ausgeschaltet");
+        }
+        speakerNaming.suggest(recording, segmentRepo.findByRecordingIdOrderBySeq(id));
+        processingService.rewriteTranscriptFile(recording);
+        return participantService.list(id).stream().map(Dtos.ParticipantView::of).toList();
+    }
+
+    private Participant requireParticipant(UUID recordingId, UUID participantId) {
+        return participantRepo.findById(participantId)
+                .filter(p -> p.getRecordingId().equals(recordingId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Teilnehmer nicht gefunden"));
     }
 
     @PostMapping("/{id}/process")

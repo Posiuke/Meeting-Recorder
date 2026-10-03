@@ -425,9 +425,17 @@ public final class Dtos {
      * Teilnehmer einer Aufnahme: aus der Diarisierung erkannter Sprecher
      * (speakerLabel) mit editierbarem Anzeigenamen.
      */
-    public record ParticipantView(UUID id, String speakerLabel, String displayName) {
+    /**
+     * Teilnehmer samt offenem Namensvorschlag (suggestedName null = keiner);
+     * confidence HIGH/MEDIUM/LOW, source BBB (Sprechanzeige) oder LLM.
+     */
+    public record ParticipantView(UUID id, String speakerLabel, String displayName,
+                                  String suggestedName, String suggestionConfidence,
+                                  String suggestionSource, String suggestionEvidence) {
         public static ParticipantView of(Participant p) {
-            return new ParticipantView(p.getId(), p.getSpeakerLabel(), p.getDisplayName());
+            return new ParticipantView(p.getId(), p.getSpeakerLabel(), p.getDisplayName(),
+                    p.getSuggestedName(), p.getSuggestionConfidence(),
+                    p.getSuggestionSource(), p.getSuggestionEvidence());
         }
     }
 

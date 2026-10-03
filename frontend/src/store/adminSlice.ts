@@ -1,13 +1,15 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { api, errorMessage } from '../api/client';
 import { translate } from '../i18n';
-import type { AdminUserView, LdapTestResult, ProcessingQueueView } from '../types';
+import type { AdminUserView, LdapTestResult, ProcessingQueueView, SettingSpec } from '../types';
 
 type SettingsMap = Record<string, string>;
 
 interface AdminState {
   settings: SettingsMap | null;
   defaults: SettingsMap | null;
+  /** Typ je Einstellung – bestimmt Eingabefeld und Prüfung im Formular. */
+  schema: Record<string, SettingSpec> | null;
   settingsLoading: boolean;
   settingsError: string | null;
   authConfig: SettingsMap | null;
@@ -25,6 +27,7 @@ interface AdminState {
 const initialState: AdminState = {
   settings: null,
   defaults: null,
+  schema: null,
   settingsLoading: false,
   settingsError: null,
   authConfig: null,
@@ -73,16 +76,17 @@ export const testLdap = createAsyncThunk<
 });
 
 export const fetchSettings = createAsyncThunk<
-  { settings: SettingsMap; defaults: SettingsMap },
+  { settings: SettingsMap; defaults: SettingsMap; schema: Record<string, SettingSpec> },
   void,
   { rejectValue: string }
 >('admin/fetchSettings', async (_, { rejectWithValue }) => {
   try {
-    const [settings, defaults] = await Promise.all([
+    const [settings, defaults, schema] = await Promise.all([
       api<SettingsMap>('/api/admin/settings'),
       api<SettingsMap>('/api/admin/settings/defaults'),
+      api<Record<string, SettingSpec>>('/api/admin/settings/schema'),
     ]);
-    return { settings, defaults };
+    return { settings, defaults, schema };
   } catch (e) {
     return rejectWithValue(errorMessage(e));
   }
@@ -172,6 +176,7 @@ const adminSlice = createSlice({
       .addCase(fetchSettings.fulfilled, (state, action) => {
         state.settings = action.payload.settings;
         state.defaults = action.payload.defaults;
+        state.schema = action.payload.schema;
         state.settingsLoading = false;
       })
       .addCase(fetchSettings.rejected, (state, action) => {

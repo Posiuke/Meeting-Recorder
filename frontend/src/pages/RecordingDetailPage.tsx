@@ -18,6 +18,8 @@ import {
   setCurrentSummary,
   transcribeRecording,
   updateParticipant,
+  resolveNameSuggestion,
+  suggestSpeakerNames,
   updateSummary,
 } from '../store/recordingsSlice';
 import StatusBadge from '../components/StatusBadge';
@@ -905,6 +907,40 @@ function ParticipantsTab({
   const { t } = useI18n();
   const [saveBusy, setSaveBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [suggestBusy, setSuggestBusy] = useState(false);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+
+  const handleSuggest = async () => {
+    setError(null);
+    setInfo(null);
+    setSuggestBusy(true);
+    try {
+      const updated = await dispatch(suggestSpeakerNames(recordingId)).unwrap();
+      const before = new Map(participants.map((p) => [p.id, p]));
+      const anyNew = updated.some((p) => {
+        const old = before.get(p.id);
+        return p.suggestedName !== null || (old !== undefined && old.displayName !== p.displayName);
+      });
+      if (!anyNew) setInfo(t('recordingDetail.suggestionsNone'));
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setSuggestBusy(false);
+    }
+  };
+
+  const handleResolve = async (p: ParticipantView, accept: boolean) => {
+    setError(null);
+    setResolvingId(p.id);
+    try {
+      await dispatch(resolveNameSuggestion({ recordingId, participantId: p.id, accept })).unwrap();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setResolvingId(null);
+    }
+  };
 
   const startEdit = (p: ParticipantView) => {
     setEditId(p.id);
@@ -931,12 +967,26 @@ function ParticipantsTab({
   return (
     <div>
       {error && <Alert kind="error">{error}</Alert>}
+      {info && <Alert kind="info">{info}</Alert>}
       {participants.length > 0 ? (
         <>
           <p className="muted">
             {t('recordingDetail.participantsIntro')}
             {canEdit && t('recordingDetail.participantsIntroEditable')}
           </p>
+          {canEdit && participants.some((p) => p.speakerLabel) && (
+            <p className="participant-suggest-bar">
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => void handleSuggest()}
+                disabled={suggestBusy}
+                title={t('recordingDetail.suggestNamesHint')}
+              >
+                {suggestBusy ? t('recordingDetail.suggestingNames') : t('recordingDetail.suggestNames')}
+              </button>
+            </p>
+          )}
           <ul className="participant-list">
             {participants.map((p, i) => (
               <li key={p.id} className="participant-item">
@@ -984,6 +1034,47 @@ function ParticipantsTab({
                       >
                         {t('recordingDetail.rename')}
                       </button>
+                    )}
+                    {canEdit && p.suggestedName && (
+                      <div
+                        className={`participant-suggestion confidence-${(
+                          p.suggestionConfidence ?? 'LOW'
+                        ).toLowerCase()}`}
+                      >
+                        <strong>
+                          {t('recordingDetail.suggestionLabel', { name: p.suggestedName })}
+                        </strong>
+                        <span className="muted">
+                          {' '}
+                          ({t(
+                            `recordingDetail.suggestionConfidence${p.suggestionConfidence ?? 'LOW'}` as TranslationKey,
+                          )}
+                          {p.suggestionSource &&
+                            ` · ${t(`recordingDetail.suggestionSource${p.suggestionSource}` as TranslationKey)}`}
+                          )
+                        </span>
+                        {p.suggestionEvidence && (
+                          <span className="participant-evidence">{p.suggestionEvidence}</span>
+                        )}
+                        <span className="participant-suggestion-actions">
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            disabled={resolvingId === p.id}
+                            onClick={() => void handleResolve(p, true)}
+                          >
+                            {t('recordingDetail.suggestionAccept')}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            disabled={resolvingId === p.id}
+                            onClick={() => void handleResolve(p, false)}
+                          >
+                            {t('recordingDetail.suggestionDismiss')}
+                          </button>
+                        </span>
+                      </div>
                     )}
                   </>
                 )}

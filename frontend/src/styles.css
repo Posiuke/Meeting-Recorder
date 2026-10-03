@@ -1539,6 +1539,51 @@ tbody tr:hover {
   max-width: 18rem;
 }
 
+.participant-item {
+  flex-wrap: wrap;
+}
+
+.participant-suggest-bar {
+  margin: 0 0 0.5rem;
+}
+
+/* Offener Namensvorschlag: eigene Zeile unter dem Sprecher, Randfarbe nach Sicherheit. */
+.participant-suggestion {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.6rem;
+  margin-left: 0.25rem;
+  padding: 0.35rem 0.6rem;
+  border-left: 3px solid var(--gray);
+  background: var(--gray-bg);
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.participant-suggestion.confidence-high {
+  border-left-color: var(--green);
+  background: var(--green-bg);
+}
+
+.participant-suggestion.confidence-medium {
+  border-left-color: var(--orange);
+  background: var(--orange-bg);
+}
+
+.participant-evidence {
+  flex-basis: 100%;
+  color: var(--text-muted);
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+
+.participant-suggestion-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
 .participant-log-head {
   margin: 1.25rem 0 0.5rem;
 }
@@ -1921,6 +1966,17 @@ tbody tr:hover {
   font-size: 0.78rem;
   color: var(--text-muted);
   word-break: break-word;
+}
+
+.field-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.form-field.field-invalid input,
+.form-field.field-invalid select,
+.form-field.field-invalid textarea {
+  border-color: var(--danger);
 }
 
 .settings-group-footer {

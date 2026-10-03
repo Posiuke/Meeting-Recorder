@@ -162,6 +162,10 @@ public class BotInstance {
     private long recordedBytes;
     private long recordingStartedAtMs;
 
+    // Sprechanzeige von BBB waehrend der Aufnahme ("start<TAB>ende<TAB>Name" je
+    // Zeile, Sekunden ab Aufnahmestart) - Grundlage fuer Namensvorschlaege.
+    private final StringBuilder talkLog = new StringBuilder();
+
     // Sichtbarer Zustand fuer REST/Frontend
     private volatile BotSession.Status status = BotSession.Status.STARTING;
     // Aus der BBB-Oberflaeche erkannter Raumname (nach Join, ggf. verzoegert)
@@ -556,6 +560,8 @@ public class BotInstance {
         String pLog = participantsLog.toString();
         clearRecordingState();
         if (recId != null) {
+            // Bis zum letzten Abholen protokollierte Intervalle sind nicht verloren.
+            persistTalkLog(recId);
             recordingService.finalizeRecording(recId, pLog, "", false, "Browser-Verbindung verloren");
         }
     }
@@ -616,6 +622,7 @@ public class BotInstance {
             return;
         }
         logRecordingLevels();
+        drainTalkLog(false);
 
         // Neue Teilnehmer protokollieren
         for (String name : info.names()) {
@@ -676,6 +683,49 @@ public class BotInstance {
             log.warn("Aufnahme seit {} min praktisch still - Audio-Zustand: {}",
                     silentMinutesInRow, joiner.audioState(page).summary());
         }
+    }
+
+    /** Startet die Abtastung der BBB-Sprechanzeige (talkActivity.js), sofern eingeschaltet. */
+    private void startTalkLog() {
+        talkLog.setLength(0);
+        if (!config.trackSpeakers()) return;
+        try {
+            page.evaluate(BrowserScripts.load(BrowserScripts.TALK_ACTIVITY), botName);
+        } catch (RuntimeException e) {
+            log.warn("Sprechanzeige kann nicht protokolliert werden: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Holt die abgeschlossenen Sprechintervalle aus der Seite. Mit final=true
+     * werden auch die offenen geschlossen und die Abtastung beendet.
+     */
+    private void drainTalkLog(boolean finalDrain) {
+        if (!config.trackSpeakers() || page == null) return;
+        try {
+            Object result = page.evaluate(
+                    "(f) => window.__BBB_TALK_LOG_DRAIN__ ? window.__BBB_TALK_LOG_DRAIN__(f) : []", finalDrain);
+            if (!(result instanceof List<?> intervals)) return;
+            for (Object o : intervals) {
+                if (!(o instanceof Map<?, ?> m)) continue;
+                String name = String.valueOf(m.get("name")).replace('\t', ' ').replace('\n', ' ').trim();
+                if (name.isEmpty() || !(m.get("start") instanceof Number start)
+                        || !(m.get("end") instanceof Number end)) continue;
+                talkLog.append(start).append('\t').append(end).append('\t').append(name).append('\n');
+            }
+        } catch (RuntimeException e) {
+            log.debug("Sprechanzeige nicht abholbar: {}", e.getMessage());
+        }
+    }
+
+    /** Sprechprotokoll an der Aufnahme speichern (vor der Finalisierung). */
+    private void persistTalkLog(UUID recordingId) {
+        if (talkLog.isEmpty()) return;
+        String logText = talkLog.toString();
+        long names = logText.lines().map(l -> l.substring(l.lastIndexOf('\t') + 1)).distinct().count();
+        log.info("Sprechanzeige protokolliert: {} Intervalle von {} Person(en).", logText.lines().count(), names);
+        recordingService.saveTalkLog(recordingId, logText);
+        talkLog.setLength(0);
     }
 
     private void tickWhileIdle(ParticipantOps.AttendeeInfo info, int tracks) {
@@ -773,6 +823,7 @@ public class BotInstance {
             silentMinutesInRow = 0;
             recordedBytes = 0;
             log.info("Audio-Zustand bei Aufnahmestart: {}", joiner.audioState(page).summary());
+            startTalkLog();
 
             if (config.sendChatWarning()) {
                 // Anonymer Stopp-Link: nur sinnvoll, wenn er auch im Chat steht.
@@ -820,6 +871,7 @@ public class BotInstance {
                 recId, reason, discard, (System.currentTimeMillis() - recordingStartedAtMs) / 1000,
                 recordedBytes / 1024, segmentSeq + 1);
         stoppingRecording = true;
+        drainTalkLog(true);
         try {
             recorder.stop();
             // Auf letzten Chunk warten; page.waitForTimeout pumpt dabei die
@@ -869,6 +921,8 @@ public class BotInstance {
         }
 
         clearRecordingState();
+        if (!discard) persistTalkLog(recId);
+        talkLog.setLength(0);
         recordingService.finalizeRecording(recId, pLog, chatLog, discard, reason);
         if (!shuttingDown && status == BotSession.Status.RECORDING) {
             updateStatus(BotSession.Status.JOINED, null);

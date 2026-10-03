@@ -398,6 +398,36 @@ export const updateParticipant = createAsyncThunk<
   }
 });
 
+/** Namensvorschlag eines Sprechers übernehmen oder verwerfen. */
+export const resolveNameSuggestion = createAsyncThunk<
+  ParticipantView,
+  { recordingId: string; participantId: string; accept: boolean },
+  { rejectValue: string }
+>('recordings/resolveNameSuggestion', async ({ recordingId, participantId, accept }, { rejectWithValue }) => {
+  try {
+    const base = `/api/recordings/${recordingId}/participants/${participantId}/suggestion`;
+    return await api<ParticipantView>(accept ? `${base}/accept` : base, {
+      method: accept ? 'POST' : 'DELETE',
+    });
+  } catch (e) {
+    return rejectWithValue(errorMessage(e));
+  }
+});
+
+/** Namen für alle noch unbenannten Sprecher (erneut) vorschlagen lassen. */
+export const suggestSpeakerNames = createAsyncThunk<ParticipantView[], string, { rejectValue: string }>(
+  'recordings/suggestSpeakerNames',
+  async (recordingId, { rejectWithValue }) => {
+    try {
+      return await api<ParticipantView[]>(`/api/recordings/${recordingId}/participants/suggest`, {
+        method: 'POST',
+      });
+    } catch (e) {
+      return rejectWithValue(errorMessage(e));
+    }
+  },
+);
+
 export const fetchTranscript = createAsyncThunk<TranscriptView, string, { rejectValue: string }>(
   'recordings/fetchTranscript',
   async (id, { rejectWithValue }) => {
@@ -730,6 +760,18 @@ const recordingsSlice = createSlice({
           state.detail.participants = state.detail.participants.map((p) =>
             p.id === action.payload.id ? action.payload : p,
           );
+        }
+      })
+      .addCase(resolveNameSuggestion.fulfilled, (state, action) => {
+        if (state.detail) {
+          state.detail.participants = state.detail.participants.map((p) =>
+            p.id === action.payload.id ? action.payload : p,
+          );
+        }
+      })
+      .addCase(suggestSpeakerNames.fulfilled, (state, action) => {
+        if (state.detail) {
+          state.detail.participants = action.payload;
         }
       })
       .addCase(fetchTranscript.pending, (state) => {

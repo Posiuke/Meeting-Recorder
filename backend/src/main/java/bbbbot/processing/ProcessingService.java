@@ -52,6 +52,7 @@ public class ProcessingService {
     private final SummaryService summaryService;
     private final bbbbot.llm.TranscriptCorrectionService correctionService;
     private final ParticipantService participantService;
+    private final bbbbot.recording.SpeakerNamingService speakerNaming;
     private final SettingsService settings;
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
@@ -65,7 +66,8 @@ public class ProcessingService {
                              RecordingSegmentRepo segmentRepo, SummaryRepo summaryRepo,
                              WhisperClient whisper, SummaryService summaryService,
                              bbbbot.llm.TranscriptCorrectionService correctionService,
-                             ParticipantService participantService, SettingsService settings) {
+                             ParticipantService participantService,
+                             bbbbot.recording.SpeakerNamingService speakerNaming, SettingsService settings) {
         this.jobRepo = jobRepo;
         this.recordingRepo = recordingRepo;
         this.segmentRepo = segmentRepo;
@@ -74,6 +76,7 @@ public class ProcessingService {
         this.summaryService = summaryService;
         this.correctionService = correctionService;
         this.participantService = participantService;
+        this.speakerNaming = speakerNaming;
         this.settings = settings;
     }
 
@@ -265,12 +268,15 @@ public class ProcessingService {
             // LLM der Ausreisser war, sind zwei verschiedene Baustellen.
             long sttStart = System.nanoTime();
             int transcribed = 0;
+            // Haelt die Sprecher ueber alle Segmente dieser Aufnahme stabil
+            // (Stimmproben fuer die Cloud-Diarisierung, siehe SpeakerContext).
+            WhisperClient.SpeakerContext speakers = new WhisperClient.SpeakerContext();
             for (RecordingSegment segment : segments) {
                 if (segment.getStatus() != RecordingSegment.Status.READY) continue;
                 if (!redoTranscripts
                         && segment.getTranscriptText() != null && !segment.getTranscriptText().isBlank()) continue;
                 WhisperClient.TranscriptionResult result =
-                        whisper.transcribe(Path.of(segment.getMp3Path()), diarize, sttLanguage);
+                        whisper.transcribe(Path.of(segment.getMp3Path()), diarize, sttLanguage, speakers);
                 if (result.success()) {
                     segment.setTranscriptText(result.text());
                     segmentRepo.save(segment);
@@ -311,6 +317,16 @@ public class ProcessingService {
             // Erkannte Diarisierungs-Sprecher als editierbare Teilnehmer festhalten
             // (die Glaettung laesst die Sprecherzeilen unberuehrt)
             participantService.syncFromEntries(recording.getId(), TranscriptAssembler.assemble(segments));
+            // Namensvorschlaege nur nach frischer Transkription - sonst haben sich
+            // die Sprecher nicht geaendert. Nie fatal: ohne Vorschlag bleibt es
+            // bei "Sprecher 1/2/...".
+            if (transcribed > 0 && diarize && speakerNaming.isEnabled()) {
+                try {
+                    speakerNaming.suggest(recording, segments);
+                } catch (RuntimeException e) {
+                    log.warn("Namensvorschlaege fuer Aufnahme {} fehlgeschlagen: {}", recording.getId(), e.getMessage());
+                }
+            }
             writeTranscriptFiles(recording, segments);
 
             // Zwei-Schritt-Auswertung: nach der Transkription stoppen, die

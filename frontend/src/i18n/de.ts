@@ -900,6 +900,19 @@ export const de = {
     participantsEmpty:
       'Keine Sprecher erkannt. Sprecher werden bei aktivierter Sprechererkennung (Diarisierung) nach der Transkription automatisch in die Teilnehmerliste übernommen.',
     participantsLogHeading: 'Sitzungs-Protokoll',
+    suggestNames: 'Namen vorschlagen',
+    suggestingNames: 'Schlägt Namen vor…',
+    suggestNamesHint:
+      'Ermittelt für alle noch unbenannten Sprecher einen Namensvorschlag – bei Bot-Aufnahmen aus der Sprechanzeige von BBB, sonst per KI aus dem Gespräch.',
+    suggestionLabel: 'Vorschlag: {{name}}',
+    suggestionAccept: 'Übernehmen',
+    suggestionDismiss: 'Verwerfen',
+    suggestionConfidenceHIGH: 'sicher',
+    suggestionConfidenceMEDIUM: 'wahrscheinlich',
+    suggestionConfidenceLOW: 'unsicher',
+    suggestionSourceBBB: 'Sprechanzeige',
+    suggestionSourceLLM: 'KI',
+    suggestionsNone: 'Für keinen weiteren Sprecher ließ sich ein Name ableiten.',
     jobKindTranscription: 'Transkription',
     jobKindAnalysis: 'Auswertung',
     jobQueued: '{{kind}} eingereiht…',
@@ -1087,6 +1100,21 @@ export const de = {
       'Aufnahme des eigenen Bildschirms direkt im Browser der Nutzer. Setzt eine HTTPS-Verbindung und Chrome oder Edge voraus – Einzelheiten in docs/SCREEN_CAPTURE.md.',
     groupBot: 'Bot-Verhalten',
     groupCleanup: 'Aufräumen',
+    groupSpeakers: 'Sprecher-Namen',
+    groupSpeakersNote:
+      'Ordnet erkannten Sprechern automatisch Namen zu. Bei Bot-Aufnahmen über die Sprechanzeige von BBB, sonst per KI aus dem Gespräch. Voraussetzung ist die Sprechererkennung (whisper → diarize).',
+    boolTrue: 'Ja',
+    boolFalse: 'Nein',
+    fieldRequired: 'Darf nicht leer sein.',
+    fieldInteger: 'Bitte eine ganze Zahl eingeben.',
+    fieldNumber: 'Bitte eine Zahl eingeben.',
+    fieldMin: 'Mindestens {{min}}.',
+    fieldMax: 'Höchstens {{max}}.',
+    fieldUrl: 'Bitte eine Adresse mit http:// oder https:// eingeben.',
+    fieldTime: 'Bitte eine Uhrzeit im Format HH:MM eingeben.',
+    fieldChoice: 'Bitte einen Wert aus der Liste wählen.',
+    fieldRange: 'Erlaubt: {{min}} bis {{max}}',
+    fixInvalid: 'Bitte zuerst die markierten Felder korrigieren.',
     groupOther: 'Sonstige',
     ocrAuto: 'auto – OCR nur, wenn kaum Text eingebettet ist',
     ocrNone: 'no_ocr – keine OCR, nur eingebetteter Text',
@@ -1152,6 +1180,16 @@ export const de = {
     usersRunningNone: 'Derzeit läuft keine Aufnahme – Wartungsarbeiten sind unkritisch.',
     usersUntitled: 'ohne Titel',
     keyHelp: {
+      whisperDiarize:
+        'Sprechererkennung freischalten: Nutzer können sie dann pro Aufnahme, Upload und Bot wählen. Lokal braucht sie WhisperX, in der Cloud das Modell aus openaiDiarizeModel.',
+      whisperOpenaiDiarizeModel:
+        'Cloud-Modell für Aufnahmen mit Sprechererkennung (z.B. gpt-4o-transcribe-diarize). Aufnahmen ohne Sprechererkennung nutzen weiter openaiModel.',
+      speakersNameSuggestions:
+        'Nach der Transkription Namen für die erkannten Sprecher vorschlagen. Aus = Sprecher heißen „Sprecher 1, 2, …“, bis jemand sie umbenennt.',
+      speakersAutoApply:
+        'Vorschläge mit hoher Sicherheit sofort als Namen übernehmen statt sie nur vorzuschlagen. Unsichere Vorschläge müssen immer bestätigt werden.',
+      speakersBbbActivity:
+        'Der Bot protokolliert während der Aufnahme die Sprechanzeige von BBB (wer gerade spricht). Das ist bei Bot-Aufnahmen die zuverlässigste Quelle für Namen.',
       botWarnMessage:
         'Hinweis, den der Bot beim Aufnahmestart in den Chat schreibt. Platzhalter: ${STOP} (Befehl zum Verwerfen), ${START} (Befehl zum Starten), ${STOP_URL} (anonymer Stopp-Link, falls eingeschaltet). Fehlt ${STOP_URL}, hängt der Bot den Link als eigenen Satz an.',
       botAnonymousStopEnabled:

@@ -20,7 +20,9 @@ public record BotConfig(
         int segmentMinutes,
         long minAudioBytes,
         boolean anonymousStopEnabled,
-        String publicUrl
+        String publicUrl,
+        // Sprechanzeige von BBB mitprotokollieren (Namensvorschlaege fuer Sprecher)
+        boolean trackSpeakers
 ) {
     public static BotConfig fromSettings(SettingsService settings) {
         return new BotConfig(
@@ -37,7 +39,9 @@ public record BotConfig(
                 settings.getInt(SettingsService.RECORDING_SEGMENT_MINUTES),
                 settings.getLong(SettingsService.RECORDING_MIN_AUDIO_BYTES),
                 settings.getBool(SettingsService.BOT_ANONYMOUS_STOP_ENABLED),
-                settings.get(SettingsService.BOT_PUBLIC_URL)
+                settings.get(SettingsService.BOT_PUBLIC_URL),
+                settings.getBool(SettingsService.SPEAKERS_BBB_ACTIVITY)
+                        && settings.getBool(SettingsService.SPEAKERS_NAME_SUGGESTIONS)
         );
     }
 
@@ -53,7 +57,7 @@ public record BotConfig(
         return new BotConfig(chatStartCommand, chatStopCommand, sendChatWarning, warnMessage,
                 recordMinOthers, checkIntervalMs, autoReconnect, reconnectMaxAttempts,
                 reconnectBackoffBaseMs, reconnectBackoffFactor, segmentMinutes, minAudioBytes,
-                anonymousStopEnabled, appOrigin);
+                anonymousStopEnabled, appOrigin, trackSpeakers);
     }
 
     /** Platzhalter fuer den anonymen Stopp-Link in der Warnmeldung. */

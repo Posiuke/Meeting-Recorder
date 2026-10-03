@@ -77,6 +77,14 @@ public class Recording {
     @Column(columnDefinition = "text")
     private String chatLog;
 
+    /**
+     * Sprechanzeige von BBB waehrend der Aufnahme (nur Bot-Aufnahmen): eine
+     * Zeile je Intervall "start<TAB>ende<TAB>Name", Sekunden ab Aufnahmestart.
+     * Grundlage fuer Namensvorschlaege, siehe SpeakerNamingService.
+     */
+    @Column(columnDefinition = "text")
+    private String talkLog;
+
     private Long durationMs;
 
     private String discardReason;
@@ -179,6 +187,8 @@ public class Recording {
     public void setParticipantsLog(String participantsLog) { this.participantsLog = participantsLog; }
     public String getChatLog() { return chatLog; }
     public void setChatLog(String chatLog) { this.chatLog = chatLog; }
+    public String getTalkLog() { return talkLog; }
+    public void setTalkLog(String talkLog) { this.talkLog = talkLog; }
     public Long getDurationMs() { return durationMs; }
     public void setDurationMs(Long durationMs) { this.durationMs = durationMs; }
     public String getDiscardReason() { return discardReason; }
