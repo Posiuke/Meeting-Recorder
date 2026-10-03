@@ -6,6 +6,8 @@ import {
   fetchAuthConfig,
   fetchProcessingQueue,
   fetchSettings,
+  createLocalUser,
+  resetUserPassword,
   retryProcessingJob,
   saveAuthConfig,
   saveSettings,
@@ -825,6 +827,185 @@ function minutesSince(iso: string): number {
   return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
 }
 
+/** Mindestlänge lokaler Passwörter – wie im Backend (AuthService.MIN_PASSWORD_LENGTH). */
+const MIN_PASSWORD_LENGTH = 8;
+
+/** Zufallspasswort ohne leicht verwechselbare Zeichen (0/O, 1/l/I) zum Weitergeben. */
+function generatePassword(length = 14): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_!';
+  const random = new Uint32Array(length);
+  crypto.getRandomValues(random);
+  return Array.from(random, (n) => alphabet[n % alphabet.length]).join('');
+}
+
+/**
+ * Formular „Lokalen Benutzer anlegen“: für Nutzer ohne LDAP/Active Directory.
+ * Das Initialpasswort gibt der Admin weiter; beim ersten Login muss es
+ * geändert werden.
+ */
+function CreateLocalUserForm() {
+  const { t } = useI18n();
+  const dispatch = useAppDispatch();
+  const [open, setOpen] = useState(false);
+  const [username, setUsername] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [admin, setAdmin] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<{ username: string; password: string } | null>(null);
+
+  const usernameValid = /^[A-Za-z0-9._@-]{2,64}$/.test(username.trim());
+  const passwordValid = password.length >= MIN_PASSWORD_LENGTH;
+
+  const reset = () => {
+    setUsername('');
+    setDisplayName('');
+    setEmail('');
+    setPassword('');
+    setAdmin(false);
+  };
+
+  const handleSubmit = async () => {
+    if (!usernameValid || !passwordValid) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const user = await dispatch(
+        createLocalUser({ username: username.trim(), displayName, email, password, admin }),
+      ).unwrap();
+      setCreated({ username: user.username, password });
+      reset();
+      setOpen(false);
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="admin-create-user">
+      {created && (
+        <Alert kind="success">
+          {t('admin.usersCreated', { username: created.username })}{' '}
+          <code className="admin-password">{created.password}</code>
+          <button type="button" className="link-button" onClick={() => setCreated(null)}>
+            {t('admin.usersCreatedDismiss')}
+          </button>
+        </Alert>
+      )}
+      {!open ? (
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={() => {
+            setOpen(true);
+            setCreated(null);
+            if (!password) setPassword(generatePassword());
+          }}
+        >
+          {t('admin.usersCreateOpen')}
+        </button>
+      ) : (
+        <form
+          className="admin-create-user-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleSubmit();
+          }}
+        >
+          <h3>{t('admin.usersCreateTitle')}</h3>
+          <p className="muted">{t('admin.usersCreateHint')}</p>
+          {error && <Alert kind="error">{error}</Alert>}
+          <div className="form-row">
+            <div className={`form-field${username && !usernameValid ? ' field-invalid' : ''}`}>
+              <label htmlFor="new-user-name">{t('admin.usersUsername')}</label>
+              <input
+                id="new-user-name"
+                value={username}
+                autoComplete="off"
+                maxLength={64}
+                required
+                onChange={(e) => setUsername(e.target.value)}
+              />
+              {username && !usernameValid && (
+                <span className="field-error">{t('admin.usersUsernameRule')}</span>
+              )}
+            </div>
+            <div className="form-field">
+              <label htmlFor="new-user-display">{t('admin.usersDisplayName')}</label>
+              <input
+                id="new-user-display"
+                value={displayName}
+                maxLength={200}
+                placeholder={username.trim()}
+                onChange={(e) => setDisplayName(e.target.value)}
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="new-user-email">{t('admin.usersEmail')}</label>
+              <input
+                id="new-user-email"
+                type="email"
+                value={email}
+                maxLength={200}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className={`form-field${password && !passwordValid ? ' field-invalid' : ''}`}>
+              <label htmlFor="new-user-password">{t('admin.usersInitialPassword')}</label>
+              <div className="model-picker">
+                <input
+                  id="new-user-password"
+                  value={password}
+                  autoComplete="new-password"
+                  spellCheck={false}
+                  required
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button type="button" className="btn btn-sm" onClick={() => setPassword(generatePassword())}>
+                  {t('admin.usersPasswordGenerate')}
+                </button>
+              </div>
+              <span className={password && !passwordValid ? 'field-error' : 'field-hint'}>
+                {t('admin.usersPasswordRule', { min: MIN_PASSWORD_LENGTH })}
+              </span>
+            </div>
+          </div>
+          <label className="checkbox-field">
+            <input type="checkbox" checked={admin} onChange={(e) => setAdmin(e.target.checked)} />
+            {t('admin.usersCreateAdmin')}
+          </label>
+          <div className="settings-group-footer">
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={busy || !usernameValid || !passwordValid}
+            >
+              {busy ? t('common.saving') : t('admin.usersCreateSubmit')}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={busy}
+              onClick={() => {
+                setOpen(false);
+                setError(null);
+              }}
+            >
+              {t('common.cancel')}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
 function UsersTab() {
   const { t } = useI18n();
   const dispatch = useAppDispatch();
@@ -832,6 +1013,9 @@ function UsersTab() {
   const { users, usersLoading, usersError } = useAppSelector((s) => s.admin);
   const [error, setError] = useState<string | null>(null);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const [resetUserId, setResetUserId] = useState<string | null>(null);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetDone, setResetDone] = useState<{ username: string; password: string } | null>(null);
   const [refreshedAt, setRefreshedAt] = useState<string>(() => new Date().toISOString());
 
   // Der Zustand ist nur brauchbar, wenn er aktuell ist: Die Liste lädt sich
@@ -865,6 +1049,22 @@ function UsersTab() {
     setBusyUserId(userId);
     try {
       await dispatch(setUserAdmin({ userId, admin })).unwrap();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusyUserId(null);
+    }
+  };
+
+  const handleReset = async (userId: string, username: string) => {
+    if (resetPassword.length < MIN_PASSWORD_LENGTH) return;
+    setError(null);
+    setBusyUserId(userId);
+    try {
+      await dispatch(resetUserPassword({ userId, password: resetPassword })).unwrap();
+      setResetDone({ username, password: resetPassword });
+      setResetUserId(null);
+      setResetPassword('');
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -911,6 +1111,17 @@ function UsersTab() {
       <div className="card">
         {usersError && <Alert kind="error">{usersError}</Alert>}
         {error && <Alert kind="error">{error}</Alert>}
+        {resetDone && (
+          <Alert kind="success">
+            {t('admin.usersResetDone', { username: resetDone.username })}{' '}
+            <code className="admin-password">{resetDone.password}</code>
+            <button type="button" className="link-button" onClick={() => setResetDone(null)}>
+              {t('admin.usersCreatedDismiss')}
+            </button>
+          </Alert>
+        )}
+
+        <CreateLocalUserForm />
 
         <div className="admin-users-head">
           <span className="muted">
@@ -947,7 +1158,71 @@ function UsersTab() {
             <tbody>
               {users.map((user) => (
                 <tr key={user.id}>
-                  <td>{user.username}</td>
+                  <td>
+                    {user.username}
+                    <div className="admin-user-account">
+                      <span className={`badge ${user.local ? 'badge-blue' : 'badge-gray'}`}>
+                        {user.local ? t('admin.usersTypeLocal') : t('admin.usersTypeLdap')}
+                      </span>
+                      {user.local && user.mustChangePassword && (
+                        <span className="muted"> {t('admin.usersMustChange')}</span>
+                      )}
+                    </div>
+                    {user.local &&
+                      user.id !== me?.id &&
+                      (resetUserId === user.id ? (
+                        <form
+                          className="admin-reset-form"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            void handleReset(user.id, user.username);
+                          }}
+                        >
+                          <input
+                            value={resetPassword}
+                            aria-label={t('admin.usersInitialPassword')}
+                            autoComplete="new-password"
+                            spellCheck={false}
+                            onChange={(e) => setResetPassword(e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => setResetPassword(generatePassword())}
+                          >
+                            {t('admin.usersPasswordGenerate')}
+                          </button>
+                          <button
+                            type="submit"
+                            className="btn btn-primary btn-sm"
+                            disabled={
+                              busyUserId === user.id || resetPassword.length < MIN_PASSWORD_LENGTH
+                            }
+                          >
+                            {t('admin.usersResetSubmit')}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => setResetUserId(null)}
+                          >
+                            {t('common.cancel')}
+                          </button>
+                        </form>
+                      ) : (
+                        <button
+                          type="button"
+                          className="link-button"
+                          onClick={() => {
+                            setResetUserId(user.id);
+                            setResetPassword(generatePassword());
+                            setResetDone(null);
+                          }}
+                        >
+                          {t('admin.usersResetPassword')}
+                        </button>
+                      ))}
+                  </td>
                   <td>{user.displayName}</td>
                   <td>{user.email ?? '–'}</td>
                   <td>

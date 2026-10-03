@@ -37,6 +37,8 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/admin")
 public class AdminController {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AdminController.class);
+
     private final SettingsService settings;
     private final AuthSettingsService authSettings;
     private final LdapAuthenticator ldap;
@@ -47,13 +49,15 @@ public class AdminController {
     private final FfmpegService ffmpeg;
     private final bbbbot.docs.TikaClient tika;
     private final bbbbot.processing.ProcessingQueueService queue;
+    private final bbbbot.auth.AuthService authService;
 
     public AdminController(SettingsService settings, AuthSettingsService authSettings,
                            LdapAuthenticator ldap, AppUserRepo userRepo,
                            RecordingRepo recordingRepo,
                            LlmClient llm, WhisperClient whisper, FfmpegService ffmpeg,
                            bbbbot.docs.TikaClient tika,
-                           bbbbot.processing.ProcessingQueueService queue) {
+                           bbbbot.processing.ProcessingQueueService queue,
+                           bbbbot.auth.AuthService authService) {
         this.settings = settings;
         this.authSettings = authSettings;
         this.ldap = ldap;
@@ -64,6 +68,7 @@ public class AdminController {
         this.ffmpeg = ffmpeg;
         this.tika = tika;
         this.queue = queue;
+        this.authService = authService;
     }
 
     @GetMapping("/settings")
@@ -231,6 +236,39 @@ public class AdminController {
                 .sorted(Comparator.comparing(AppUser::getUsername, String.CASE_INSENSITIVE_ORDER))
                 .map(u -> adminView(u, running))
                 .toList();
+    }
+
+    /** Lokales Konto anlegen - fuer Nutzer ohne LDAP/Active Directory. */
+    @PostMapping("/users")
+    public Dtos.AdminUserView createLocalUser(@RequestBody Dtos.CreateLocalUserRequest request) {
+        try {
+            AppUser user = authService.createLocalUser(request.username(), request.displayName(),
+                    request.email(), request.password(), request.admin());
+            log.info("Lokales Konto '{}' angelegt von {} (Admin={})",
+                    user.getUsername(), CurrentUser.get().getUsername(), user.isAdmin());
+            return adminView(user, runningRecordingsByOwner());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        }
+    }
+
+    /** Passwort eines lokalen Kontos neu setzen; der Nutzer muss es beim naechsten Login aendern. */
+    @PutMapping("/users/{userId}/password")
+    public Dtos.AdminUserView resetPassword(@PathVariable UUID userId,
+                                            @RequestBody Dtos.ResetPasswordRequest request) {
+        try {
+            AppUser user = authService.resetPassword(userId, request.password());
+            log.info("Passwort von '{}' zurueckgesetzt von {}", user.getUsername(), CurrentUser.get().getUsername());
+            return adminView(user, runningRecordingsByOwner());
+        } catch (java.util.NoSuchElementException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        }
     }
 
     @PutMapping("/users/{userId}/admin")

@@ -129,6 +129,35 @@ export const setUserAdmin = createAsyncThunk<
   }
 });
 
+/** Lokales Konto anlegen (ohne LDAP); das Initialpasswort muss beim ersten Login geändert werden. */
+export const createLocalUser = createAsyncThunk<
+  AdminUserView,
+  { username: string; displayName: string; email: string; password: string; admin: boolean },
+  { rejectValue: string }
+>('admin/createLocalUser', async (body, { rejectWithValue }) => {
+  try {
+    return await api<AdminUserView>('/api/admin/users', { method: 'POST', body });
+  } catch (e) {
+    return rejectWithValue(errorMessage(e));
+  }
+});
+
+/** Passwort eines lokalen Kontos neu setzen (vergessenes Passwort). */
+export const resetUserPassword = createAsyncThunk<
+  AdminUserView,
+  { userId: string; password: string },
+  { rejectValue: string }
+>('admin/resetUserPassword', async ({ userId, password }, { rejectWithValue }) => {
+  try {
+    return await api<AdminUserView>(`/api/admin/users/${userId}/password`, {
+      method: 'PUT',
+      body: { password },
+    });
+  } catch (e) {
+    return rejectWithValue(errorMessage(e));
+  }
+});
+
 /**
  * Zustand der Verarbeitungs-Warteschlange. Lädt sich nach, solange der Tab
  * offen ist – ein Betriebsbild ist nur brauchbar, wenn es aktuell ist.
@@ -233,6 +262,17 @@ const adminSlice = createSlice({
         if (idx >= 0) {
           state.users[idx] = action.payload;
         }
+      })
+      .addCase(resetUserPassword.fulfilled, (state, action) => {
+        const idx = state.users.findIndex((u) => u.id === action.payload.id);
+        if (idx >= 0) {
+          state.users[idx] = action.payload;
+        }
+      })
+      .addCase(createLocalUser.fulfilled, (state, action) => {
+        state.users = [...state.users, action.payload].sort((a, b) =>
+          a.username.localeCompare(b.username, undefined, { sensitivity: 'base' }),
+        );
       });
   },
 });

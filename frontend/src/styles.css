@@ -2757,3 +2757,43 @@ tbody tr:hover {
   flex-wrap: wrap;
   gap: 0.5rem;
 }
+
+/* ===== Lokale Benutzer (Admin) ===== */
+.admin-create-user {
+  margin-bottom: 1rem;
+}
+
+.admin-create-user-form {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+}
+
+.admin-create-user-form h3 {
+  margin: 0 0 0.25rem;
+}
+
+.admin-password {
+  user-select: all;
+  font-family: ui-monospace, 'SF Mono', Consolas, 'Liberation Mono', monospace;
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  margin-right: 0.5rem;
+}
+
+.admin-user-account {
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+}
+
+.admin-reset-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+}
+
+.admin-reset-form input {
+  max-width: 12rem;
+}

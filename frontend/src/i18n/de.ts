@@ -1077,7 +1077,7 @@ export const de = {
     testAfterSave: 'Zum Testen zuerst speichern.',
     groupWhisper: 'Spracherkennung (Whisper)',
     groupWhisperNote:
-      'provider „local" nutzt den Whisper-Server im Intranet (Einstellung url). provider „openai" nutzt eine OpenAI-kompatible Cloud-API (Einstellungen openaiUrl, openaiApiKey, openaiModel) – z. B. OpenAI oder Groq. Achtung: Bei Cloud-APIs verlassen die Audiodaten das eigene Netz; Sprechererkennung (Diarisierung) wird dort nicht unterstützt.',
+      'provider „local" nutzt den Whisper-Server im Intranet (Einstellung url). provider „openai" nutzt eine OpenAI-kompatible Cloud-API (Einstellungen openaiUrl, openaiApiKey, openaiModel) – z. B. OpenAI oder Groq. Achtung: Bei Cloud-APIs verlassen die Audiodaten das eigene Netz. Sprechererkennung (diarize) braucht lokal WhisperX, in der Cloud ein Diarisierungs-Modell (openaiDiarizeModel, bei OpenAI gpt-4o-transcribe-diarize).',
     groupLlm: 'KI-Modell (LLM)',
     groupLlmNote:
       'provider „local" nutzt den eigenen LLM-Server (baseUrl, apiKey, model). provider „openai" nutzt eine öffentliche Cloud-API (openaiUrl, openaiApiKey, openaiModel) – das Modell wird aus der Liste des Anbieters gewählt („Modelle abrufen"). Neben OpenAI (https://api.openai.com/v1) gehen auch kompatible Anbieter, z. B. Groq https://api.groq.com/openai/v1 oder Mistral https://api.mistral.ai/v1. Parameter, die ein Modell ablehnt, lässt der Bot von selbst weg. Achtung: Bei Cloud-APIs verlassen Transkript und Chat-Protokoll das eigene Netz.',
@@ -1158,6 +1158,24 @@ export const de = {
     usersEmail: 'E-Mail',
     usersAdmin: 'Administrator',
     usersYourself: '(Sie selbst)',
+    usersCreateOpen: 'Lokalen Benutzer anlegen',
+    usersCreateTitle: 'Lokalen Benutzer anlegen',
+    usersCreateHint:
+      'Für Personen ohne LDAP-/AD-Konto. Das Initialpasswort geben Sie weiter – beim ersten Login muss es geändert werden.',
+    usersCreateAdmin: 'Administrator-Rechte',
+    usersCreateSubmit: 'Benutzer anlegen',
+    usersCreated: 'Benutzer „{{username}}“ angelegt. Initialpasswort zum Weitergeben:',
+    usersCreatedDismiss: 'Ausblenden',
+    usersUsernameRule: '2–64 Zeichen: Buchstaben, Ziffern und . _ @ - (keine Leerzeichen).',
+    usersInitialPassword: 'Initialpasswort',
+    usersPasswordGenerate: 'Zufällig erzeugen',
+    usersPasswordRule: 'Mindestens {{min}} Zeichen.',
+    usersTypeLocal: 'Lokal',
+    usersTypeLdap: 'LDAP',
+    usersMustChange: 'Passwortwechsel ausstehend',
+    usersResetPassword: 'Passwort zurücksetzen',
+    usersResetSubmit: 'Setzen',
+    usersResetDone: 'Neues Passwort für „{{username}}“ (muss beim nächsten Login geändert werden):',
     usersStatus: 'Status',
     usersStatusHelp:
       'Die Anmeldung ist zustandslos (Token), deshalb zählt hier die letzte Anfrage aus dem Frontend: „Angemeldet" heißt Aktivität in den letzten 5 Minuten. Zugriffe über API-Schlüssel bleiben unberücksichtigt.',

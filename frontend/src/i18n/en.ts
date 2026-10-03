@@ -1051,7 +1051,7 @@ export const en: typeof de = {
     testAfterSave: 'Please save before testing.',
     groupWhisper: 'Speech recognition (Whisper)',
     groupWhisperNote:
-      'provider "local" uses the Whisper server on the intranet (setting url). provider "openai" uses an OpenAI-compatible cloud API (settings openaiUrl, openaiApiKey, openaiModel) – e.g. OpenAI or Groq. Caution: with cloud APIs the audio data leaves your own network; speaker recognition (diarisation) is not supported there.',
+      'provider "local" uses the Whisper server on the intranet (setting url). provider "openai" uses an OpenAI-compatible cloud API (settings openaiUrl, openaiApiKey, openaiModel) – e.g. OpenAI or Groq. Caution: with cloud APIs the audio data leaves your own network. Speaker recognition (diarize) needs WhisperX locally and a diarisation model in the cloud (openaiDiarizeModel, gpt-4o-transcribe-diarize at OpenAI).',
     groupLlm: 'AI model (LLM)',
     groupLlmNote:
       'provider "local" uses your own LLM server (baseUrl, apiKey, model). provider "openai" uses a public cloud API (openaiUrl, openaiApiKey, openaiModel) – the model is picked from the provider\'s list ("Fetch models"). Besides OpenAI (https://api.openai.com/v1), compatible providers work too, e.g. Groq https://api.groq.com/openai/v1 or Mistral https://api.mistral.ai/v1. Parameters a model rejects are dropped automatically. Caution: with cloud APIs the transcript and chat log leave your own network.',
@@ -1131,6 +1131,24 @@ export const en: typeof de = {
     usersEmail: 'Email',
     usersAdmin: 'Administrator',
     usersYourself: '(yourself)',
+    usersCreateOpen: 'Create local user',
+    usersCreateTitle: 'Create local user',
+    usersCreateHint:
+      'For people without an LDAP/AD account. Pass the initial password on – it must be changed at the first login.',
+    usersCreateAdmin: 'Administrator rights',
+    usersCreateSubmit: 'Create user',
+    usersCreated: 'User “{{username}}” created. Initial password to pass on:',
+    usersCreatedDismiss: 'Hide',
+    usersUsernameRule: '2–64 characters: letters, digits and . _ @ - (no spaces).',
+    usersInitialPassword: 'Initial password',
+    usersPasswordGenerate: 'Generate',
+    usersPasswordRule: 'At least {{min}} characters.',
+    usersTypeLocal: 'Local',
+    usersTypeLdap: 'LDAP',
+    usersMustChange: 'password change pending',
+    usersResetPassword: 'Reset password',
+    usersResetSubmit: 'Set',
+    usersResetDone: 'New password for “{{username}}” (must be changed at the next login):',
     usersStatus: 'Status',
     usersStatusHelp:
       'Sign-in is stateless (token based), so what counts here is the last request from the frontend: “Signed in” means activity within the last 5 minutes. Access via API keys is not counted.',

@@ -62,6 +62,13 @@ public final class Dtos {
         }
     }
 
+    /** Lokales Konto anlegen (Admin): Initialpasswort muss beim ersten Login geaendert werden. */
+    public record CreateLocalUserRequest(String username, String displayName, String email,
+                                         String password, boolean admin) {}
+
+    /** Neues Passwort fuer ein lokales Konto (Admin-Reset). */
+    public record ResetPasswordRequest(String password) {}
+
     /** Oberflaechensprache des angemeldeten Nutzers setzen. */
     public record LanguageRequest(String language) {}
 
