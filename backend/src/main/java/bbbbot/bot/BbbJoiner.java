@@ -67,6 +67,14 @@ public class BbbJoiner {
             "button[aria-label*=\"Audio starten\" i]"
     );
 
+    // Toolbar-Button "Mikrofon stummschalten" - nur sichtbar, wenn der Bot mit
+    // (offenem) Mikrofon statt "Nur zuhoeren" im Audio ist. Bewusst ohne
+    // aria-label-Fallback: "Mute" traefe sonst z.B. den Player eines geteilten
+    // externen Videos, dessen Ton dann in der Aufnahme fehlte.
+    private static final List<String> MUTE_MIC_SELECTORS = List.of(
+            "button[data-test=\"muteMicButton\"]"
+    );
+
     // Kombinierter Wartetreffer: Audio-Auswahl oder fertige Meeting-UI.
     private static final String AUDIO_PROMPT_OR_MEETING_UI =
             "[data-test=\"audioModal\"], button[data-test=\"listenOnlyBtn\"], "
@@ -132,7 +140,26 @@ public class BbbJoiner {
         // Audio-Join, damit die Audio-Auswahl nicht versehentlich geschlossen wird.
         dismissOverlays(page);
 
+        // Ist der Bot mit Mikrofon statt "Nur zuhoeren" im Audio (Mikrofon-Fallback
+        // oder Auto-Join des Servers), sich stummschalten (Issue #30).
+        muteMicrophoneIfOpen(page);
+
         log.info("Join abgeschlossen, Remote-Audio liegt an.");
+    }
+
+    /**
+     * Schaltet das Mikrofon des Bots stumm, falls er mit offenem Mikrofon im
+     * Audio ist. Mehrere Versuche, da die Toolbar kurz nach dem Audio-Join erst
+     * nachzieht. Best-effort.
+     */
+    private void muteMicrophoneIfOpen(Page page) {
+        for (int attempt = 0; attempt < 3; attempt++) {
+            if (tryClickSelectors(page, MUTE_MIC_SELECTORS, "mute-microphone")) {
+                log.warn("Bot war mit offenem Mikrofon statt 'Nur zuhoeren' im Audio - stummgeschaltet.");
+                return;
+            }
+            page.waitForTimeout(1000);
+        }
     }
 
     /**
@@ -371,6 +398,10 @@ public class BbbJoiner {
                 if (Boolean.TRUE.equals(ok)) return;
             } catch (RuntimeException ignored) {
             }
+            // Offener Echo-Test ("Hoeren Sie sich?") auch ausserhalb des Audio-Modals
+            // bestaetigen - sonst haengt der Bot im Echo-Test und "hoert" nur sein
+            // eigenes Fake-Mikrofon statt der Konferenz.
+            tryClickSelectors(page, List.of("button[data-test=\"echoYesBtn\"]"), "echo-confirm");
             // Falls die Audio-Auswahl verspaetet erschien oder ein Klick blockiert
             // wurde: Auswahl erneut treffen, solange das Modal sichtbar ist.
             try {

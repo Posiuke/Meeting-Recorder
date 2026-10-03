@@ -370,9 +370,12 @@ public class BotInstance {
                 "--disable-features=AudioServiceOutOfProcess",
                 "--disable-dev-shm-usage",
                 "--use-fake-ui-for-media-stream",
-                // Fake-Mikrofon (Stille): noetig, damit der Mikrofon-Fallback der
+                // Fake-Mikrofon: noetig, damit der Mikrofon-Fallback der
                 // Audio-Auswahl auch headless/ohne Audiogeraet funktioniert.
-                "--use-fake-device-for-media-stream"
+                "--use-fake-device-for-media-stream",
+                // Ohne Datei piept das Fake-Mikrofon jede Sekunde - im Raum und in
+                // der Aufnahme (Issue #30). Mit der Stille-WAV bleibt es stumm.
+                "--use-file-for-fake-audio-capture=" + SilentMicrophone.wavFile()
         ));
         if (botProps.isInsecureTls()) {
             args.add("--ignore-certificate-errors");
