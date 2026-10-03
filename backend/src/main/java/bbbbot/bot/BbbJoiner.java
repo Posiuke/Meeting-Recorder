@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * UI-basierter BBB-Join (Portierung von src/providers/joinDirect.ts).
@@ -116,12 +117,16 @@ public class BbbJoiner {
         try {
             page.waitForSelector(AUDIO_PROMPT_OR_MEETING_UI,
                     new Page.WaitForSelectorOptions().setTimeout(45_000));
+            log.info("BBB-Oberflaeche geladen: {}", audioState(page).summary());
         } catch (RuntimeException e) {
-            log.warn("Weder Audio-Auswahl noch Meeting-UI innerhalb 45s sichtbar, fahre fort.");
+            log.warn("Weder Audio-Auswahl noch Meeting-UI innerhalb 45s sichtbar, fahre fort: {}",
+                    audioState(page).summary());
         }
 
         if (!chooseAudio(page)) {
-            log.info("Keine Audio-Auswahl geklickt (evtl. Auto-Join).");
+            // Zustand mitloggen: warum kein Button gefunden wurde (Modal noch zu,
+            // Auto-Join laeuft, anderes Theme ...).
+            log.info("Keine Audio-Auswahl geklickt (evtl. Auto-Join): {}", audioState(page).summary());
         }
 
         // Auf Meeting-UI warten (Teilnehmerliste)
@@ -144,7 +149,31 @@ public class BbbJoiner {
         // oder Auto-Join des Servers), sich stummschalten (Issue #30).
         muteMicrophoneIfOpen(page);
 
-        log.info("Join abgeschlossen, Remote-Audio liegt an.");
+        AudioState state = audioState(page);
+        if ("listen-only".equals(state.mode())) {
+            log.info("Join abgeschlossen, Remote-Audio liegt an: {}", state.summary());
+        } else {
+            // Erwartet ist "Nur zuhoeren"; alles andere ist ein Hinweis auf
+            // Raumeinstellungen oder eine geaenderte BBB-Oberflaeche (Issue #30).
+            log.warn("Join abgeschlossen, aber nicht im Modus 'Nur zuhoeren': {}", state.summary());
+        }
+    }
+
+    /** Audio-Zustand der Seite fuer die Diagnose (siehe bot/audioState.js). */
+    public record AudioState(String mode, String summary) {
+        static final AudioState UNKNOWN = new AudioState("unknown", "Audio-Zustand nicht lesbar");
+    }
+
+    public AudioState audioState(Page page) {
+        try {
+            Object result = page.evaluate(BrowserScripts.load(BrowserScripts.AUDIO_STATE));
+            if (result instanceof Map<?, ?> m) {
+                return new AudioState(String.valueOf(m.get("mode")), String.valueOf(m.get("summary")));
+            }
+        } catch (RuntimeException e) {
+            return new AudioState("unknown", "Audio-Zustand nicht lesbar: " + e.getMessage());
+        }
+        return AudioState.UNKNOWN;
     }
 
     /**
@@ -419,8 +448,12 @@ public class BbbJoiner {
             } catch (RuntimeException ignored) {
             }
             iteration++;
+            if (iteration % 10 == 0) {
+                log.info("Noch kein Remote-Audio nach {} s: {}", iteration, audioState(page).summary());
+            }
             page.waitForTimeout(1000);
         }
+        log.warn("Kein Remote-Audio innerhalb {} ms: {}", timeoutMs, audioState(page).summary());
         throw new IllegalStateException("Timeout: keine Remote-Audio-Elemente gefunden.");
     }
 }

@@ -19,7 +19,17 @@
 
   const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
   const dest = ctx.createMediaStreamDestination();
+  // Alle Quellen laufen ueber Mix -> Analyser -> Aufnahme. Der Analyser reicht
+  // das Signal unveraendert durch und liefert die Pegel-Diagnose
+  // (window.__BBB_RECORDER_LEVELS__). Haengt er nur seitlich am Mix ohne
+  // Ausgang, verarbeitet Chrome ihn nicht und misst dauerhaft Stille.
+  const mix = ctx.createGain();
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048;
+  mix.connect(analyser);
+  analyser.connect(dest);
   const connected = new WeakSet();
+  let sourceCount = 0;
 
   const attachAll = () => {
     const remotes = collectRemoteAudioElements();
@@ -28,14 +38,44 @@
       if (!s || connected.has(s)) continue;
       try {
         const src = ctx.createMediaStreamSource(s);
-        src.connect(dest);
+        src.connect(mix);
         connected.add(s);
+        sourceCount++;
       } catch {}
     }
   };
 
   attachAll();
   const pollId = window.setInterval(attachAll, 1500);
+
+  // Pegel-Messung: alle 250 ms RMS und Spitze des Mixes; das Backend holt die
+  // Werte regelmaessig ab (und setzt sie dabei zurueck).
+  const SILENCE_RMS = 0.001; // ca. -60 dBFS
+  const levelBuf = new Float32Array(analyser.fftSize);
+  let lvSumSq = 0, lvN = 0, lvPeak = 0, lvSilent = 0, lvSamples = 0;
+  const levelId = window.setInterval(() => {
+    analyser.getFloatTimeDomainData(levelBuf);
+    let sq = 0, pk = 0;
+    for (const v of levelBuf) { sq += v * v; const a = Math.abs(v); if (a > pk) pk = a; }
+    const rms = Math.sqrt(sq / levelBuf.length);
+    lvSumSq += sq; lvN += levelBuf.length;
+    if (pk > lvPeak) lvPeak = pk;
+    if (rms < SILENCE_RMS) lvSilent++;
+    lvSamples++;
+  }, 250);
+  const toDb = v => v > 0 ? Math.round(20 * Math.log10(v) * 10) / 10 : -120;
+  window.__BBB_RECORDER_LEVELS__ = () => {
+    const out = {
+      rmsDb: toDb(lvN ? Math.sqrt(lvSumSq / lvN) : 0),
+      peakDb: toDb(lvPeak),
+      silentPct: lvSamples ? Math.round(100 * lvSilent / lvSamples) : 100,
+      sources: sourceCount,
+      ctxState: ctx.state,
+      recorderState: recorder.state
+    };
+    lvSumSq = 0; lvN = 0; lvPeak = 0; lvSilent = 0; lvSamples = 0;
+    return out;
+  };
 
   const mime = 'audio/webm;codecs=opus';
   let recorder = new MediaRecorder(dest.stream, { mimeType: mime, audioBitsPerSecond: 128000 });
@@ -90,6 +130,8 @@
     stopped = true;
     if (segTimer) window.clearInterval(segTimer);
     window.clearInterval(pollId);
+    window.clearInterval(levelId);
+    delete window.__BBB_RECORDER_LEVELS__;
 
     if (recorder.state !== 'inactive') {
       await new Promise(res => {
@@ -103,6 +145,8 @@
         }
       });
     }
+    try { mix.disconnect(); } catch {}
+    try { analyser.disconnect(); } catch {}
     try { dest.disconnect(); } catch {}
     try { ctx.close(); } catch {}
   };

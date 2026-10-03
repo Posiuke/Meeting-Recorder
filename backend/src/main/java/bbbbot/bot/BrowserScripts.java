@@ -15,6 +15,7 @@ public final class BrowserScripts {
     public static final String ATTENDEES = "bot/attendees.js";
     public static final String AUDIO_STATS = "bot/audioStats.js";
     public static final String HAS_REMOTE_AUDIO = "bot/hasRemoteAudio.js";
+    public static final String AUDIO_STATE = "bot/audioState.js";
     public static final String START_COMMAND_INFO = "bot/startCommandInfo.js";
     public static final String ROOM_NAME = "bot/roomName.js";
 

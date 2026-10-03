@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
@@ -150,6 +151,16 @@ public class BotInstance {
     private int reconnectAttempts;
     private String lastProcessedStartSignature;
     private volatile long lastChunkAtMs;
+
+    // Diagnose der laufenden Aufnahme: Pegel-Log einmal pro Minute, Warnung bei
+    // anhaltender Stille, Zusammenfassung beim Stopp.
+    private static final long LEVEL_LOG_INTERVAL_MS = 60_000;
+    private static final int SILENT_PCT_THRESHOLD = 98;
+    private static final int SILENT_MINUTES_WARN = 3;
+    private long lastLevelLogAtMs;
+    private int silentMinutesInRow;
+    private long recordedBytes;
+    private long recordingStartedAtMs;
 
     // Sichtbarer Zustand fuer REST/Frontend
     private volatile BotSession.Status status = BotSession.Status.STARTING;
@@ -604,6 +615,7 @@ public class BotInstance {
             scheduleReconnect("Audio-Stall (keine Daten seit " + stallThreshold + " ms)");
             return;
         }
+        logRecordingLevels();
 
         // Neue Teilnehmer protokollieren
         for (String name : info.names()) {
@@ -632,6 +644,37 @@ public class BotInstance {
             }
         } else {
             stopConfirmTicks = 0;
+        }
+    }
+
+    /**
+     * Loggt einmal pro Minute den Pegel des aufgenommenen Mixes. Bleibt die
+     * Aufnahme mehrere Minuten am Stueck praktisch still, kommt eine Warnung
+     * mit dem Audio-Zustand der Seite - so faellt eine stumme oder falsch
+     * verbundene Aufnahme schon waehrend des Meetings im Log auf.
+     */
+    private void logRecordingLevels() {
+        long now = System.currentTimeMillis();
+        if (now - lastLevelLogAtMs < LEVEL_LOG_INTERVAL_MS) return;
+        lastLevelLogAtMs = now;
+        Map<?, ?> lv = recorder.pollLevels();
+        if (lv == null) {
+            log.warn("Pegel der Aufnahme nicht lesbar (Recorder-Skript antwortet nicht).");
+            return;
+        }
+        Object silentPct = lv.get("silentPct");
+        log.info("Aufnahme-Pegel (1 min): RMS {} dBFS, Spitze {} dBFS, still {} %, Quellen {}, "
+                        + "AudioContext {}, Recorder {}, Teilnehmer {}, {} KB bisher",
+                lv.get("rmsDb"), lv.get("peakDb"), silentPct, lv.get("sources"),
+                lv.get("ctxState"), lv.get("recorderState"), currentOthers, recordedBytes / 1024);
+
+        boolean silent = silentPct instanceof Number n && n.intValue() >= SILENT_PCT_THRESHOLD;
+        silentMinutesInRow = silent ? silentMinutesInRow + 1 : 0;
+        // Einmal bei Erreichen der Schwelle warnen, danach alle 10 Minuten erinnern.
+        if (silentMinutesInRow == SILENT_MINUTES_WARN
+                || (silentMinutesInRow > SILENT_MINUTES_WARN && silentMinutesInRow % 10 == 0)) {
+            log.warn("Aufnahme seit {} min praktisch still - Audio-Zustand: {}",
+                    silentMinutesInRow, joiner.audioState(page).summary());
         }
     }
 
@@ -725,6 +768,11 @@ public class BotInstance {
 
             long segmentMs = config.segmentMinutes() * 60_000L;
             recorder.start(segmentMs, this::onAudioChunk);
+            recordingStartedAtMs = System.currentTimeMillis();
+            lastLevelLogAtMs = recordingStartedAtMs;
+            silentMinutesInRow = 0;
+            recordedBytes = 0;
+            log.info("Audio-Zustand bei Aufnahmestart: {}", joiner.audioState(page).summary());
 
             if (config.sendChatWarning()) {
                 // Anonymer Stopp-Link: nur sinnvoll, wenn er auch im Chat steht.
@@ -768,7 +816,9 @@ public class BotInstance {
     private void stopRecording(boolean discard, String reason) {
         if (currentRecordingId == null) return;
         UUID recId = currentRecordingId;
-        log.info("Stoppe Aufnahme {} ({}, verwerfen={}).", recId, reason, discard);
+        log.info("Stoppe Aufnahme {} ({}, verwerfen={}) nach {} s, {} KB in {} Segment(en).",
+                recId, reason, discard, (System.currentTimeMillis() - recordingStartedAtMs) / 1000,
+                recordedBytes / 1024, segmentSeq + 1);
         stoppingRecording = true;
         try {
             recorder.stop();
@@ -854,6 +904,7 @@ public class BotInstance {
         try {
             if (segmentOut != null && data.length > 0) {
                 segmentOut.write(data);
+                recordedBytes += data.length;
             }
             if (isLast) {
                 if (stoppingRecording) {

@@ -86,6 +86,21 @@ public class PageAudioRecorder {
         log.info("Browser-Aufnahme gestoppt.");
     }
 
+    /**
+     * Pegel des aufgenommenen Mixes seit dem letzten Aufruf (setzt die Messung
+     * zurueck): rmsDb, peakDb, silentPct, sources, ctxState, recorderState.
+     * Null, wenn keine Aufnahme laeuft oder die Seite nicht antwortet.
+     */
+    public Map<?, ?> pollLevels() {
+        try {
+            Object result = page.evaluate(
+                    "() => window.__BBB_RECORDER_LEVELS__ ? window.__BBB_RECORDER_LEVELS__() : null");
+            return result instanceof Map<?, ?> m ? m : null;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     public void clearSink() {
         this.sink = null;
     }
