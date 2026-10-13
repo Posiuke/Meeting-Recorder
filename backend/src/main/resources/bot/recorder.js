@@ -78,46 +78,46 @@
   };
 
   const mime = 'audio/webm;codecs=opus';
-  let recorder = new MediaRecorder(dest.stream, { mimeType: mime, audioBitsPerSecond: 128000 });
-  let sendLastPending = false;
+  const timeslice = 1500;
   let stopped = false;
 
-  const sendChunk = async (blob, last) => {
-    if (!blob || blob.size === 0) {
-      if (last) {
-        const silence = new Blob([new Uint8Array(1)], { type: mime });
-        const ab = await silence.arrayBuffer();
-        await nodeBinding({ bytes: Array.from(new Uint8Array(ab)), last: true });
-      }
-      return;
-    }
-    const ab = await blob.arrayBuffer();
-    await nodeBinding({ bytes: Array.from(new Uint8Array(ab)), last });
+  // Alle Sendungen laufen strikt nacheinander ueber eine Kette. Das Ende einer
+  // Segmentdatei (last=true) haengt am stop-Ereignis des jeweiligen Recorders,
+  // das nach dessen letztem dataavailable feuert. Frueher markierte ein
+  // gemeinsames Flag "naechster Chunk ist der letzte" - solange der Versand
+  // ans Backend dauerte, bekamen auch der Rest des alten und der erste Chunk
+  // des neuen Recorders (mit dem WebM-Header) das Flag. Folge: ein Segment
+  // von ~1 s mit Header und danach ein Segment ohne Header (defekt), Issue #31.
+  let sendQueue = Promise.resolve();
+  const enqueue = (bytes, last) => {
+    sendQueue = sendQueue
+      .then(async () => {
+        const arr = bytes ? Array.from(new Uint8Array(await bytes.arrayBuffer())) : [];
+        await nodeBinding({ bytes: arr, last });
+      })
+      .catch(() => {});
+    return sendQueue;
   };
 
-  const onData = async e => {
-    if (e.data && e.data.size > 0) {
-      const last = sendLastPending;
-      await sendChunk(e.data, last);
-      if (last) sendLastPending = false;
-    }
+  const startRecorder = () => {
+    const r = new MediaRecorder(dest.stream, { mimeType: mime, audioBitsPerSecond: 128000 });
+    r.ondataavailable = e => {
+      if (e.data && e.data.size > 0) enqueue(e.data, false);
+    };
+    r.addEventListener('stop', () => enqueue(null, true), { once: true });
+    r.start(timeslice);
+    return r;
   };
 
-  recorder.ondataavailable = onData;
-  const timeslice = 1500;
-  recorder.start(timeslice);
+  let recorder = startRecorder();
 
   const rotate = () => {
-    if (recorder.state === 'recording') {
-      sendLastPending = true;
-      try {
-        recorder.requestData();
-        recorder.stop();
-      } catch {}
-      recorder = new MediaRecorder(dest.stream, { mimeType: mime, audioBitsPerSecond: 128000 });
-      recorder.ondataavailable = onData;
-      recorder.start(timeslice);
-    }
+    if (stopped || recorder.state !== 'recording') return;
+    const old = recorder;
+    // stop() liefert die Restdaten und danach das stop-Ereignis; beides landet
+    // in der Kette vor dem ersten Chunk des neuen Recorders (erst nach 1,5 s).
+    try { old.stop(); } catch {}
+    recorder = startRecorder();
   };
 
   let segTimer = null;
@@ -135,16 +135,19 @@
 
     if (recorder.state !== 'inactive') {
       await new Promise(res => {
-        sendLastPending = true;
         recorder.addEventListener('stop', () => res(), { once: true });
         try {
-          recorder.requestData();
           recorder.stop();
         } catch {
+          enqueue(null, true);
           res();
         }
       });
+    } else {
+      enqueue(null, true);
     }
+    // Erst zurueckkehren, wenn auch der Ende-Marker beim Backend ist.
+    await sendQueue;
     try { mix.disconnect(); } catch {}
     try { analyser.disconnect(); } catch {}
     try { dest.disconnect(); } catch {}
