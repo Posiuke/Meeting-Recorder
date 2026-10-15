@@ -73,7 +73,10 @@ export default function App() {
         <Route path="/groups" element={<GroupsPage />} />
         <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/glossary" element={<GlossaryPage />} />
-        <Route path="/api" element={<ApiPage />} />
+        {/* Nicht /api: Das ist das Präfix der Backend-Routen, ein Neuladen der
+            Seite landete dort beim Backend und endete mit 401. */}
+        <Route path="/developer" element={<ApiPage />} />
+        <Route path="/api" element={<Navigate to="/developer" replace />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/change-password" element={<ChangePassword />} />
       </Route>

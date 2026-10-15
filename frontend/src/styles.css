@@ -2508,15 +2508,21 @@ tbody tr:hover {
 
 .api-section {
   margin-bottom: 0.5rem;
+  padding: 0;
 }
 
+/* Die ganze Kopfzeile des Panels ist klickbar, nicht nur der Titeltext:
+   Der Knopf übernimmt das Innenpolster der Karte. */
 .api-section .collapse-toggle {
   width: 100%;
   justify-content: flex-start;
+  padding: 1.1rem 1.25rem;
+  border-radius: var(--radius);
+  text-align: left;
 }
 
 .api-section-body {
-  margin-top: 0.75rem;
+  padding: 0 1.25rem 1.1rem;
 }
 
 .api-endpoint {

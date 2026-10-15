@@ -4,6 +4,7 @@ import bbbbot.auth.ApiKeyAuthFilter;
 import bbbbot.auth.JwtAuthFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -41,6 +42,10 @@ public class SecurityConfig {
                 // geprueft wird sie im PublicShareController. Nur Lesen, nur die
                 // eine freigegebene Aufnahme.
                 .requestMatchers("/api/public/**").permitAll()
+                // Die nackte Adresse /api war frueher die API-Seite des
+                // Frontends; alte Lesezeichen bekommen die SPA statt 401 und
+                // werden dort auf /developer umgeleitet. Darunter liegt nichts.
+                .requestMatchers(HttpMethod.GET, "/api").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll())

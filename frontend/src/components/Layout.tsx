@@ -29,7 +29,7 @@ export default function Layout() {
             <NavLink to="/bots">{t('app.nav.bots')}</NavLink>
             <NavLink to="/templates">{t('app.nav.templates')}</NavLink>
             <NavLink to="/glossary">{t('app.nav.glossary')}</NavLink>
-            <NavLink to="/api">{t('app.nav.api')}</NavLink>
+            <NavLink to="/developer">{t('app.nav.api')}</NavLink>
             {user?.admin && <NavLink to="/admin">{t('app.nav.admin')}</NavLink>}
           </nav>
           <div className="app-user">
