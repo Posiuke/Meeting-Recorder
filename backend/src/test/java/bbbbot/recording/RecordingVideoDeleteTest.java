@@ -51,7 +51,7 @@ class RecordingVideoDeleteTest {
 
         service = new RecordingService(props, ffmpeg, mock(SettingsService.class), recordingRepo,
                 segmentRepo, mock(ProcessingJobRepo.class), mock(BotSessionRepo.class),
-                mock(bbbbot.sharing.BotTemplateAccess.class));
+                mock(bbbbot.sharing.BotTemplateAccess.class), new bbbbot.storage.FileStore(props, (bbbbot.storage.ObjectStore) null));
     }
 
     private Recording aufnahme(Recording.Source source, Recording.VideoStatus videoStatus) throws IOException {

@@ -273,10 +273,20 @@ mvn test -Dtest=UiUploadSmokeTest -Dui.it.url="http://localhost:5173" \
 | `CHROME_PATH` | Optionaler Pfad zu einem System-Chromium |
 | `INSECURE_TLS` | `true`: Bots akzeptieren Self-Signed-Zertifikate (nur mit `BBB_ON`) |
 | `FFMPEG_PATH`, `FFPROBE_PATH` | Optionale Pfade zu ffmpeg/ffprobe (im Image bereits vorhanden) |
-| `STORAGE_DIR` | Ablage für Aufnahmen/Transkripte/Zusammenfassungen/beigefügte Unterlagen |
+| `STORAGE_DIR` | Ablage für Aufnahmen/Transkripte/Zusammenfassungen/beigefügte Unterlagen (mit `STORAGE_BACKEND=s3` nur Arbeitsverzeichnis und Zwischenspeicher) |
+| `STORAGE_BACKEND` | `local` (Standard) oder `s3`, siehe [Ablage in S3](#ablage-in-s3) |
+| `S3_BUCKET`, `S3_PREFIX`, `S3_REGION` | Bucket, optionales Schlüssel-Präfix, Region (leer = aus der Umgebung, z. B. auf AWS) |
+| `S3_ENDPOINT`, `S3_PATH_STYLE` | Für S3-kompatible Speicher (MinIO o. ä.): Adresse und `true` für Path-Style |
+| `S3_ACCESS_KEY`, `S3_SECRET_KEY` | Zugangsschlüssel; leer = Standardkette des AWS-SDK (Task-/Instanzrolle) |
+| `STORAGE_CACHE_HOURS` | Mit S3: so lange bleibt eine ungenutzte lokale Kopie liegen (Standard 24) |
+| `PUBLIC_URL` | Öffentliche Adresse (z. B. `https://rec.example.com`) für die SSO-Redirect-URI; leer = aus Anfrage/Proxy-Headern |
+| `ACTIVITY_TOKEN` | Schaltet `GET /api/internal/activity` frei (Header `X-Activity-Token`), siehe [Scale-to-zero](#scale-to-zero-leerlauf-meldung) |
+| `DB_POOL_SIZE` | Höchstzahl DB-Verbindungen (Standard 10; auf einer kleinen geteilten Datenbank senken) |
+| `SHUTDOWN_TIMEOUT` | Wie lange laufende Anfragen beim Stoppen noch beendet werden dürfen (Standard `20s`) |
 
-LDAP/Active Directory wird nicht über Umgebungsvariablen konfiguriert, sondern
-unter **Admin → Authentifizierung** (siehe [Erste Anmeldung](#erste-anmeldung)).
+LDAP/Active Directory und die Anmeldung per OpenID Connect werden nicht über
+Umgebungsvariablen konfiguriert, sondern unter **Admin → Authentifizierung**
+(siehe [Erste Anmeldung](#erste-anmeldung) und [Single Sign-on](#single-sign-on-openid-connect)).
 Alle fachlichen Parameter (Whisper-URL und -Parameter, LLM-Endpunkt/Modell,
 Zeitfenster, Segmentlänge, Chat-Befehle, Reconnect-Verhalten, …) werden zur
 Laufzeit im Frontend unter **Admin → Einstellungen** gepflegt und in der
@@ -1159,6 +1169,71 @@ denen kein Bot beitreten kann (Teams/Zoom/WebEx, Präsenzsitzungen). Voraussetzu
 sind HTTPS und Chrome/Edge; die Admin-Einstellungen stehen unter dem Präfix
 `capture.`. Einrichtung, Reverse-Proxy-Konfiguration, Grenzen und Fehlersuche:
 [docs/SCREEN_CAPTURE.md](docs/SCREEN_CAPTURE.md)
+
+## Single Sign-on (OpenID Connect)
+
+Unter **Admin → Authentifizierung** lassen sich beliebig viele OIDC-Anbieter
+anlegen – mit Vorlagen für Microsoft Entra ID, Google und Keycloak, oder
+jeder andere Anbieter über seine Issuer-Adresse. Jeder erscheint als Knopf
+„Anmelden mit …“. Ablauf: Authorization Code Flow mit PKCE im Backend
+(`auth/oidc/`), state/nonce/Verifier in einem kurzlebigen signierten Cookie,
+ID-Token gegen die JWKS des Anbieters geprüft (Issuer, Audience, Ablauf,
+Nonce; Microsofts Multi-Tenant-Platzhalter `{tenantid}` wird über `tid`
+aufgelöst). Danach stellt der Recorder sein eigenes JWT aus – alles Weitere
+ist wie nach der Passwortanmeldung.
+
+- Konten werden beim ersten Login angelegt und danach über Anbieter + `sub`
+  wiedererkannt (Umbenennung beim Anbieter schadet nicht).
+- Ein **LDAP-Konto** gleichen Namens wird übernommen (Umstieg AD → Entra ohne
+  Verlust von Aufnahmen und Freigaben), ein lokales Passwort-Konto nicht.
+- Admin-Recht und Zugang können einem Gruppen-/Rollen-Claim folgen (Entra:
+  App-Rollen in `roles`); das Admin-Recht wird dann bei jedem Login abgeglichen.
+- Die Passwortanmeldung lässt sich auf der Anmeldeseite einklappen; der lokale
+  Admin funktioniert immer.
+- Redirect-URI: `https://<host>/api/auth/oidc/<kennung>/callback` (steht nach
+  dem Speichern in der Anbieterliste).
+
+## Ablage in S3
+
+Mit `STORAGE_BACKEND=s3` landen fertige Dateien (Audio-Segmente, MP4, Uploads,
+Bildschirmaufnahmen, Unterlagen) im Bucket; `STORAGE_DIR` ist nur noch
+Arbeitsverzeichnis für ffmpeg/Whisper und Zwischenspeicher. Umgesetzt in
+`storage/FileStore`: `publish()` sichert eine fertige Datei, `ensureLocal()`
+holt sie bei Bedarf zurück, `serve()` liefert Audio/Video direkt aus dem Bucket
+mit Range-Requests aus (Springen ohne Komplett-Download), eine regelmäßige
+Räumung entfernt lange ungenutzte, nachweislich gesicherte Kopien. Die
+Datenbank behält ihre Pfade; der Objektschlüssel ist der Pfad relativ zu
+`STORAGE_DIR` (plus `S3_PREFIX`).
+
+Umzug einer bestehenden Installation: Container stoppen,
+`aws s3 sync ./data/recordings s3://<bucket>/<präfix>/`, mit
+`STORAGE_BACKEND=s3` starten.
+
+Test gegen einen echten S3-kompatiblen Speicher:
+
+```bash
+docker run -d -p 19090:9090 -e initialBuckets=recorder-test adobe/s3mock:3.12.0
+cd backend && S3_IT_ENDPOINT=http://localhost:19090 S3_IT_BUCKET=recorder-test \
+  mvn test -Dtest=S3ObjectStoreIT
+```
+
+## Scale-to-zero (Leerlauf-Meldung)
+
+Der Container darf jederzeit gestoppt werden, wenn nichts läuft: Alles liegt in
+der Datenbank und (mit S3) im Bucket; eine laufende Bildschirmaufnahme wird beim
+Herunterfahren gesichert und nach dem nächsten Start abgeschlossen. Mit
+`ACTIVITY_TOKEN` meldet `GET /api/internal/activity` (Header
+`X-Activity-Token`), ob gerade gearbeitet wird (`busy`, `reasons`: Auswertung,
+fällige Jobs, Bildschirmaufnahmen, Bots, Medienarbeit, Textextraktion) und seit
+wann keine Nutzeranfrage mehr kam (`idleSeconds`). Automatisches Nachladen der
+Oberfläche (Header `X-Background-Request`) zählt nicht – ein offener Tab hält
+den Dienst also nicht wach. Auswertungen, die auf das Nachtfenster warten,
+stehen als `deferredJobs` mit `nextWindowStart` in der Antwort.
+
+Für solche Umgebungen gibt es das **schlanke Image** ohne Chromium
+(`docker build -f backend/Dockerfile --target slim .`, auf Docker Hub die Tags
+`…-slim`): nur Java und ffmpeg, Bruchteil der Größe, schnellerer Start – für
+Betrieb ohne `BBB_ON`.
 
 ## Sprechererkennung (optional)
 

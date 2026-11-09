@@ -10,6 +10,17 @@ public class AppProperties {
     private Media media = new Media();
     private Auth auth = new Auth();
     private Bbb bbb = new Bbb();
+    private Activity activity = new Activity();
+
+    /** Leerlauf-Meldung fuer Scale-to-zero (ACTIVITY_TOKEN). Leer = Endpunkt aus. */
+    public static class Activity {
+        private String token = "";
+        public String getToken() { return token; }
+        public void setToken(String token) { this.token = token; }
+    }
+
+    public Activity getActivity() { return activity; }
+    public void setActivity(Activity activity) { this.activity = activity; }
 
     /**
      * BigBlueButton-Anbindung (Bots, Bot-Vorlagen, Zeitplaene, Stopp-Link).
@@ -24,8 +35,53 @@ public class AppProperties {
 
     public static class Storage {
         private String rootDir = "./data/recordings";
+        /**
+         * "local" (Standard): Dateien liegen nur unter rootDir. "s3": rootDir ist
+         * nur noch Arbeitsverzeichnis/Zwischenspeicher, massgeblich ist der Bucket.
+         */
+        private String backend = "local";
+        /** Wie lange eine nach S3 gesicherte Datei unbenutzt lokal liegen bleibt. */
+        private int cacheHours = 24;
+        private S3 s3 = new S3();
+
         public String getRootDir() { return rootDir; }
         public void setRootDir(String rootDir) { this.rootDir = rootDir; }
+        public String getBackend() { return backend; }
+        public void setBackend(String backend) { this.backend = backend; }
+        public int getCacheHours() { return cacheHours; }
+        public void setCacheHours(int cacheHours) { this.cacheHours = cacheHours; }
+        public S3 getS3() { return s3; }
+        public void setS3(S3 s3) { this.s3 = s3; }
+    }
+
+    /**
+     * S3 oder S3-kompatibler Speicher (z.B. MinIO). Ohne Zugangsschluessel gilt
+     * die Standard-Kette des AWS-SDK (Task-Rolle, Instanzprofil, Umgebung).
+     */
+    public static class S3 {
+        private String bucket = "";
+        private String prefix = "";
+        private String region = "";
+        /** Leer = AWS. Fuer MinIO o.ae. die Adresse, z.B. http://minio:9000 */
+        private String endpoint = "";
+        private boolean pathStyle = false;
+        private String accessKey = "";
+        private String secretKey = "";
+
+        public String getBucket() { return bucket; }
+        public void setBucket(String bucket) { this.bucket = bucket; }
+        public String getPrefix() { return prefix; }
+        public void setPrefix(String prefix) { this.prefix = prefix; }
+        public String getRegion() { return region; }
+        public void setRegion(String region) { this.region = region; }
+        public String getEndpoint() { return endpoint; }
+        public void setEndpoint(String endpoint) { this.endpoint = endpoint; }
+        public boolean isPathStyle() { return pathStyle; }
+        public void setPathStyle(boolean pathStyle) { this.pathStyle = pathStyle; }
+        public String getAccessKey() { return accessKey; }
+        public void setAccessKey(String accessKey) { this.accessKey = accessKey; }
+        public String getSecretKey() { return secretKey; }
+        public void setSecretKey(String secretKey) { this.secretKey = secretKey; }
     }
 
     public static class Bots {
@@ -62,6 +118,11 @@ public class AppProperties {
     public static class Auth {
         // JWT-Signatur (Boot-Secret) - bleibt in der Env.
         private String jwtSecret = "";
+        // Oeffentliche Adresse (z.B. https://rec.example.com) fuer OIDC-Redirect-URIs.
+        // Leer = aus der Anfrage (inkl. X-Forwarded-* des Proxys).
+        private String publicUrl = "";
+        public String getPublicUrl() { return publicUrl; }
+        public void setPublicUrl(String publicUrl) { this.publicUrl = publicUrl; }
         // Login-Session-Dauer (Standard 168 h = 7 Tage)
         private int jwtTtlHours = 168;
         // Lokales Admin-Konto (immer aktiv, unabhaengig von LDAP). Nur beim

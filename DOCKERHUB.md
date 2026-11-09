@@ -38,7 +38,8 @@ container; PostgreSQL runs separately.
 - 👥 **Sharing & groups**, admin area for settings and users
 - 🔗 **Share link**: pass a recording on by URL — either **account-bound** (the recipient signs in and is granted access automatically, the default) or **without sign-in** for external people; with an optional lifetime, revocable at any time, and installation-wide restrictable to "sign-in required" by an admin switch
 - 🌐 **Interface in German and English** – each user picks their own language, stored with the account (so it applies on every device)
-- 🔐 **Sign-in** with a local account **or** LDAP/Active Directory — fully configurable and testable in the admin area
+- 🔐 **Sign-in** with a local account, LDAP/Active Directory **or single sign-on via OpenID Connect** (Microsoft Entra ID, Google, Keycloak or any other OIDC provider; several at once) — fully configurable and testable in the admin area
+- ☁️ **Files in S3** (optional): recordings and documents go to an S3 bucket or an S3-compatible store such as MinIO instead of a volume — the container itself stays stateless
 - 🧹 **Housekeeping**: retention period for old recordings, cleanup of recordings that got stuck
 
 **Optional with `BBB_ON=true`** (BigBlueButton integration):
@@ -52,11 +53,12 @@ container; PostgreSQL runs separately.
 - `latest` — current state
 - `1.0.0`, … — releases (version from the project, recommended for production)
 - `<git-hash>` — a specific commit (reproducible deployments)
+- `…-slim` (e.g. `latest-slim`, `1.0.0-slim`) — the same version **without Chromium**: a fraction of the size and faster to start, for operation **without** BigBlueButton bots (`BBB_ON` off)
 
 ## Ports & volumes
 
 - Port **8080** — UI + API
-- Volume **`/data/recordings`** — recordings, transcripts, summaries, MP4s, attached documents
+- Volume **`/data/recordings`** — recordings, transcripts, summaries, MP4s, attached documents (with `STORAGE_BACKEND=s3` only a working directory and cache, see below)
 
 ## Important environment variables
 
@@ -72,6 +74,14 @@ container; PostgreSQL runs separately.
 | `MAX_CONCURRENT_BOTS` | Maximum concurrent bots (default 5; only with `BBB_ON`) |
 | `INSECURE_TLS` | Bots accept self-signed certificates on an intranet (only with `BBB_ON`) |
 | `SERVER_PORT` | HTTP port inside the container (default 8080) |
+| `STORAGE_BACKEND` | `local` (default) or `s3` — see [Files in S3](#files-in-s3) |
+| `S3_BUCKET`, `S3_PREFIX`, `S3_REGION` | Bucket, optional key prefix and region (empty = taken from the environment, e.g. on AWS) |
+| `S3_ENDPOINT`, `S3_PATH_STYLE` | For S3-compatible stores such as MinIO: address (e.g. `http://minio:9000`) and `true` for path-style access |
+| `S3_ACCESS_KEY`, `S3_SECRET_KEY` | Access keys; empty = the AWS SDK default chain (task/instance role, environment) |
+| `STORAGE_CACHE_HOURS` | With S3: how long an unused local copy stays in the cache (default 24) |
+| `PUBLIC_URL` | Public address (e.g. `https://rec.example.com`) for the single sign-on redirect URI; empty = derived from the request/proxy headers |
+| `ACTIVITY_TOKEN` | Enables `GET /api/internal/activity` (header `X-Activity-Token`) for scale-to-zero, see below |
+| `DB_POOL_SIZE` | Maximum database connections (default 10; lower it on a small shared database) |
 
 > Everything else (Whisper, LLM, time window, bot behaviour, screen recording,
 > retention, LDAP) is configured **at runtime in the admin area** and stored in
@@ -111,6 +121,68 @@ set `X-Forwarded-Proto`/`-Host` (the app evaluates them) and must not buffer the
 request body (`proxy_request_buffering off`), so that the incrementally uploaded
 recording passes straight through. Ready-made nginx and Apache configurations:
 [docs/SCREEN_CAPTURE.md](https://github.com/Posiuke/Meeting-Recorder/blob/master/docs/SCREEN_CAPTURE.md).
+
+## Single sign-on (OpenID Connect)
+
+Under **Admin → Authentication → Sign-in via OpenID Connect** you add one or
+more providers; each one becomes a "Sign in with …" button on the sign-in page.
+Presets exist for Microsoft Entra ID, Google and Keycloak; any other OIDC
+provider works with its issuer URL. The sign-in uses the authorization code flow
+with PKCE; afterwards the app works with its own session exactly as after a
+password sign-in.
+
+- **Redirect URI**: shown in the provider list after saving —
+  `https://<your host>/api/auth/oidc/<identifier>/callback`. Behind a proxy it
+  is derived from `X-Forwarded-*`; set `PUBLIC_URL` if that is not available.
+- **Accounts** are created on the first sign-in and recognised by the
+  provider's immutable `sub` afterwards. An existing **LDAP account** with the
+  same username is taken over (recordings and shares stay), a local password
+  account is not.
+- **Admin rights / access** can follow a groups or roles claim (e.g. Entra app
+  roles `roles`): values for admins and values required for access.
+- **Microsoft Entra ID**: register an app (platform *Web*, the redirect URI
+  above), create a client secret, issuer
+  `https://login.microsoftonline.com/<directory-id>/v2.0` — or
+  `…/organizations/v2.0` to accept several company directories.
+- The password form can be collapsed on the sign-in page; the local admin
+  keeps working in any case.
+
+## Files in S3
+
+With `STORAGE_BACKEND=s3` finished files (audio segments, MP4, uploads, screen
+recordings, attached documents) are stored in the bucket; `STORAGE_DIR` is then
+only the working directory for ffmpeg/Whisper and a cache. Missing files are
+fetched back on demand, audio and video are streamed straight from the bucket
+with range requests (seeking works without downloading the whole file), and
+deleting a recording deletes its objects. Object keys are the paths relative to
+`STORAGE_DIR` (plus `S3_PREFIX`).
+
+The task/instance role or the access keys need `s3:GetObject`, `s3:PutObject`,
+`s3:DeleteObject`, `s3:AbortMultipartUpload` on the objects and
+`s3:ListBucket` on the bucket.
+
+**Moving an existing installation** from a volume to S3: stop the container,
+upload the directory once (`aws s3 sync ./data/recordings s3://<bucket>/<prefix>/`),
+then start with `STORAGE_BACKEND=s3`. The database stays as it is.
+
+## Scale to zero
+
+The container may be stopped at any time when nothing is running: everything
+lives in the database and (with S3) the bucket; a running screen recording is
+saved to the bucket on shutdown and finished after the next start. Set
+`ACTIVITY_TOKEN` and ask `GET /api/internal/activity` with header
+`X-Activity-Token` whether it is safe to stop:
+
+```json
+{"busy": false, "idleSeconds": 1840, "reasons": [],
+ "work": {"processing": 0, "pendingJobs": 0, "captures": 0, "bots": 0, "media": 0, "documents": 0},
+ "deferredJobs": 1, "nextWindowStart": "2026-11-10T19:00:00Z"}
+```
+
+Stop only when `busy` is `false` and `idleSeconds` exceeds your threshold.
+Automatic refreshes of an open browser tab do not count as activity.
+`deferredJobs`/`nextWindowStart` report analyses waiting for the processing time
+window — start the container at that time (or let users choose "Analyse now").
 
 ## Quick start (docker compose)
 

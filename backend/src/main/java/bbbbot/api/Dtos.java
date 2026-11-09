@@ -22,11 +22,12 @@ public final class Dtos {
     private Dtos() {}
 
     public record UserView(UUID id, String username, String displayName, String email, boolean admin,
-                           boolean local, boolean mustChangePassword, String language) {
+                           boolean local, boolean mustChangePassword, String language,
+                           String authProvider) {
         public static UserView of(AppUser u) {
             boolean local = u.getPasswordHash() != null && !u.getPasswordHash().isBlank();
             return new UserView(u.getId(), u.getUsername(), u.getDisplayName(), u.getEmail(), u.isAdmin(),
-                    local, u.isMustChangePassword(), u.getLanguage());
+                    local, u.isMustChangePassword(), u.getLanguage(), u.getAuthProvider());
         }
     }
 
@@ -228,8 +229,8 @@ public final class Dtos {
         }
 
         private static boolean audioExists(RecordingSegment s) {
-            return s.getMp3Path() != null && !s.getMp3Path().isBlank()
-                    && java.nio.file.Files.exists(java.nio.file.Path.of(s.getMp3Path()));
+            // Mit Ablage ohne Bucket-Anfrage je Segment (siehe FileStore#probablyExists)
+            return bbbbot.storage.FileStore.probablyExists(s.getMp3Path());
         }
     }
 

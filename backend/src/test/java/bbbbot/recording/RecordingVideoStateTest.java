@@ -58,7 +58,7 @@ class RecordingVideoStateTest {
 
         service = new RecordingService(props, ffmpeg, settings, recordingRepo,
                 mock(RecordingSegmentRepo.class), mock(ProcessingJobRepo.class), sessionRepo,
-                mock(bbbbot.sharing.BotTemplateAccess.class));
+                mock(bbbbot.sharing.BotTemplateAccess.class), new bbbbot.storage.FileStore(props, (bbbbot.storage.ObjectStore) null));
     }
 
     /** Aufnahme mit eigenem Verzeichnis, die vor {@code endeVorMinuten} beendet wurde. */

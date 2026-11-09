@@ -9,12 +9,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -40,11 +37,14 @@ public class RetentionCleanupService {
     private final RecordingRepo recordingRepo;
     private final SettingsService settings;
     private final BotManager botManager;
+    private final bbbbot.storage.FileStore store;
 
-    public RetentionCleanupService(RecordingRepo recordingRepo, SettingsService settings, BotManager botManager) {
+    public RetentionCleanupService(RecordingRepo recordingRepo, SettingsService settings, BotManager botManager,
+                                   bbbbot.storage.FileStore store) {
         this.recordingRepo = recordingRepo;
         this.settings = settings;
         this.botManager = botManager;
+        this.store = store;
     }
 
     /** Stuendliche Pruefung (leichtgewichtig, wenn nichts zu tun ist). */
@@ -70,13 +70,9 @@ public class RetentionCleanupService {
     }
 
     private void deleteDirectoryQuietly(Path dir) {
-        if (dir == null || !Files.exists(dir)) return;
-        try (var stream = Files.walk(dir)) {
-            stream.sorted(Comparator.reverseOrder()).forEach(p -> {
-                try { Files.delete(p); } catch (IOException ignored) {}
-            });
-        } catch (IOException e) {
-            log.warn("Verzeichnis der abgelaufenen Aufnahme konnte nicht geloescht werden: {}", e.getMessage());
+        if (dir == null) return;
+        if (!store.deleteDirectory(dir)) {
+            log.warn("Verzeichnis der abgelaufenen Aufnahme {} konnte nicht vollstaendig geloescht werden", dir);
         }
     }
 }

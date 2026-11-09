@@ -51,6 +51,14 @@ public class AppUser {
     @Column(length = 8)
     private String language;
 
+    /** slug des OIDC-Anbieters, ueber den das Konto angelegt wurde; NULL = lokal/LDAP. */
+    @Column(name = "auth_provider", length = 40)
+    private String authProvider;
+
+    /** Unveraenderliche Kennung beim Anbieter (Claim sub). */
+    @Column(name = "external_subject")
+    private String externalSubject;
+
     public static AppUser create(String username, String displayName, String email) {
         AppUser u = new AppUser();
         u.id = UUID.randomUUID();
@@ -81,4 +89,8 @@ public class AppUser {
     public void setMustChangePassword(boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; }
     public String getLanguage() { return language; }
     public void setLanguage(String language) { this.language = language; }
+    public String getAuthProvider() { return authProvider; }
+    public void setAuthProvider(String authProvider) { this.authProvider = authProvider; }
+    public String getExternalSubject() { return externalSubject; }
+    public void setExternalSubject(String externalSubject) { this.externalSubject = externalSubject; }
 }

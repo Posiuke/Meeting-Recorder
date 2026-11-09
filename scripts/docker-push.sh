@@ -13,6 +13,8 @@
 #
 # Tags: Immer "latest", der kurze Git-Hash und die Version aus backend/pom.xml
 # (z.B. "1.0.0"). Ein Argument bzw. IMAGE_TAG kommt als weiterer Tag hinzu.
+# Dazu jeweils dieselben Tags mit Endung "-slim" fuer das schlanke Image ohne
+# Chromium (nur fuer Betrieb ohne BBB_ON, siehe backend/Dockerfile).
 #
 # Docker-Hub-Beschreibung:
 #   Nur bei Docker Hub (DOCKER_REGISTRY leer) und gesetzten DOCKERHUB_USERNAME/
@@ -77,16 +79,25 @@ TAG_ARGS=()
 for tag in "${TAGS[@]}"; do
   TAG_ARGS+=(-t "$APP_IMAGE:$tag")
 done
-docker build -f backend/Dockerfile \
-    --label "org.opencontainers.image.title=Meeting Recorder" \
-    --label "org.opencontainers.image.version=$VERSION_TAG" \
-    --label "org.opencontainers.image.revision=$GIT_TAG" \
-    --label "org.opencontainers.image.source=https://github.com/Posiuke/Meeting-Recorder" \
-    "${TAG_ARGS[@]}" .
+LABEL_ARGS=(
+    --label "org.opencontainers.image.title=Meeting Recorder"
+    --label "org.opencontainers.image.version=$VERSION_TAG"
+    --label "org.opencontainers.image.revision=$GIT_TAG"
+    --label "org.opencontainers.image.source=https://github.com/Posiuke/Meeting-Recorder"
+)
+docker build -f backend/Dockerfile --target full "${LABEL_ARGS[@]}" "${TAG_ARGS[@]}" .
 
-echo ">> Pushe Image"
+echo ">> Baue schlankes Image (ohne Chromium, Tags mit -slim)"
+SLIM_TAG_ARGS=()
+for tag in "${TAGS[@]}"; do
+  SLIM_TAG_ARGS+=(-t "$APP_IMAGE:$tag-slim")
+done
+docker build -f backend/Dockerfile --target slim "${LABEL_ARGS[@]}" "${SLIM_TAG_ARGS[@]}" .
+
+echo ">> Pushe Images"
 for tag in "${TAGS[@]}"; do
   docker push "$APP_IMAGE:$tag"
+  docker push "$APP_IMAGE:$tag-slim"
 done
 
 if [[ -z "$DOCKER_REGISTRY" ]]; then
@@ -97,4 +108,4 @@ fi
 
 echo
 echo "Fertig. Gepusht:"
-echo "  $APP_IMAGE  ($(IFS=', '; echo "${TAGS[*]}"))"
+echo "  $APP_IMAGE  ($(IFS=', '; echo "${TAGS[*]}"), jeweils auch -slim)"

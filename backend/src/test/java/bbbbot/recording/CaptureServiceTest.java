@@ -80,7 +80,8 @@ class CaptureServiceTest {
         when(settings.getLong(SettingsService.RECORDING_MIN_AUDIO_BYTES)).thenReturn(10L);
         when(recordingService.hasVideoStream(any())).thenReturn(false);
 
-        service = new CaptureService(props, settings, recordingRepo, recordingService);
+        service = new CaptureService(props, settings, recordingRepo, recordingService,
+                new bbbbot.storage.FileStore(props, (bbbbot.storage.ObjectStore) null));
     }
 
     private Recording start() throws Exception {

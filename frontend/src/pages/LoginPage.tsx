@@ -1,11 +1,29 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { login } from '../store/authSlice';
 import Alert from '../components/Alert';
 import { LANGUAGES, useI18n } from '../i18n';
 import type { Language } from '../i18n';
+import { fetchLoginOptions, oidcStartUrl } from '../api/oidc';
+import type { LoginOptions } from '../api/oidc';
+
+/** Bekannte Fehlerkennungen der OIDC-Anmeldung (siehe OidcException im Backend). */
+const SSO_ERRORS = [
+  'access_denied',
+  'not_allowed',
+  'username_taken',
+  'no_username',
+  'state_expired',
+  'state_mismatch',
+  'unknown_provider',
+  'discovery_failed',
+  'token_failed',
+  'invalid_token',
+  'session',
+] as const;
+type SsoError = (typeof SSO_ERRORS)[number];
 
 export default function LoginPage() {
   const dispatch = useAppDispatch();
@@ -16,11 +34,31 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [searchParams] = useSearchParams();
+  const [options, setOptions] = useState<LoginOptions | null>(null);
+  const [showLocal, setShowLocal] = useState(false);
 
+  // Anbieter-Knöpfe laden; scheitert das, bleibt die Passwortanmeldung.
+  useEffect(() => {
+    fetchLoginOptions()
+      .then(setOptions)
+      .catch(() => setOptions({ providers: [], localLoginHidden: false }));
+  }, []);
+
+  const from = (location.state as { from?: { pathname: string; search?: string } } | null)?.from;
   if (status === 'authenticated') {
-    const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
-    return <Navigate to={from ?? '/'} replace />;
+    return <Navigate to={from?.pathname ?? '/'} replace />;
   }
+
+  const ssoErrorCode = searchParams.get('sso_error');
+  const ssoError = ssoErrorCode
+    ? (SSO_ERRORS as readonly string[]).includes(ssoErrorCode)
+      ? t(`login.ssoError.${ssoErrorCode as SsoError}`)
+      : t('login.ssoError.provider_error')
+    : null;
+  const providers = options?.providers ?? [];
+  const localVisible = !options?.localLoginHidden || showLocal;
+  const next = from ? from.pathname + (from.search ?? '') : '/';
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -58,8 +96,25 @@ export default function LoginPage() {
             ))}
           </select>
         </div>
-        <p className="login-hint">{t('login.hint')}</p>
-        {error && <Alert kind="error">{error}</Alert>}
+        {ssoError && <Alert kind="error">{ssoError}</Alert>}
+        {providers.length > 0 && (
+          <div className="login-sso">
+            {providers.map((p) => (
+              <a key={p.slug} className="btn btn-primary btn-block" href={oidcStartUrl(p.slug, next)}>
+                {t('login.ssoButton', { name: p.displayName })}
+              </a>
+            ))}
+          </div>
+        )}
+        {!localVisible && (
+          <button type="button" className="link-button login-local-toggle" onClick={() => setShowLocal(true)}>
+            {t('login.showLocal')}
+          </button>
+        )}
+        {localVisible && providers.length > 0 && <div className="login-divider">{t('login.or')}</div>}
+        {localVisible && <p className="login-hint">{t('login.hint')}</p>}
+        {localVisible && error && <Alert kind="error">{error}</Alert>}
+        {localVisible && (
         <form onSubmit={handleSubmit}>
           <div className="form-field">
             <label htmlFor="login-username">{t('login.username')}</label>
@@ -69,7 +124,7 @@ export default function LoginPage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
-              autoFocus
+              autoFocus={providers.length === 0}
               required
             />
           </div>
@@ -88,6 +143,7 @@ export default function LoginPage() {
             {busy ? t('login.submitting') : t('login.submit')}
           </button>
         </form>
+        )}
       </div>
     </div>
   );

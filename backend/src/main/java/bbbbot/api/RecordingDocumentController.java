@@ -7,8 +7,6 @@ import bbbbot.domain.AppUser;
 import bbbbot.domain.Recording;
 import bbbbot.domain.RecordingDocument;
 import bbbbot.sharing.AccessService;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -24,7 +22,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
@@ -47,10 +44,13 @@ public class RecordingDocumentController {
 
     private final AccessService access;
     private final RecordingDocumentService documents;
+    private final bbbbot.storage.FileStore store;
 
-    public RecordingDocumentController(AccessService access, RecordingDocumentService documents) {
+    public RecordingDocumentController(AccessService access, RecordingDocumentService documents,
+                                       bbbbot.storage.FileStore store) {
         this.access = access;
         this.documents = documents;
+        this.store = store;
     }
 
     @GetMapping
@@ -127,20 +127,13 @@ public class RecordingDocumentController {
      * nicht im Kontext der Anwendung ausgefuehrt werden.
      */
     @GetMapping("/{documentId}/download")
-    public ResponseEntity<FileSystemResource> download(@PathVariable UUID id,
+    public ResponseEntity<org.springframework.core.io.Resource> download(@PathVariable UUID id,
                                                        @PathVariable UUID documentId) {
         AppUser user = CurrentUser.get();
         access.requireReadable(id, user);
         RecordingDocument document = requireDocument(id, documentId);
-        Path file = Path.of(document.getStoredPath());
-        if (!Files.exists(file)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Datei nicht vorhanden");
-        }
-        return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + document.getFilename() + "\"")
-                .body(new FileSystemResource(file));
+        return store.serve(Path.of(document.getStoredPath()), MediaType.APPLICATION_OCTET_STREAM,
+                "attachment; filename=\"" + document.getFilename() + "\"");
     }
 
     /** Der extrahierte Text - so ist nachsehbar, was die KI aus der Datei bekommt. */

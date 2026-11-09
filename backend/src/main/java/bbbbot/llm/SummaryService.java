@@ -45,6 +45,13 @@ public class SummaryService {
     private final SummaryRepo summaryRepo;
     private final ParticipantService participantService;
     private final RecordingDocumentService documentService;
+    /** Optional, damit Tests ohne Ablage auskommen. */
+    private bbbbot.storage.FileStore store;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setFileStore(bbbbot.storage.FileStore store) {
+        this.store = store;
+    }
 
     public SummaryService(LlmClient llm, SettingsService settings, SummaryRepo summaryRepo,
                           ParticipantService participantService,
@@ -260,8 +267,13 @@ public class SummaryService {
             writeSummaryFile(recording, current.get().getMarkdown());
             return;
         }
+        Path file = Path.of(recording.getDirectory()).resolve("summary.md");
+        if (store != null) {
+            store.delete(file);
+            return;
+        }
         try {
-            Files.deleteIfExists(Path.of(recording.getDirectory()).resolve("summary.md"));
+            Files.deleteIfExists(file);
         } catch (IOException e) {
             log.warn("summary.md konnte nicht geloescht werden: {}", e.getMessage());
         }
@@ -270,7 +282,10 @@ public class SummaryService {
     private void writeSummaryFile(Recording recording, String document) {
         try {
             Path dir = Path.of(recording.getDirectory());
-            if (Files.isDirectory(dir)) {
+            if (store != null) {
+                // Mit Ablage fehlt das Verzeichnis nach einem Neustart lokal oft.
+                store.writeString(dir.resolve("summary.md"), document);
+            } else if (Files.isDirectory(dir)) {
                 Files.writeString(dir.resolve("summary.md"), document, StandardCharsets.UTF_8);
             }
         } catch (IOException e) {

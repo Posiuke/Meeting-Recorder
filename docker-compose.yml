@@ -87,6 +87,16 @@ services:
       INSECURE_TLS: "true"
 
       STORAGE_DIR: /data/recordings
+
+      # --- Ablage in S3 (optional) ---
+      # Statt im Volume landen fertige Dateien im Bucket; STORAGE_DIR ist dann
+      # nur noch Arbeitsverzeichnis/Zwischenspeicher (siehe DOCKERHUB.md).
+      # STORAGE_BACKEND: s3
+      # S3_BUCKET: meeting-recorder
+      # S3_ENDPOINT: http://minio:9000   # nur fuer S3-kompatible Speicher
+      # S3_PATH_STYLE: "true"
+      # S3_ACCESS_KEY: ...
+      # S3_SECRET_KEY: ...
     # UI + API werden zusammen auf 8080 ausgeliefert.
     # Links der Host-Port (im Browser aufrufen), rechts bleibt 8080.
     ports:

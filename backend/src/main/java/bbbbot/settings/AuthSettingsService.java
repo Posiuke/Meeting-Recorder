@@ -26,9 +26,11 @@ public class AuthSettingsService {
     public static final String LDAP_URL = "auth.ldapUrl";
     public static final String LDAP_ROOT_DN = "auth.ldapRootDn";
     public static final String BOOTSTRAP_ADMINS = "auth.bootstrapAdmins";
+    /** Anmeldeseite zeigt nur die OIDC-Knoepfe; das Passwortformular erst auf Klick. */
+    public static final String LOCAL_LOGIN_HIDDEN = "auth.localLoginHidden";
 
     private static final List<String> KEYS =
-            List.of(LDAP_ENABLED, LDAP_DOMAIN, LDAP_URL, LDAP_ROOT_DN, BOOTSTRAP_ADMINS);
+            List.of(LDAP_ENABLED, LDAP_DOMAIN, LDAP_URL, LDAP_ROOT_DN, BOOTSTRAP_ADMINS, LOCAL_LOGIN_HIDDEN);
 
     private final AppSettingRepo repo;
 
@@ -44,6 +46,7 @@ public class AuthSettingsService {
     public String domain() { return raw(LDAP_DOMAIN, "").trim(); }
     public String url() { return raw(LDAP_URL, "").trim(); }
     public String rootDn() { return raw(LDAP_ROOT_DN, "").trim(); }
+    public boolean isLocalLoginHidden() { return Boolean.parseBoolean(raw(LOCAL_LOGIN_HIDDEN, "false").trim()); }
 
     public Set<String> bootstrapAdmins() {
         return Arrays.stream(raw(BOOTSTRAP_ADMINS, "").split(","))
@@ -62,6 +65,7 @@ public class AuthSettingsService {
         m.put(LDAP_URL, url());
         m.put(LDAP_ROOT_DN, rootDn());
         m.put(BOOTSTRAP_ADMINS, raw(BOOTSTRAP_ADMINS, ""));
+        m.put(LOCAL_LOGIN_HIDDEN, String.valueOf(isLocalLoginHidden()));
         return m;
     }
 
@@ -72,9 +76,9 @@ public class AuthSettingsService {
                 throw new IllegalArgumentException("Unbekannter Auth-Schluessel: " + e.getKey());
             }
             String value = e.getValue() == null ? "" : e.getValue();
-            if (LDAP_ENABLED.equals(e.getKey())
+            if ((LDAP_ENABLED.equals(e.getKey()) || LOCAL_LOGIN_HIDDEN.equals(e.getKey()))
                     && !value.trim().equalsIgnoreCase("true") && !value.trim().equalsIgnoreCase("false")) {
-                throw new IllegalArgumentException("auth.ldapEnabled erwartet true/false");
+                throw new IllegalArgumentException(e.getKey() + " erwartet true/false");
             }
             save(e.getKey(), value);
         }

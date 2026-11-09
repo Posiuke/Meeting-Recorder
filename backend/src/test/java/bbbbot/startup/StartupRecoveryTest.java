@@ -59,7 +59,7 @@ class StartupRecoveryTest {
 
         this.tmp = tmp;
         recovery = new StartupRecovery(sessionRepo, recordingRepo, segmentRepo, jobRepo,
-                documentRepo, documentService, props);
+                documentRepo, documentService, props, new bbbbot.storage.FileStore(props, (bbbbot.storage.ObjectStore) null));
     }
 
     private Path tmp;

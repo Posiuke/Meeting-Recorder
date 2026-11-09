@@ -18,13 +18,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -56,6 +54,7 @@ public class RecordingService {
     private final ProcessingJobRepo jobRepo;
     private final BotSessionRepo sessionRepo;
     private final bbbbot.sharing.BotTemplateAccess templateAccess;
+    private final bbbbot.storage.FileStore store;
 
     private final ExecutorService transcodePool = Executors.newFixedThreadPool(2, r -> {
         Thread t = new Thread(r, "transcode");
@@ -89,7 +88,8 @@ public class RecordingService {
     public RecordingService(AppProperties props, FfmpegService ffmpeg, SettingsService settings,
                             RecordingRepo recordingRepo, RecordingSegmentRepo segmentRepo,
                             ProcessingJobRepo jobRepo, BotSessionRepo sessionRepo,
-                            bbbbot.sharing.BotTemplateAccess templateAccess) {
+                            bbbbot.sharing.BotTemplateAccess templateAccess,
+                            bbbbot.storage.FileStore store) {
         this.props = props;
         this.ffmpeg = ffmpeg;
         this.settings = settings;
@@ -98,6 +98,7 @@ public class RecordingService {
         this.jobRepo = jobRepo;
         this.sessionRepo = sessionRepo;
         this.templateAccess = templateAccess;
+        this.store = store;
     }
 
     /**
@@ -119,11 +120,12 @@ public class RecordingService {
         if (title != null && !title.isBlank()) {
             recording.setTitle(title.trim());
         }
-        Path dir = Path.of(props.getStorage().getRootDir()).resolve(recording.getId().toString());
+        Path dir;
         try {
-            Files.createDirectories(dir);
+            dir = store.recordingDir(recording.getId());
         } catch (IOException e) {
-            throw new IllegalStateException("Aufnahme-Verzeichnis kann nicht angelegt werden: " + dir, e);
+            throw new IllegalStateException("Aufnahme-Verzeichnis kann nicht angelegt werden: "
+                    + recording.getId(), e);
         }
         recording.setDirectory(dir.toAbsolutePath().toString());
         recordingRepo.save(recording);
@@ -224,8 +226,7 @@ public class RecordingService {
         // Dasselbe gilt fuer die Sprache der Spracherkennung: Sie wird beim
         // Transkribieren gebraucht, das direkt im Anschluss laufen kann.
         recording.setSttLanguage(options.sttLanguage());
-        Path dir = Path.of(props.getStorage().getRootDir()).resolve(recording.getId().toString());
-        Files.createDirectories(dir);
+        Path dir = store.recordingDir(recording.getId());
         recording.setDirectory(dir.toAbsolutePath().toString());
 
         Path source = dir.resolve("upload_" + sanitizeFilename(originalFilename));
@@ -269,6 +270,8 @@ public class RecordingService {
         transcodePool.execute(() -> {
             transcodeSourceFile(recordingId, source);
             finalizeSourceFile(recordingId, processNow, transcribeOnly);
+            // Die Quelldatei bleibt aufbewahrt (Neuverarbeitung, Video loeschen).
+            store.publish(source);
         });
         if (hasVideo) {
             activeMuxes.add(recordingId);
@@ -327,6 +330,7 @@ public class RecordingService {
                 segment.setSizeBytes(Files.size(mp3));
             } catch (IOException ignored) {}
             segment.setStatus(RecordingSegment.Status.READY);
+            store.publish(mp3);
             segmentRepo.save(segment);
         }
         log.info("Quelldatei von Aufnahme {} in {} MP3-Segment(e) transkodiert",
@@ -350,6 +354,7 @@ public class RecordingService {
         if (recording == null) return;
         Path outMp4 = Path.of(recording.getDirectory()).resolve("meeting.mp4");
         FfmpegService.MuxResult result = ffmpeg.convertToMp4(source, outMp4);
+        if (result.success()) store.publish(outMp4);
 
         // Gezieltes Update statt save(): Die Transkodierung/Finalisierung derselben
         // Aufnahme laeuft parallel und wuerde sonst mit ihrem alten Schnappschuss
@@ -486,6 +491,8 @@ public class RecordingService {
                 segment.setMp3Path(result.mp3Path().toAbsolutePath().toString());
                 segment.setDurationMs(result.durationMs());
                 segment.setStatus(RecordingSegment.Status.READY);
+                store.publish(result.mp3Path());
+                store.publish(webm);
                 log.info("Segment {} transkodiert: {} ({} ms)", segment.getSeq(), mp3.getFileName(), result.durationMs());
             } else {
                 segment.setStatus(RecordingSegment.Status.FAILED);
@@ -655,6 +662,7 @@ public class RecordingService {
         List<Path> audio = segmentRepo.findByRecordingIdOrderBySeq(recordingId).stream()
                 .filter(s -> s.getStatus() == RecordingSegment.Status.READY && s.getMp3Path() != null)
                 .map(s -> Path.of(s.getMp3Path()))
+                .filter(store::ensureLocal)
                 .toList();
         // Vorlauf des Videos vor dem Aufnahmestart (Playwright nimmt den ganzen
         // Kontext ab Join auf) -> Video vorne abschneiden, damit A/V synchron sind.
@@ -663,6 +671,7 @@ public class RecordingService {
                 : Math.max(0, recording.getStartedAt().toEpochMilli() - videoStartEpochMs);
         Path outMp4 = Path.of(recording.getDirectory()).resolve("meeting.mp4");
         FfmpegService.MuxResult result = ffmpeg.muxToMp4(parts, audio, outMp4, offsetMs);
+        if (result.success()) store.publish(outMp4);
 
         if (result.success()) {
             recordingRepo.updateVideoState(recordingId, Recording.VideoStatus.READY,
@@ -704,7 +713,7 @@ public class RecordingService {
                     .map(RecordingSegment::getWebmPath)
                     .filter(Objects::nonNull)
                     .map(Path::of)
-                    .filter(p -> Files.exists(p) && hasVideoStream(p))
+                    .filter(p -> containsVideo(p, recording))
                     .forEach(files::add);
         }
         // Die Tonspur bleibt in jedem Fall stehen.
@@ -717,14 +726,22 @@ public class RecordingService {
             Path abs = file.toAbsolutePath().normalize();
             // Nur im eigenen Aufnahme-Verzeichnis loeschen, nie die Tonspur.
             if (!abs.startsWith(dir) || audio.contains(abs)) continue;
-            try {
-                if (Files.deleteIfExists(abs)) log.info("Video von Aufnahme {} geloescht: {}", recordingId, abs.getFileName());
-            } catch (IOException e) {
-                log.warn("Videodatei {} konnte nicht geloescht werden: {}", abs, e.getMessage());
-            }
+            store.delete(abs);
+            log.info("Video von Aufnahme {} geloescht: {}", recordingId, abs.getFileName());
         }
         recordingRepo.updateVideoState(recordingId, Recording.VideoStatus.DELETED, null);
         return true;
+    }
+
+    /**
+     * Steckt in der aufbewahrten Quelldatei ein Bild? Lokal wird das geprobt.
+     * Liegt sie nur noch in der Ablage, entscheidet die Aufnahme selbst - eine
+     * mehrere GB grosse Datei nur fuer diese Frage zu laden lohnt nicht, und bei
+     * Upload/Bildschirmaufnahme mit Video stammt das Bild genau aus ihr.
+     */
+    private boolean containsVideo(Path source, Recording recording) {
+        if (Files.isRegularFile(source)) return hasVideoStream(source);
+        return recording.isRecordVideo() && store.exists(source);
     }
 
     /** Video als fehlgeschlagen kennzeichnen, ohne andere Felder der Aufnahme anzufassen. */
@@ -758,7 +775,8 @@ public class RecordingService {
             if (isSessionRunning(r.getBotSessionId())) continue;
 
             Path mp4 = Path.of(r.getDirectory()).resolve("meeting.mp4");
-            boolean usable = Files.isRegularFile(mp4) && fileSizeQuietly(mp4) > 0;
+            boolean usable = store.size(mp4) > 0;
+            if (usable && Files.isRegularFile(mp4)) store.publish(mp4);
             if (usable) {
                 recordingRepo.updateVideoState(r.getId(), Recording.VideoStatus.READY,
                         mp4.toAbsolutePath().toString());
@@ -779,14 +797,6 @@ public class RecordingService {
                         || s.getStatus() == BotSession.Status.RECORDING
                         || s.getStatus() == BotSession.Status.RECONNECTING)
                 .orElse(false);
-    }
-
-    private static long fileSizeQuietly(Path file) {
-        try {
-            return Files.size(file);
-        } catch (IOException e) {
-            return 0;
-        }
     }
 
     private void awaitFinalize(UUID recordingId) {
@@ -822,17 +832,9 @@ public class RecordingService {
         recording.setDiscardReason(reason);
         recordingRepo.save(recording);
         // Audiodaten verworfen, Verzeichnis aufraeumen (Datenschutz: Teilnehmer hat STOP gesendet)
-        try {
-            Path dir = Path.of(recording.getDirectory());
-            if (Files.exists(dir)) {
-                try (var stream = Files.walk(dir)) {
-                    stream.sorted(Comparator.reverseOrder()).forEach(p -> {
-                        try { Files.delete(p); } catch (IOException ignored) {}
-                    });
-                }
-            }
-        } catch (IOException e) {
-            log.warn("Verzeichnis der verworfenen Aufnahme konnte nicht geloescht werden: {}", e.getMessage());
+        if (!store.deleteDirectory(Path.of(recording.getDirectory()))) {
+            log.warn("Verzeichnis der verworfenen Aufnahme {} konnte nicht vollstaendig geloescht werden",
+                    recording.getId());
         }
         log.info("Aufnahme {} verworfen: {}", recording.getId(), reason);
     }
@@ -852,14 +854,27 @@ public class RecordingService {
         try {
             Path dir = Path.of(recording.getDirectory());
             if (recording.getParticipantsLog() != null) {
-                Files.writeString(dir.resolve("participants.txt"), recording.getParticipantsLog(), StandardCharsets.UTF_8);
+                store.writeString(dir.resolve("participants.txt"), recording.getParticipantsLog());
             }
             if (recording.getChatLog() != null) {
-                Files.writeString(dir.resolve("chat.txt"), recording.getChatLog(), StandardCharsets.UTF_8);
+                store.writeString(dir.resolve("chat.txt"), recording.getChatLog());
             }
         } catch (IOException e) {
             log.warn("Protokoll-Dateien konnten nicht geschrieben werden: {}", e.getMessage());
         }
+    }
+
+    /**
+     * Laufende oder wartende Medienarbeit (Transkodieren, Finalisieren, Video).
+     * Fuer die Leerlauf-Meldung: Solange hier etwas ansteht, darf der Dienst
+     * nicht herunterfahren.
+     */
+    public int activeMediaWork() {
+        int pool = 0;
+        if (transcodePool instanceof java.util.concurrent.ThreadPoolExecutor tpe) {
+            pool = tpe.getActiveCount() + tpe.getQueue().size();
+        }
+        return pool + finalizeFutures.size() + activeMuxes.size();
     }
 
     @PreDestroy

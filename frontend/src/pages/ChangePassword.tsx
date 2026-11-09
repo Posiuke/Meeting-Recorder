@@ -29,7 +29,11 @@ export default function ChangePassword() {
     return (
       <div className="page narrow">
         <h1>{t('changePassword.heading')}</h1>
-        <Alert kind="info">{t('changePassword.ldapManaged')}</Alert>
+        <Alert kind="info">
+          {user.authProvider
+            ? t('changePassword.ssoManaged', { provider: user.authProvider })
+            : t('changePassword.ldapManaged')}
+        </Alert>
       </div>
     );
   }

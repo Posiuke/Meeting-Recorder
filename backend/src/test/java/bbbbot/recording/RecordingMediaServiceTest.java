@@ -36,7 +36,7 @@ class RecordingMediaServiceTest {
         SummaryRepo summaryRepo = mock(SummaryRepo.class);
         participantService = mock(ParticipantService.class);
         media = new RecordingMediaService(segmentRepo, summaryRepo, participantService,
-                mock(FullAudioService.class));
+                mock(FullAudioService.class), new bbbbot.storage.FileStore(new bbbbot.config.AppProperties(), (bbbbot.storage.ObjectStore) null));
 
         recording = Recording.start(null, UUID.randomUUID(), null, "/tmp/x", false, true, true);
         recording.setTitle("Wochenbesprechung Technik");

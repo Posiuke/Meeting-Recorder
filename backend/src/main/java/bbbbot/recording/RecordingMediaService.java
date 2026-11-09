@@ -10,7 +10,8 @@ import bbbbot.export.WordDocument;
 import bbbbot.repository.Repositories.RecordingSegmentRepo;
 import bbbbot.repository.Repositories.SummaryRepo;
 import bbbbot.stt.TranscriptAssembler;
-import org.springframework.core.io.FileSystemResource;
+import bbbbot.storage.FileStore;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -39,31 +40,31 @@ public class RecordingMediaService {
     private final SummaryRepo summaryRepo;
     private final ParticipantService participantService;
     private final FullAudioService fullAudioService;
+    private final FileStore store;
 
     public RecordingMediaService(RecordingSegmentRepo segmentRepo, SummaryRepo summaryRepo,
-                                 ParticipantService participantService, FullAudioService fullAudioService) {
+                                 ParticipantService participantService, FullAudioService fullAudioService,
+                                 FileStore store) {
         this.segmentRepo = segmentRepo;
         this.summaryRepo = summaryRepo;
         this.participantService = participantService;
         this.fullAudioService = fullAudioService;
+        this.store = store;
     }
 
     /**
-     * MP3 eines Segments. ResponseEntity mit Resource unterstuetzt
-     * HTTP-Range-Requests (Springen in der Wiedergabe) automatisch.
+     * MP3 eines Segments, mit HTTP-Range-Requests (Springen in der Wiedergabe) -
+     * lokal oder direkt aus der Ablage ({@link FileStore#serve}).
      */
-    public ResponseEntity<FileSystemResource> audio(UUID recordingId, UUID segmentId) {
+    public ResponseEntity<Resource> audio(UUID recordingId, UUID segmentId) {
         RecordingSegment segment = segmentRepo.findById(segmentId)
                 .filter(s -> s.getRecordingId().equals(recordingId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Segment nicht gefunden"));
-        if (segment.getMp3Path() == null || !Files.exists(Path.of(segment.getMp3Path()))) {
+        if (segment.getMp3Path() == null || segment.getMp3Path().isBlank()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Audiodatei nicht vorhanden");
         }
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("audio/mpeg"))
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "inline; filename=\"segment_%03d.mp3\"".formatted(segment.getSeq()))
-                .body(new FileSystemResource(segment.getMp3Path()));
+        return store.serve(Path.of(segment.getMp3Path()), MediaType.parseMediaType("audio/mpeg"),
+                "inline; filename=\"segment_%03d.mp3\"".formatted(segment.getSeq()));
     }
 
     /**
@@ -71,22 +72,18 @@ public class RecordingMediaService {
      * Requests werden unterstuetzt - erst dadurch kann der Player an eine Stelle
      * springen, ohne die ganze Datei zu laden.
      */
-    public ResponseEntity<FileSystemResource> fullAudio(Recording recording) {
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("audio/mpeg"))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"aufnahme.mp3\"")
-                .body(new FileSystemResource(requireFullAudio(recording)));
+    public ResponseEntity<Resource> fullAudio(Recording recording) {
+        return store.serve(requireFullAudio(recording), MediaType.parseMediaType("audio/mpeg"),
+                "inline; filename=\"aufnahme.mp3\"");
     }
 
     /** Dieselbe Tonspur zum Herunterladen - Dateiname mit Datum und Kurz-Kennung. */
-    public ResponseEntity<FileSystemResource> fullAudioDownload(Recording recording) {
+    public ResponseEntity<Resource> fullAudioDownload(Recording recording) {
         Path path = requireFullAudio(recording);
         String filename = "aufnahme_" + recording.getStartedAt().toString().substring(0, 10)
                 + "_" + recording.getId().toString().substring(0, 8) + ".mp3";
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("audio/mpeg"))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                .body(new FileSystemResource(path));
+        return store.serve(path, MediaType.parseMediaType("audio/mpeg"),
+                "attachment; filename=\"" + filename + "\"");
     }
 
     private Path requireFullAudio(Recording recording) {
@@ -96,22 +93,18 @@ public class RecordingMediaService {
     }
 
     /** Video zur Wiedergabe im Browser (Range-Requests fuer das Springen). */
-    public ResponseEntity<FileSystemResource> video(Recording recording) {
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("video/mp4"))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"meeting.mp4\"")
-                .body(new FileSystemResource(requireVideoPath(recording)));
+    public ResponseEntity<Resource> video(Recording recording) {
+        return store.serve(Path.of(requireVideoPath(recording)), MediaType.parseMediaType("video/mp4"),
+                "inline; filename=\"meeting.mp4\"");
     }
 
     /** Video zum Herunterladen - Dateiname mit Datum und Kurz-Kennung der Aufnahme. */
-    public ResponseEntity<FileSystemResource> videoDownload(Recording recording) {
+    public ResponseEntity<Resource> videoDownload(Recording recording) {
         String path = requireVideoPath(recording);
         String filename = "meeting_" + recording.getStartedAt().toString().substring(0, 10)
                 + "_" + recording.getId().toString().substring(0, 8) + ".mp4";
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("video/mp4"))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                .body(new FileSystemResource(path));
+        return store.serve(Path.of(path), MediaType.parseMediaType("video/mp4"),
+                "attachment; filename=\"" + filename + "\"");
     }
 
     /** Aktuelle Fassung der Zusammenfassung als Markdown-Datei. */
@@ -192,9 +185,14 @@ public class RecordingMediaService {
         return variant == null ? date : date + " · Fassung: " + variant;
     }
 
-    /** Ist ein abspielbares Video vorhanden? (Datei existiert wirklich) */
+    /**
+     * Ist ein abspielbares Video vorhanden? Lokal wird die Datei geprueft; mit
+     * Ablage gilt der Video-Status (sonst fragte jede Ansicht den Bucket an).
+     */
     public boolean hasVideo(Recording recording) {
-        return recording.getVideoPath() != null && Files.exists(Path.of(recording.getVideoPath()));
+        if (recording.getVideoPath() == null) return false;
+        if (FileStore.isRemoteMode()) return recording.getVideoStatus() == Recording.VideoStatus.READY;
+        return Files.exists(Path.of(recording.getVideoPath()));
     }
 
     private String requireVideoPath(Recording recording) {

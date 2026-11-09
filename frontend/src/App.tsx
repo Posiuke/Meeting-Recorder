@@ -8,6 +8,7 @@ import { isLanguage, setLanguage } from './i18n';
 import Layout from './components/Layout';
 import RequireAuth from './components/RequireAuth';
 import LoginPage from './pages/LoginPage';
+import SsoCallbackPage from './pages/SsoCallbackPage';
 import BotsPage from './pages/BotsPage';
 import RecordingsPage from './pages/RecordingsPage';
 import RecordingDetailPage from './pages/RecordingDetailPage';
@@ -75,6 +76,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/login/sso" element={<SsoCallbackPage />} />
       {/* Freigabe-Link: bewusst ohne RequireAuth - die Berechtigung steckt im Token */}
       <Route path="/share/:token" element={<SharePage />} />
       {/* Anonymer Stopp-Link aus dem Aufnahme-Hinweis des Bots - ohne Anmeldung */}

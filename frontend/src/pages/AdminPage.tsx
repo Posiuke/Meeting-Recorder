@@ -19,6 +19,7 @@ import Alert from '../components/Alert';
 import HelpTip from '../components/HelpTip';
 import { api, errorMessage } from '../api/client';
 import StatusBadge from '../components/StatusBadge';
+import AdminOidcSection from './AdminOidcSection';
 import AdminGroupsTab from './AdminGroupsTab';
 import { formatDateTime, formatShortDuration, formatTime } from '../utils/format';
 import { useI18n } from '../i18n';
@@ -352,6 +353,7 @@ function AuthTab() {
 
   return (
     <div>
+      <AdminOidcSection />
       <section className="card settings-group">
         <h2>{t('admin.authHeading')}</h2>
         <p className="settings-note">{t('admin.authNote')}</p>
@@ -1028,12 +1030,12 @@ function UsersTab() {
   // Der Zustand ist nur brauchbar, wenn er aktuell ist: Die Liste lädt sich
   // nach, solange der Tab offen ist.
   useEffect(() => {
-    const load = () => {
-      void dispatch(fetchAdminUsers());
+    const load = (background: boolean) => {
+      void dispatch(fetchAdminUsers(background));
       setRefreshedAt(new Date().toISOString());
     };
-    load();
-    const timer = window.setInterval(load, USERS_REFRESH_MS);
+    load(false);
+    const timer = window.setInterval(() => load(true), USERS_REFRESH_MS);
     return () => window.clearInterval(timer);
   }, [dispatch]);
 
@@ -1169,7 +1171,11 @@ function UsersTab() {
                     {user.username}
                     <div className="admin-user-account">
                       <span className={`badge ${user.local ? 'badge-blue' : 'badge-gray'}`}>
-                        {user.local ? t('admin.usersTypeLocal') : t('admin.usersTypeLdap')}
+                        {user.local
+                          ? t('admin.usersTypeLocal')
+                          : user.authProvider
+                            ? t('admin.usersTypeSso', { provider: user.authProvider })
+                            : t('admin.usersTypeLdap')}
                       </span>
                       {user.local && user.mustChangePassword && (
                         <span className="muted"> {t('admin.usersMustChange')}</span>
@@ -1308,12 +1314,12 @@ function ProcessingTab() {
 
   // Ein Betriebsbild ist nur brauchbar, wenn es aktuell ist.
   useEffect(() => {
-    const load = () => {
-      void dispatch(fetchProcessingQueue());
+    const load = (background: boolean) => {
+      void dispatch(fetchProcessingQueue(background));
       setRefreshedAt(new Date().toISOString());
     };
-    load();
-    const timer = window.setInterval(load, PROCESSING_REFRESH_MS);
+    load(false);
+    const timer = window.setInterval(() => load(true), PROCESSING_REFRESH_MS);
     return () => window.clearInterval(timer);
   }, [dispatch]);
 

@@ -43,12 +43,15 @@ public class FullAudioService {
 
     private final RecordingSegmentRepo segmentRepo;
     private final FfmpegService ffmpeg;
+    private final bbbbot.storage.FileStore store;
 
     private final Map<UUID, ReentrantLock> locks = new ConcurrentHashMap<>();
 
-    public FullAudioService(RecordingSegmentRepo segmentRepo, FfmpegService ffmpeg) {
+    public FullAudioService(RecordingSegmentRepo segmentRepo, FfmpegService ffmpeg,
+                            bbbbot.storage.FileStore store) {
         this.segmentRepo = segmentRepo;
         this.ffmpeg = ffmpeg;
+        this.store = store;
     }
 
     /**
@@ -58,10 +61,16 @@ public class FullAudioService {
      *         Zusammenfuegen fehlschlaegt
      */
     public Optional<Path> fullAudio(Recording recording) {
-        List<Path> parts = audioParts(recording.getId());
-        if (parts.isEmpty()) return Optional.empty();
+        List<Path> paths = segmentPaths(recording.getId());
+        if (paths.isEmpty()) return Optional.empty();
         // Eine einzelne Datei ist bereits die ganze Aufnahme - nichts zu tun.
-        if (parts.size() == 1) return Optional.of(parts.get(0));
+        // Sie wird direkt ausgeliefert (mit Ablage auch aus dem Bucket).
+        if (paths.size() == 1) {
+            return store.exists(paths.get(0)) ? Optional.of(paths.get(0)) : Optional.empty();
+        }
+        // Zum Zusammenfuegen braucht ffmpeg alle Segmente lokal.
+        List<Path> parts = paths.stream().filter(store::ensureLocal).toList();
+        if (parts.isEmpty()) return Optional.empty();
 
         Path target = Path.of(recording.getDirectory()).resolve(FILENAME);
         ReentrantLock lock = locks.computeIfAbsent(recording.getId(), id -> new ReentrantLock());
@@ -85,19 +94,24 @@ public class FullAudioService {
         }
     }
 
-    /** Hat die Aufnahme ueberhaupt abspielbares Audio? (ohne etwas zu erzeugen) */
+    /**
+     * Hat die Aufnahme ueberhaupt abspielbares Audio? Ohne etwas zu erzeugen
+     * und - mit Ablage - ohne den Bucket je Segment zu fragen.
+     */
     public boolean hasAudio(Recording recording) {
-        return !audioParts(recording.getId()).isEmpty();
+        return !segmentPaths(recording.getId()).isEmpty();
     }
 
-    /** Fertige MP3-Segmente in Reihenfolge, nur vorhandene Dateien. */
-    private List<Path> audioParts(UUID recordingId) {
+    /**
+     * Fertige MP3-Segmente in Reihenfolge. Ohne Ablage nur vorhandene Dateien;
+     * mit Ablage gelten sie als vorhanden (geholt wird erst beim Zusammenfuegen).
+     */
+    private List<Path> segmentPaths(UUID recordingId) {
         return segmentRepo.findByRecordingIdOrderBySeq(recordingId).stream()
                 .filter(s -> s.getStatus() == RecordingSegment.Status.READY)
                 .map(RecordingSegment::getMp3Path)
-                .filter(p -> p != null && !p.isBlank())
+                .filter(bbbbot.storage.FileStore::probablyExists)
                 .map(Path::of)
-                .filter(Files::exists)
                 .toList();
     }
 

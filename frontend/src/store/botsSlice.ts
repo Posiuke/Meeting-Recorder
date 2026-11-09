@@ -26,9 +26,9 @@ const initialState: BotsState = {
 /** Arg: silent = true beim Polling (kein Lade-Spinner). */
 export const fetchBots = createAsyncThunk<BotView[], boolean, { rejectValue: string }>(
   'bots/fetch',
-  async (_silent, { rejectWithValue }) => {
+  async (silent, { rejectWithValue }) => {
     try {
-      return await api<BotView[]>('/api/bots');
+      return await api<BotView[]>('/api/bots', { background: silent });
     } catch (e) {
       return rejectWithValue(errorMessage(e));
     }

@@ -8,6 +8,8 @@ export interface UserView {
   admin: boolean;
   /** true = lokales Passwort-Konto (kann Passwort aendern); false = reines LDAP-Konto */
   local: boolean;
+  /** Kennung des OIDC-Anbieters, über den das Konto angemeldet wird; null = lokal/LDAP. */
+  authProvider: string | null;
   mustChangePassword: boolean;
   /** Am Konto gespeicherte Oberflächensprache; null = noch nicht gewählt */
   language: string | null;

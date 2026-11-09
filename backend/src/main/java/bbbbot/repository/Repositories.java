@@ -8,6 +8,7 @@ import bbbbot.domain.BotTemplate;
 import bbbbot.domain.BotTemplateShare;
 import bbbbot.domain.GlossaryEntry;
 import bbbbot.domain.GroupMember;
+import bbbbot.domain.OidcProvider;
 import bbbbot.domain.Participant;
 import bbbbot.domain.ProcessingJob;
 import bbbbot.domain.PromptTemplate;
@@ -33,7 +34,14 @@ public interface Repositories {
 
     interface AppUserRepo extends JpaRepository<AppUser, UUID> {
         Optional<AppUser> findByUsernameIgnoreCase(String username);
+        Optional<AppUser> findByAuthProviderAndExternalSubject(String authProvider, String externalSubject);
         List<AppUser> findTop20ByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(String u, String d);
+    }
+
+    interface OidcProviderRepo extends JpaRepository<OidcProvider, UUID> {
+        Optional<OidcProvider> findBySlug(String slug);
+        List<OidcProvider> findAllByOrderByDisplayNameAsc();
+        List<OidcProvider> findByEnabledTrueOrderByDisplayNameAsc();
     }
 
     interface ApiKeyRepo extends JpaRepository<ApiKey, UUID> {

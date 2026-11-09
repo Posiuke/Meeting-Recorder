@@ -47,6 +47,7 @@ public class RecordingDocumentService {
     private final RecordingDocumentRepo repo;
     private final DocumentTextExtractor extractor;
     private final SettingsService settings;
+    private final bbbbot.storage.FileStore store;
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "document-extract");
@@ -55,10 +56,11 @@ public class RecordingDocumentService {
     });
 
     public RecordingDocumentService(RecordingDocumentRepo repo, DocumentTextExtractor extractor,
-                                    SettingsService settings) {
+                                    SettingsService settings, bbbbot.storage.FileStore store) {
         this.repo = repo;
         this.extractor = extractor;
         this.settings = settings;
+        this.store = store;
     }
 
     public boolean isEnabled() {
@@ -96,7 +98,7 @@ public class RecordingDocumentService {
      */
     public RecordingDocument add(Recording recording, String originalFilename, String contentType,
                                 InputStream data, UUID uploadedBy) throws IOException {
-        Path dir = Path.of(recording.getDirectory()).resolve(SUBDIRECTORY);
+        Path dir = Path.of(recording.getDirectory()).resolve(SUBDIRECTORY).toAbsolutePath();
         Files.createDirectories(dir);
 
         String filename = safeFilename(originalFilename);
@@ -106,6 +108,7 @@ public class RecordingDocumentService {
         // Dateien nicht, und im Verzeichnis ist sichtbar, was zu welcher Zeile gehoert.
         Path target = dir.resolve(document.getId() + "_" + filename);
         long bytes = Files.copy(data, target, StandardCopyOption.REPLACE_EXISTING);
+        store.publish(target);
         document.setStoredPath(target.toAbsolutePath().toString());
         document.setSizeBytes(bytes);
         repo.save(document);
@@ -129,12 +132,7 @@ public class RecordingDocumentService {
 
     /** Datei und Zeile entfernen. Ein fehlendes Original ist kein Fehler mehr. */
     public void delete(RecordingDocument document) {
-        try {
-            Files.deleteIfExists(Path.of(document.getStoredPath()));
-        } catch (IOException e) {
-            log.warn("Unterlage {} konnte nicht geloescht werden: {}",
-                    document.getStoredPath(), e.getMessage());
-        }
+        store.delete(Path.of(document.getStoredPath()));
         repo.delete(document);
     }
 
@@ -144,12 +142,22 @@ public class RecordingDocumentService {
                 .anyMatch(d -> d.getStatus() == RecordingDocument.Status.PENDING);
     }
 
+    /** Eingereihte oder laufende Textextraktionen (Leerlauf-Meldung). */
+    private final java.util.concurrent.atomic.AtomicInteger queued = new java.util.concurrent.atomic.AtomicInteger();
+
+    public int pendingExtractions() {
+        return queued.get();
+    }
+
     private void queueExtraction(UUID documentId) {
+        queued.incrementAndGet();
         worker.submit(() -> {
             try {
                 extractNow(documentId);
             } catch (RuntimeException e) {
                 log.error("Textextraktion fuer Unterlage {} unerwartet gescheitert", documentId, e);
+            } finally {
+                queued.decrementAndGet();
             }
         });
     }
@@ -158,6 +166,8 @@ public class RecordingDocumentService {
     void extractNow(UUID documentId) {
         RecordingDocument document = repo.findById(documentId).orElse(null);
         if (document == null) return;
+        // Mit Ablage liegt die Datei nach einem Neustart nur im Bucket.
+        store.ensureLocal(Path.of(document.getStoredPath()));
         DocumentTextExtractor.Result result = extractor.extract(document);
         document.setExtractedAt(Instant.now());
         if (result.success()) {

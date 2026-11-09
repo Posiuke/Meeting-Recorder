@@ -26,7 +26,6 @@ import bbbbot.repository.Repositories.UserGroupRepo;
 import bbbbot.sharing.AccessService;
 import bbbbot.sharing.ShareLinkService;
 import bbbbot.stt.TranscriptAssembler;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -46,7 +45,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Comparator;
@@ -89,6 +87,7 @@ public class RecordingController {
     private final bbbbot.docs.RecordingDocumentService documentService;
     private final bbbbot.processing.ProcessingQueueService processingQueue;
     private final bbbbot.recording.SpeakerNamingService speakerNaming;
+    private final bbbbot.storage.FileStore store;
 
     public RecordingController(AccessService access, RecordingRepo recordingRepo,
                                RecordingSegmentRepo segmentRepo, SummaryRepo summaryRepo,
@@ -106,7 +105,8 @@ public class RecordingController {
                                bbbbot.recording.RecordingMediaService media,
                                bbbbot.docs.RecordingDocumentService documentService,
                                bbbbot.processing.ProcessingQueueService processingQueue,
-                               bbbbot.recording.SpeakerNamingService speakerNaming) {
+                               bbbbot.recording.SpeakerNamingService speakerNaming,
+                               bbbbot.storage.FileStore store) {
         this.access = access;
         this.recordingRepo = recordingRepo;
         this.segmentRepo = segmentRepo;
@@ -130,6 +130,7 @@ public class RecordingController {
         this.documentService = documentService;
         this.processingQueue = processingQueue;
         this.speakerNaming = speakerNaming;
+        this.store = store;
     }
 
     // ---------------------------------------------------------------- Upload
@@ -581,7 +582,7 @@ public class RecordingController {
     // ------------------------------------------------------------ Audio/Text
 
     @GetMapping("/{id}/segments/{segmentId}/audio")
-    public ResponseEntity<FileSystemResource> audio(@PathVariable UUID id, @PathVariable UUID segmentId) {
+    public ResponseEntity<org.springframework.core.io.Resource> audio(@PathVariable UUID id, @PathVariable UUID segmentId) {
         AppUser user = CurrentUser.get();
         access.requireReadable(id, user);
         return media.audio(id, segmentId);
@@ -593,26 +594,26 @@ public class RecordingController {
      * die passende Stelle springen laesst.
      */
     @GetMapping("/{id}/audio")
-    public ResponseEntity<FileSystemResource> fullAudio(@PathVariable UUID id) {
+    public ResponseEntity<org.springframework.core.io.Resource> fullAudio(@PathVariable UUID id) {
         AppUser user = CurrentUser.get();
         return media.fullAudio(access.requireReadable(id, user));
     }
 
     /** Dieselbe Tonspur als Download der kompletten Aufnahme. */
     @GetMapping("/{id}/audio/download")
-    public ResponseEntity<FileSystemResource> fullAudioDownload(@PathVariable UUID id) {
+    public ResponseEntity<org.springframework.core.io.Resource> fullAudioDownload(@PathVariable UUID id) {
         AppUser user = CurrentUser.get();
         return media.fullAudioDownload(access.requireReadable(id, user));
     }
 
     @GetMapping("/{id}/video")
-    public ResponseEntity<FileSystemResource> video(@PathVariable UUID id) {
+    public ResponseEntity<org.springframework.core.io.Resource> video(@PathVariable UUID id) {
         AppUser user = CurrentUser.get();
         return media.video(access.requireReadable(id, user));
     }
 
     @GetMapping("/{id}/video/download")
-    public ResponseEntity<FileSystemResource> videoDownload(@PathVariable UUID id) {
+    public ResponseEntity<org.springframework.core.io.Resource> videoDownload(@PathVariable UUID id) {
         AppUser user = CurrentUser.get();
         return media.videoDownload(access.requireReadable(id, user));
     }
@@ -1128,17 +1129,10 @@ public class RecordingController {
     }
 
     private void deleteDirectory(Path dir) {
-        try {
-            if (Files.exists(dir)) {
-                try (var stream = Files.walk(dir)) {
-                    stream.sorted(Comparator.reverseOrder()).forEach(p -> {
-                        try { Files.delete(p); } catch (IOException ignored) {}
-                    });
-                }
-            }
-        } catch (IOException e) {
+        if (!store.deleteDirectory(dir)) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Dateien konnten nicht geloescht werden: " + e.getMessage());
+                    "Dateien konnten nicht vollstaendig geloescht werden");
         }
     }
+
 }

@@ -38,6 +38,10 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/login", "/actuator/health").permitAll()
+                // OIDC: Anmeldeseite (Knoepfe), Start und Rueckkehr vom Anbieter
+                .requestMatchers("/api/auth/options", "/api/auth/oidc/**").permitAll()
+                // Leerlauf-Meldung: eigenes Token, geprueft im ActivityController
+                .requestMatchers("/api/internal/activity").permitAll()
                 // Freigabe-Links: Die Berechtigung steckt im Token in der Adresse,
                 // geprueft wird sie im PublicShareController. Nur Lesen, nur die
                 // eine freigegebene Aufnahme.

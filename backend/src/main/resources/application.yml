@@ -1,10 +1,16 @@
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:20s}
   application:
     name: bbb-bot-backend
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/bbbbot}
     username: ${DB_USER:bbbbot}
     password: ${DB_PASSWORD:bbbbot}
+    hikari:
+      # Auf einer geteilten Datenbank (z.B. kleine RDS) begrenzen; Standard wie Spring.
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -19,6 +25,9 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  # Beim Stoppen (Deploy, Scale-to-zero) laufende Anfragen noch beantworten;
+  # danach sichern CaptureService & Co. offene Daten (@PreDestroy).
+  shutdown: graceful
   # Hinter einem Reverse Proxy (TLS-Terminierung) die X-Forwarded-*-Header
   # auswerten, damit die Anwendung Schema und Host des Proxys kennt. Noetig fuer
   # die Bildschirmaufnahme, die nur im sicheren Kontext (HTTPS) laeuft -
@@ -48,6 +57,22 @@ bbbbot:
   storage:
     # Wurzelverzeichnis fuer Aufnahmen, Transkripte und Zusammenfassungen
     root-dir: ${STORAGE_DIR:./data/recordings}
+    # local (Standard) oder s3. Bei s3 ist root-dir nur Arbeitsverzeichnis und
+    # Zwischenspeicher; fertige Dateien liegen im Bucket (siehe DOCKERHUB.md).
+    backend: ${STORAGE_BACKEND:local}
+    cache-hours: ${STORAGE_CACHE_HOURS:24}
+    s3:
+      bucket: ${S3_BUCKET:}
+      prefix: ${S3_PREFIX:}
+      region: ${S3_REGION:}
+      endpoint: ${S3_ENDPOINT:}
+      path-style: ${S3_PATH_STYLE:false}
+      access-key: ${S3_ACCESS_KEY:}
+      secret-key: ${S3_SECRET_KEY:}
+  activity:
+    # Token fuer GET /api/internal/activity (Header X-Activity-Token), z.B. fuer
+    # Scale-to-zero. Leer = Endpunkt abgeschaltet.
+    token: ${ACTIVITY_TOKEN:}
   bots:
     # Maximale Anzahl gleichzeitiger Bot-Instanzen (jede Instanz = eine Chromium-Instanz)
     max-concurrent: ${MAX_CONCURRENT_BOTS:5}
@@ -70,6 +95,9 @@ bbbbot:
     # Login geaendert werden.
     admin-username: ${ADMIN_USERNAME:admin}
     admin-initial-password: ${ADMIN_INITIAL_PASSWORD:admin}
+    # Oeffentliche Adresse fuer OIDC-Redirect-URIs (z.B. https://rec.example.com).
+    # Leer = aus der Anfrage; hinter einem Proxy mit X-Forwarded-* genuegt das.
+    public-url: ${PUBLIC_URL:}
 
 logging:
   pattern:

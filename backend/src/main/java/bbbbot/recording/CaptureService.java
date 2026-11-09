@@ -21,7 +21,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -68,16 +67,19 @@ public class CaptureService {
     private final SettingsService settings;
     private final RecordingRepo recordingRepo;
     private final RecordingService recordingService;
+    private final bbbbot.storage.FileStore store;
 
     /** Laufende Aufnahmen mit offener Datei; nach einem Neustart leer (siehe sweepStale). */
     private final Map<UUID, Session> sessions = new ConcurrentHashMap<>();
 
     public CaptureService(AppProperties props, SettingsService settings,
-                          RecordingRepo recordingRepo, RecordingService recordingService) {
+                          RecordingRepo recordingRepo, RecordingService recordingService,
+                          bbbbot.storage.FileStore store) {
         this.props = props;
         this.settings = settings;
         this.recordingRepo = recordingRepo;
         this.recordingService = recordingService;
+        this.store = store;
     }
 
     /** Eine laufende Bildschirmaufnahme mit offenem Schreibkanal. */
@@ -164,8 +166,7 @@ public class CaptureService {
                 ? "Bildschirmaufnahme " + LocalDateTime.now().format(TITLE_TIME)
                 : title.trim());
 
-        Path dir = Path.of(props.getStorage().getRootDir()).resolve(recording.getId().toString());
-        Files.createDirectories(dir);
+        Path dir = store.recordingDir(recording.getId());
         recording.setDirectory(dir.toAbsolutePath().toString());
         recordingRepo.save(recording);
 
@@ -297,7 +298,7 @@ public class CaptureService {
         if (!recording.getOwnerId().equals(ownerId)) {
             throw new SecurityException("Aufnahme gehoert einem anderen Nutzer");
         }
-        deleteDirectoryQuietly(Path.of(recording.getDirectory()));
+        store.deleteDirectory(Path.of(recording.getDirectory()));
         recordingRepo.delete(recording);
         log.info("Bildschirmaufnahme {} abgebrochen und verworfen", recordingId);
     }
@@ -356,6 +357,9 @@ public class CaptureService {
         recording.setEndedAt(Instant.now());
         recording.setCaptureLastChunkAt(null);
 
+        // Nach einem Neustart auf frischem Speicher liegt die beim Herunterfahren
+        // gesicherte Rohdatei nur noch in der Ablage.
+        store.ensureLocal(file);
         long size = fileSize(file);
         long minBytes = settings.getLong(SettingsService.RECORDING_MIN_AUDIO_BYTES);
         if (size < minBytes) {
@@ -383,13 +387,8 @@ public class CaptureService {
     /** Rohdatei einer Aufnahme suchen, deren Sitzung nicht mehr im Speicher liegt. */
     private Path findCaptureFile(Recording recording) {
         Path dir = Path.of(recording.getDirectory());
-        try (var stream = Files.list(dir)) {
-            return stream.filter(p -> p.getFileName().toString().startsWith(CAPTURE_BASENAME + "."))
-                    .findFirst()
-                    .orElse(dir.resolve(CAPTURE_BASENAME + ".webm"));
-        } catch (IOException e) {
-            return dir.resolve(CAPTURE_BASENAME + ".webm");
-        }
+        return store.findByPrefix(dir, CAPTURE_BASENAME + ".")
+                .orElse(dir.resolve(CAPTURE_BASENAME + ".webm"));
     }
 
     private static String extensionFor(String mimeType) {
@@ -420,16 +419,6 @@ public class CaptureService {
         }
     }
 
-    private static void deleteDirectoryQuietly(Path dir) {
-        if (!Files.exists(dir)) return;
-        try (var stream = Files.walk(dir)) {
-            stream.sorted(Comparator.reverseOrder()).forEach(p -> {
-                try { Files.delete(p); } catch (IOException ignored) {}
-            });
-        } catch (IOException e) {
-            log.warn("Verzeichnis {} konnte nicht geloescht werden: {}", dir, e.getMessage());
-        }
-    }
 
     /** Beim Herunterfahren offene Dateien schliessen, damit nichts im Puffer verloren geht. */
     @PreDestroy
@@ -439,13 +428,16 @@ public class CaptureService {
             Session session = sessions.remove(id);
             if (session == null) continue;
             closeQuietly(session);
+            // Mit Ablage ist der lokale Speicher nach dem Neustart leer: Die
+            // bisher empfangenen Daten muessen vorher in den Bucket.
+            store.publish(session.file);
             log.info("Bildschirmaufnahme {} beim Herunterfahren gesichert ({} Bytes) - "
                     + "wird nach dem Start abgeschlossen", id, session.bytes);
         }
     }
 
-    /** Nur fuer Tests: Anzahl offener Aufnahmen. */
-    int openSessions() {
+    /** Anzahl laufender Bildschirmaufnahmen (auch fuer die Leerlauf-Meldung). */
+    public int openSessions() {
         return sessions.size();
     }
 }

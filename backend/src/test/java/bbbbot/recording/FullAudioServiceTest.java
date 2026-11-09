@@ -42,7 +42,8 @@ class FullAudioServiceTest {
     void setUp() {
         segmentRepo = mock(RecordingSegmentRepo.class);
         ffmpeg = mock(FfmpegService.class);
-        service = new FullAudioService(segmentRepo, ffmpeg);
+        service = new FullAudioService(segmentRepo, ffmpeg,
+                new bbbbot.storage.FileStore(new bbbbot.config.AppProperties(), (bbbbot.storage.ObjectStore) null));
 
         recording = Recording.start(null, UUID.randomUUID(), null, dir.toString(), false, true, false);
         // ffmpeg wird nicht wirklich aufgerufen - die Zieldatei entsteht hier

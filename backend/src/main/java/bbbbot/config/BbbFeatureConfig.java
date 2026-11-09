@@ -29,6 +29,12 @@ public class BbbFeatureConfig implements WebMvcConfigurer {
 
     public BbbFeatureConfig(AppProperties props) {
         this.props = props;
+        // Das schlanke Image hat keinen Browser - Bots wuerden erst beim Start scheitern.
+        if (props.getBbb().isEnabled() && "slim".equalsIgnoreCase(System.getenv("IMAGE_VARIANT"))) {
+            org.slf4j.LoggerFactory.getLogger(BbbFeatureConfig.class).error(
+                    "BBB_ON ist gesetzt, aber dies ist das schlanke Image ohne Chromium - "
+                            + "Bots koennen nicht starten. Das volle Image verwenden.");
+        }
     }
 
     @Override

@@ -254,9 +254,9 @@ export const fetchRecordingDetail = createAsyncThunk<
   RecordingDetail,
   { id: string; silent?: boolean },
   { rejectValue: string }
->('recordings/fetchDetail', async ({ id }, { rejectWithValue }) => {
+>('recordings/fetchDetail', async ({ id, silent }, { rejectWithValue }) => {
   try {
-    return await api<RecordingDetail>(`/api/recordings/${id}`);
+    return await api<RecordingDetail>(`/api/recordings/${id}`, { background: silent });
   } catch (e) {
     return rejectWithValue(errorMessage(e));
   }

@@ -76,6 +76,11 @@ interface RequestOptions {
   method?: string;
   /** Objekt (wird als JSON gesendet) oder FormData für Datei-Uploads. */
   body?: unknown;
+  /**
+   * Automatisches Nachladen (Polling) statt Nutzeraktion. Zählt am Server
+   * nicht als Aktivität – ein vergessener Tab hält den Dienst so nicht wach.
+   */
+  background?: boolean;
 }
 
 /**
@@ -91,6 +96,9 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   }
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+  if (options.background) {
+    headers['X-Background-Request'] = '1';
   }
   // Bei FormData setzt der Browser den Content-Type samt Boundary selbst –
   // ein eigener Header würde den Upload unbrauchbar machen.

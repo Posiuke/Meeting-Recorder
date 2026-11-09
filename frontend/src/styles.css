@@ -591,6 +591,40 @@ tbody tr:hover {
   margin-bottom: 1.25rem;
 }
 
+/* Anmeldung über OIDC-Anbieter: Knöpfe über dem Passwortformular */
+.login-sso {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 1rem 0 0.75rem;
+}
+
+.login-sso .btn {
+  text-decoration: none;
+}
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--border);
+}
+
+.login-local-toggle {
+  display: block;
+  margin: 0.25rem auto 0;
+  font-size: 0.85rem;
+}
+
 /* ===== Bot-Karten ===== */
 .bot-card {
   display: flex;
@@ -2820,4 +2854,56 @@ tbody tr:hover {
 
 .admin-reset-form input {
   max-width: 12rem;
+}
+
+/* ===== Admin: OIDC-Anbieter ===== */
+.oidc-provider-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.oidc-provider {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.oidc-provider-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.oidc-provider-meta,
+.oidc-provider-redirect {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.oidc-provider-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.oidc-presets {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.oidc-form {
+  border-top: 1px solid var(--border);
+  margin-top: 1rem;
+  padding-top: 1rem;
 }

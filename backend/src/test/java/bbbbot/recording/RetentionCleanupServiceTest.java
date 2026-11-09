@@ -30,7 +30,8 @@ class RetentionCleanupServiceTest {
         recordingRepo = org.mockito.Mockito.mock(RecordingRepo.class);
         settings = org.mockito.Mockito.mock(SettingsService.class);
         botManager = org.mockito.Mockito.mock(BotManager.class);
-        service = new RetentionCleanupService(recordingRepo, settings, botManager);
+        service = new RetentionCleanupService(recordingRepo, settings, botManager,
+                new bbbbot.storage.FileStore(new bbbbot.config.AppProperties(), (bbbbot.storage.ObjectStore) null));
 
         when(settings.getBool(SettingsService.CLEANUP_ENABLED)).thenReturn(true);
         when(settings.getLong(SettingsService.CLEANUP_OLDER_THAN_DAYS)).thenReturn(90L);

@@ -56,13 +56,14 @@ public class StartupRecovery implements ApplicationRunner {
     private final ProcessingJobRepo jobRepo;
     private final RecordingDocumentRepo documentRepo;
     private final RecordingDocumentService documentService;
+    private final bbbbot.storage.FileStore store;
     private final AppProperties props;
 
     public StartupRecovery(BotSessionRepo sessionRepo, RecordingRepo recordingRepo,
                            RecordingSegmentRepo segmentRepo, ProcessingJobRepo jobRepo,
                            RecordingDocumentRepo documentRepo,
                            RecordingDocumentService documentService,
-                           AppProperties props) {
+                           AppProperties props, bbbbot.storage.FileStore store) {
         this.sessionRepo = sessionRepo;
         this.recordingRepo = recordingRepo;
         this.segmentRepo = segmentRepo;
@@ -70,6 +71,7 @@ public class StartupRecovery implements ApplicationRunner {
         this.documentRepo = documentRepo;
         this.documentService = documentService;
         this.props = props;
+        this.store = store;
     }
 
     @Override
@@ -167,7 +169,9 @@ public class StartupRecovery implements ApplicationRunner {
                     && r.getStatus() == Recording.Status.RECORDING) continue;
 
             Path mp4 = Path.of(r.getDirectory()).resolve("meeting.mp4");
-            if (Files.isRegularFile(mp4) && sizeQuietly(mp4) > 0) {
+            // Lokal fertig geschrieben (dann noch sichern) oder schon in der Ablage
+            if (store.size(mp4) > 0) {
+                if (Files.isRegularFile(mp4)) store.publish(mp4);
                 r.setVideoPath(mp4.toAbsolutePath().toString());
                 r.setVideoStatus(Recording.VideoStatus.READY);
                 rescued++;
@@ -180,14 +184,6 @@ public class StartupRecovery implements ApplicationRunner {
         if (rescued > 0 || failed > 0) {
             log.info("Recovery: {} fertige(s) Video(s) nachtraeglich eingehaengt, "
                     + "{} haengende(s) Video(s) auf FAILED gesetzt", rescued, failed);
-        }
-    }
-
-    private static long sizeQuietly(Path file) {
-        try {
-            return Files.size(file);
-        } catch (IOException e) {
-            return 0;
         }
     }
 

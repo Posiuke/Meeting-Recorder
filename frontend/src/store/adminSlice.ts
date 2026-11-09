@@ -103,11 +103,12 @@ export const saveSettings = createAsyncThunk<SettingsMap, SettingsMap, { rejectV
   },
 );
 
-export const fetchAdminUsers = createAsyncThunk<AdminUserView[], void, { rejectValue: string }>(
+/** Arg: true beim automatischen Nachladen (zählt nicht als Aktivität). */
+export const fetchAdminUsers = createAsyncThunk<AdminUserView[], boolean | undefined, { rejectValue: string }>(
   'admin/fetchUsers',
-  async (_, { rejectWithValue }) => {
+  async (background, { rejectWithValue }) => {
     try {
-      return await api<AdminUserView[]>('/api/admin/users');
+      return await api<AdminUserView[]>('/api/admin/users', { background: background === true });
     } catch (e) {
       return rejectWithValue(errorMessage(e));
     }
@@ -164,11 +165,11 @@ export const resetUserPassword = createAsyncThunk<
  */
 export const fetchProcessingQueue = createAsyncThunk<
   ProcessingQueueView,
-  void,
+  boolean | undefined,
   { rejectValue: string }
->('admin/fetchProcessingQueue', async (_, { rejectWithValue }) => {
+>('admin/fetchProcessingQueue', async (background, { rejectWithValue }) => {
   try {
-    return await api<ProcessingQueueView>('/api/admin/processing');
+    return await api<ProcessingQueueView>('/api/admin/processing', { background: background === true });
   } catch (e) {
     return rejectWithValue(errorMessage(e));
   }

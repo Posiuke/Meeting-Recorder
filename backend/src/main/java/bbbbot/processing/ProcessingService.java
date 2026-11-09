@@ -18,8 +18,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalTime;
@@ -54,6 +52,7 @@ public class ProcessingService {
     private final ParticipantService participantService;
     private final bbbbot.recording.SpeakerNamingService speakerNaming;
     private final SettingsService settings;
+    private final bbbbot.storage.FileStore store;
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "processing");
@@ -67,7 +66,8 @@ public class ProcessingService {
                              WhisperClient whisper, SummaryService summaryService,
                              bbbbot.llm.TranscriptCorrectionService correctionService,
                              ParticipantService participantService,
-                             bbbbot.recording.SpeakerNamingService speakerNaming, SettingsService settings) {
+                             bbbbot.recording.SpeakerNamingService speakerNaming, SettingsService settings,
+                             bbbbot.storage.FileStore store) {
         this.jobRepo = jobRepo;
         this.recordingRepo = recordingRepo;
         this.segmentRepo = segmentRepo;
@@ -78,6 +78,7 @@ public class ProcessingService {
         this.participantService = participantService;
         this.speakerNaming = speakerNaming;
         this.settings = settings;
+        this.store = store;
     }
 
     /** Manuell ausgeloeste Sofort-Auswertung aus dem Frontend. */
@@ -202,6 +203,11 @@ public class ProcessingService {
         return job;
     }
 
+    /** Laeuft gerade eine Auswertung? (Leerlauf-Meldung) */
+    public boolean isBusy() {
+        return busy.get();
+    }
+
     @Scheduled(fixedDelay = 30_000, initialDelay = 15_000)
     public void poll() {
         if (busy.get()) return;
@@ -275,8 +281,11 @@ public class ProcessingService {
                 if (segment.getStatus() != RecordingSegment.Status.READY) continue;
                 if (!redoTranscripts
                         && segment.getTranscriptText() != null && !segment.getTranscriptText().isBlank()) continue;
+                Path mp3 = Path.of(segment.getMp3Path());
+                // Mit Ablage liegt das Segment nach einem Neustart nur im Bucket.
+                store.ensureLocal(mp3);
                 WhisperClient.TranscriptionResult result =
-                        whisper.transcribe(Path.of(segment.getMp3Path()), diarize, sttLanguage, speakers);
+                        whisper.transcribe(mp3, diarize, sttLanguage, speakers);
                 if (result.success()) {
                     segment.setTranscriptText(result.text());
                     segmentRepo.save(segment);
@@ -551,8 +560,7 @@ public class ProcessingService {
             // Diarisierungs-Labels werden durch die gepflegten Teilnehmernamen ersetzt
             String text = TranscriptAssembler.toText(TranscriptAssembler.applyNames(entries, names));
             if (!text.isBlank()) {
-                Files.writeString(Path.of(recording.getDirectory()).resolve(filename),
-                        text + "\n", StandardCharsets.UTF_8);
+                store.writeString(Path.of(recording.getDirectory()).resolve(filename), text + "\n");
             }
         } catch (IOException e) {
             log.warn("{} konnte nicht geschrieben werden: {}", filename, e.getMessage());

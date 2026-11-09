@@ -13,7 +13,6 @@ import bbbbot.repository.Repositories.RecordingSegmentRepo;
 import bbbbot.repository.Repositories.SummaryRepo;
 import bbbbot.sharing.ShareLinkService;
 import bbbbot.stt.TranscriptAssembler;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -101,19 +100,19 @@ public class PublicShareController {
     }
 
     @GetMapping("/segments/{segmentId}/audio")
-    public ResponseEntity<FileSystemResource> audio(@PathVariable String token,
+    public ResponseEntity<org.springframework.core.io.Resource> audio(@PathVariable String token,
                                                     @PathVariable UUID segmentId) {
         Recording recording = requireRecording(requireOpenLink(token));
         return media.audio(recording.getId(), segmentId);
     }
 
     @GetMapping("/video")
-    public ResponseEntity<FileSystemResource> video(@PathVariable String token) {
+    public ResponseEntity<org.springframework.core.io.Resource> video(@PathVariable String token) {
         return media.video(requireRecording(requireOpenLink(token)));
     }
 
     @GetMapping("/video/download")
-    public ResponseEntity<FileSystemResource> videoDownload(@PathVariable String token) {
+    public ResponseEntity<org.springframework.core.io.Resource> videoDownload(@PathVariable String token) {
         return media.videoDownload(requireRecording(requireOpenLink(token)));
     }
 

@@ -21,6 +21,7 @@
     <java.version>21</java.version>
     <playwright.version>1.52.0</playwright.version>
     <jjwt.version>0.12.6</jjwt.version>
+    <awssdk.version>2.33.1</awssdk.version>
   </properties>
 
   <dependencies>
@@ -90,6 +91,26 @@
       <artifactId>jjwt-jackson</artifactId>
       <version>${jjwt.version}</version>
       <scope>runtime</scope>
+    </dependency>
+
+    <!-- OIDC-Anmeldung: Pruefung der ID-Tokens (Signatur per JWKS) -->
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-oauth2-jose</artifactId>
+    </dependency>
+
+    <!-- Ablage in S3 (optional, STORAGE_BACKEND=s3). Nur der synchrone
+         Apache-HTTP-Client, ohne Netty. -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+      <version>${awssdk.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>netty-nio-client</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <!-- Tests -->
