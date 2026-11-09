@@ -13,7 +13,6 @@ import {
   fetchTranscript,
   processRecording,
   renameRecording,
-  reprocessRecording,
   retranscribeRecording,
   setCurrentSummary,
   transcribeRecording,
@@ -30,6 +29,7 @@ import Markdown from '../components/Markdown';
 import ShareDialog from '../components/ShareDialog';
 import TranscriptList from '../components/TranscriptList';
 import SummaryOptionsDialog from '../components/SummaryOptionsDialog';
+import ReanalyzeDialog from '../components/ReanalyzeDialog';
 import TagEditor from '../components/TagEditor';
 import RecordingProgress from '../components/RecordingProgress';
 import NextStepCard from '../components/NextStepCard';
@@ -119,8 +119,7 @@ export default function RecordingDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [processBusy, setProcessBusy] = useState(false);
   const [transcribeBusy, setTranscribeBusy] = useState(false);
-  const [confirmReprocess, setConfirmReprocess] = useState(false);
-  const [reprocessBusy, setReprocessBusy] = useState(false);
+  const [reanalyzeOpen, setReanalyzeOpen] = useState(false);
   const [confirmRetranscribe, setConfirmRetranscribe] = useState(false);
   const [retranscribeBusy, setRetranscribeBusy] = useState(false);
   const [summaryOptionsOpen, setSummaryOptionsOpen] = useState(false);
@@ -265,6 +264,17 @@ export default function RecordingDetailPage() {
   const rec = detail.recording;
   // Herunterladen gibt es die aktuelle Fassung - genau die kennt der Endpunkt.
   const hasDownloadableSummary = detail.summaries.some((s) => s.current);
+  /**
+   * Neu auswerten geht bei jeder Aufnahme, die schon eine Zusammenfassung hat –
+   * auch nach einem gescheiterten Lauf (die alten Fassungen sind ja noch da).
+   * Der Server verlangt dasselbe: eigene Aufnahme, nichts läuft, nicht in Aufnahme.
+   */
+  const canReanalyze =
+    rec.mine &&
+    detail.summaries.length > 0 &&
+    !hasActiveJob &&
+    rec.status !== 'RECORDING' &&
+    rec.status !== 'FINALIZING';
 
   const handleProcess = async () => {
     setActionError(null);
@@ -289,21 +299,6 @@ export default function RecordingDetailPage() {
       setActionError(errorMessage(e));
     } finally {
       setTranscribeBusy(false);
-    }
-  };
-
-  const handleReprocess = async () => {
-    setActionError(null);
-    setReprocessBusy(true);
-    try {
-      await dispatch(reprocessRecording(id)).unwrap();
-      await dispatch(fetchRecordingDetail({ id, silent: true }));
-      setConfirmReprocess(false);
-    } catch (e) {
-      setActionError(errorMessage(e));
-      setConfirmReprocess(false);
-    } finally {
-      setReprocessBusy(false);
     }
   };
 
@@ -489,13 +484,8 @@ export default function RecordingDetailPage() {
             der Box darunter: Dort ist genau ein Angebot das primäre, statt sechs
             gleichrangige Knöpfe nebeneinander. */}
         <div className="detail-actions">
-          {rec.mine && rec.status === 'DONE' && detail.summaries.length > 0 && !hasActiveJob && (
-            <button
-              type="button"
-              className="btn"
-              onClick={() => setConfirmReprocess(true)}
-              disabled={reprocessBusy}
-            >
+          {canReanalyze && (
+            <button type="button" className="btn" onClick={() => setReanalyzeOpen(true)}>
               {t('recordingDetail.reprocess')}
             </button>
           )}
@@ -657,7 +647,10 @@ export default function RecordingDetailPage() {
         {/* Der Zusammenfassungs-Tab bleibt gemountet (nur versteckt), damit eine
             laufende Bearbeitung beim Tab-Wechsel nicht verloren geht. */}
         <div hidden={tab !== 'summary'}>
-          <SummaryTab recordingId={id} />
+          <SummaryTab
+            recordingId={id}
+            onReanalyze={canReanalyze ? () => setReanalyzeOpen(true) : undefined}
+          />
         </div>
 
         {tab === 'transcript' && (
@@ -832,15 +825,15 @@ export default function RecordingDetailPage() {
           onClose={() => setSummaryOptionsOpen(false)}
         />
       )}
-      {confirmReprocess && (
-        <ConfirmDialog
-          title={t('recordingDetail.confirmReprocessTitle')}
-          message={t('recordingDetail.confirmReprocessMessage')}
-          confirmLabel={t('recordingDetail.reprocess')}
-          danger
-          busy={reprocessBusy}
-          onConfirm={handleReprocess}
-          onCancel={() => setConfirmReprocess(false)}
+      {reanalyzeOpen && (
+        <ReanalyzeDialog
+          recordingId={id}
+          options={detail.summaryOptions}
+          onClose={() => setReanalyzeOpen(false)}
+          onOpenOptions={() => {
+            setReanalyzeOpen(false);
+            setSummaryOptionsOpen(true);
+          }}
         />
       )}
       {confirmRetranscribe && (
@@ -1302,7 +1295,14 @@ function DocumentsTab({ recordingId, canEdit }: { recordingId: string; canEdit: 
   );
 }
 
-function SummaryTab({ recordingId }: { recordingId: string }) {
+function SummaryTab({
+  recordingId,
+  onReanalyze,
+}: {
+  recordingId: string;
+  /** Gesetzt, wenn der Nutzer diese Aufnahme neu auswerten darf. */
+  onReanalyze?: () => void;
+}) {
   const dispatch = useAppDispatch();
   const detail = useAppSelector((s) => s.recordings.detail);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -1474,6 +1474,15 @@ function SummaryTab({ recordingId }: { recordingId: string }) {
     <div>
       {deleteError && <Alert kind="error">{deleteError}</Alert>}
       {jobProgressLabel && <Spinner label={jobProgressLabel} />}
+
+      {onReanalyze && editId === null && (
+        <div className="reanalyze-bar">
+          <span>{t('recordingDetail.reanalyzeBar')}</span>
+          <button type="button" className="btn btn-sm" onClick={onReanalyze}>
+            {t('recordingDetail.reanalyzeBarButton')}
+          </button>
+        </div>
+      )}
 
       {summaries.length > 1 && (
         <div className="summary-versions">

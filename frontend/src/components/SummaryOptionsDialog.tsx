@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Modal from './Modal';
 import Alert from './Alert';
 import ConfirmDialog from './ConfirmDialog';
 import HelpTip from './HelpTip';
 import PromptPresetSelect, {
+  CUSTOM_PRESET,
   findOwnTemplate,
+  presetForPrompt,
   presetLabel,
   resolvePresetPrompt,
 } from './PromptPresetSelect';
@@ -71,7 +73,10 @@ export default function SummaryOptionsDialog({
   const [maxWords, setMaxWords] = useState(options.maxWords?.toString() ?? '');
   const [language, setLanguage] = useState(options.language ?? '');
   const [sttLanguage, setSttLanguage] = useState(options.sttLanguage ?? '');
-  const [preset, setPreset] = useState('');
+  // Die an der Aufnahme hinterlegte Vorlage anzeigen, nicht immer „Standard".
+  const [preset, setPreset] = useState(() => presetForPrompt(options.prompt, templates));
+  /** Hat der Nutzer die Auswahl schon angefasst? Dann nicht mehr nachträglich umstellen. */
+  const presetTouched = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [templateSaveOpen, setTemplateSaveOpen] = useState(false);
@@ -87,6 +92,14 @@ export default function SummaryOptionsDialog({
     }
   }, [dispatch, templatesLoaded, templatesLoading]);
 
+  // Eigene Vorlagen kommen ggf. erst nach dem Öffnen an – dann die Vorbelegung
+  // nachziehen, solange der Nutzer nichts gewählt hat.
+  useEffect(() => {
+    if (templatesLoaded && !presetTouched.current) {
+      setPreset(presetForPrompt(options.prompt, templates));
+    }
+  }, [templatesLoaded, templates, options.prompt]);
+
   const defaultPrompt = (options.defaultPrompt ?? '').trim();
   const maxWordsNum = maxWords.trim() === '' ? null : Number(maxWords);
   const maxWordsInvalid =
@@ -100,7 +113,10 @@ export default function SummaryOptionsDialog({
   const selectedTemplate = findOwnTemplate(preset, templates);
 
   const applyPreset = (key: string) => {
+    presetTouched.current = true;
     setPreset(key);
+    // „Eigener Prompt" steht nur für den schon gespeicherten Text – nichts ersetzen.
+    if (key === CUSTOM_PRESET) return;
     setPrompt(resolvePresetPrompt(key, templates));
     setPromptTemplateName(presetLabel(key, templates));
     // Eine eigene Vorlage bringt ihr Modell und ihre Temperatur mit; hat sie
@@ -119,6 +135,7 @@ export default function SummaryOptionsDialog({
    * Standardtext ueberschreiben.
    */
   const applyDefaultPrompt = () => {
+    presetTouched.current = true;
     setPreset('');
     setPrompt(options.defaultPrompt ?? '');
     setPromptTemplateName(null);
@@ -137,6 +154,7 @@ export default function SummaryOptionsDialog({
           temperature: temperatureNum,
         }),
       ).unwrap();
+      presetTouched.current = true;
       setPreset(`tpl:${created.id}`);
       setPromptTemplateName(created.name);
       setTemplateSaveOpen(false);
@@ -175,6 +193,7 @@ export default function SummaryOptionsDialog({
     setTemplateBusy(true);
     try {
       await dispatch(deletePromptTemplate(selectedTemplate.id)).unwrap();
+      presetTouched.current = true;
       setPreset('');
       setPromptTemplateName(null);
       setConfirmTemplateDelete(false);
@@ -292,6 +311,7 @@ export default function SummaryOptionsDialog({
           disabled={busy}
           placeholder={`${t('summaryOptions.promptPlaceholder')}\n\n${options.defaultPrompt}`}
           onChange={(e) => {
+            presetTouched.current = true;
             setPrompt(e.target.value);
             // Von Hand geändert: der Text ist nicht mehr der der Vorlage
             setPromptTemplateName(null);

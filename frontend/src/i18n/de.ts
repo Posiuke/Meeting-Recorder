@@ -720,6 +720,7 @@ export const de = {
     presetDefault: 'Meeting (Standard)',
     presetBuiltIn: 'Integrierte Vorlagen',
     presetMine: 'Meine Vorlagen',
+    presetCustom: 'Eigener Prompt (angepasst)',
     templatesError: 'Eigene Vorlagen konnten nicht geladen werden: {{message}}',
     manageTemplates: 'Vorlagen bearbeiten',
     manageTemplatesHint: '– öffnet den Tab „Vorlagen" in einem neuen Browser-Tab.',
@@ -887,9 +888,19 @@ export const de = {
     modeImmediate: 'Sofort',
     modeWindow: 'Zeitfenster',
     modeTranscribeOnly: ' · Nur Transkription',
-    confirmReprocessTitle: 'Aufnahme erneut auswerten',
-    confirmReprocessMessage:
-      'Die Zusammenfassung wird aus dem vorhandenen Transkript neu erstellt und ist danach die aktuelle Fassung. Die bisherige bleibt als ältere Fassung erhalten und lässt sich jederzeit wieder nach vorn holen. Fortfahren?',
+    reanalyzeTitle: 'Aufnahme neu auswerten',
+    reanalyzeIntro:
+      'Erstellt aus dem vorhandenen Transkript eine neue Zusammenfassung – mit derselben oder einer anderen Vorlage, zum Beispiel „✨ Automatisch erkennen“. Die neue Fassung wird die aktuelle; alle bisherigen bleiben erhalten und lassen sich jederzeit wieder nach vorn holen.',
+    reanalyzeCurrentHint: 'Vorbelegt ist die Vorlage, die an dieser Aufnahme hinterlegt ist.',
+    reanalyzeChangedHint:
+      'Die neue Vorlage wird an der Aufnahme gespeichert und gilt auch für spätere Auswertungen. Länge, Sprache und Modell bleiben, wie sie sind.',
+    reanalyzePromptPreview: 'Prompt ansehen',
+    reanalyzeMoreOptions: 'Länge, Sprache, Modell … (Auswertung anpassen)',
+    reanalyzeStart: 'Neu auswerten',
+    reanalyzeBusy: 'Wird gestartet …',
+    reanalyzeBar:
+      'Passt die Gliederung nicht? Werte die Aufnahme mit einer anderen Vorlage neu aus – etwa „✨ Automatisch erkennen“. Die bisherige Fassung bleibt erhalten.',
+    reanalyzeBarButton: 'Mit anderer Vorlage neu auswerten',
     confirmRetranscribeTitle: 'Transkription neu erstellen',
     confirmRetranscribeTranscribed:
       'Achtung: Die Spracherkennung läuft für alle Segmente neu, das vorhandene Transkript wird dabei ersetzt – das kann nicht rückgängig gemacht werden. Die KI-Auswertung startest du danach wieder separat. Fortfahren?',

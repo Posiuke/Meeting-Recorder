@@ -72,6 +72,17 @@ export function translate(key: TranslationKey, vars?: TranslationVars): string {
   );
 }
 
+/**
+ * Ein Schlüssel in allen Sprachen – etwa um einen gespeicherten Prompt einer
+ * integrierten Vorlage wiederzuerkennen, der in einer anderen Sprache angelegt
+ * wurde als der, in der die Oberfläche gerade läuft.
+ */
+export function translateAll(key: TranslationKey): string[] {
+  return LANGUAGES.map((entry) => lookup(dictionaries[entry.code], key)).filter(
+    (value): value is string => typeof value === 'string',
+  );
+}
+
 export function getLanguage(): Language {
   return current;
 }

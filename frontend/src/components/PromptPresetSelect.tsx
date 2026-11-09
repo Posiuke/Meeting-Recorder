@@ -1,4 +1,4 @@
-import { translate, useI18n } from '../i18n';
+import { translate, translateAll, useI18n } from '../i18n';
 import type { PromptTemplateView, SummarySelection } from '../types';
 
 /**
@@ -26,6 +26,29 @@ export const PRESET_KEYS = [
   { key: 'interview', icon: '💬', labelKey: 'summaryOptions.presets.interviewLabel', promptKey: 'summaryOptions.presets.interviewPrompt' },
   { key: 'note', icon: '📝', labelKey: 'summaryOptions.presets.noteLabel', promptKey: 'summaryOptions.presets.notePrompt' },
 ] as const;
+
+/**
+ * Auswahl für einen gespeicherten Prompt, der zu keiner Vorlage (mehr) passt –
+ * von Hand geschrieben, nachträglich geändert oder aus einer älteren Fassung
+ * einer integrierten Vorlage. Er bleibt unverändert stehen.
+ */
+export const CUSTOM_PRESET = 'custom';
+
+/**
+ * Auswahl, die zu einem an der Aufnahme gespeicherten Prompt gehört – damit
+ * Dialoge die hinterlegte Vorlage anzeigen statt immer „Standard". Erkannt wird
+ * am Prompt-Text: eigene Vorlagen zuerst, dann integrierte in jeder Sprache.
+ */
+export function presetForPrompt(prompt: string | null, templates: PromptTemplateView[]): string {
+  const text = prompt?.trim() ?? '';
+  if (text === '') return '';
+  const own = templates.find((template) => template.prompt.trim() === text);
+  if (own) return `tpl:${own.id}`;
+  const builtIn = PRESET_KEYS.find((p) =>
+    translateAll(p.promptKey).some((candidate) => candidate.trim() === text),
+  );
+  return builtIn ? builtIn.key : CUSTOM_PRESET;
+}
 
 /** Eigene Vorlage zur Auswahl, sofern eine gewählt ist (Auswahl `tpl:<id>`). */
 export function findOwnTemplate(
@@ -126,6 +149,9 @@ export default function PromptPresetSelect({
   return (
     <select id={id} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
       <option value="">{t('summaryOptions.presetDefault')}</option>
+      {value === CUSTOM_PRESET && (
+        <option value={CUSTOM_PRESET}>{t('summaryOptions.presetCustom')}</option>
+      )}
       <optgroup label={t('summaryOptions.presetBuiltIn')}>
         {PRESET_KEYS.map((p) => (
           <option key={p.key} value={p.key}>

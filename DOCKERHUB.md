@@ -31,7 +31,7 @@ container; PostgreSQL runs separately.
 - 🎛️ **Analysis adjustable per recording**: your own analysis prompt (with templates for talks, interviews, voice notes), maximum length, summary language — and the language of the speech recognition (including "detect automatically")
 - 📄 **Download as Markdown or Word**: transcript (smoothed or original) and summary as `.md` or as `.doc`, which Word and LibreOffice open directly — and can save as DOCX or PDF from there
 - ▶️ **Jump from the transcript into the recording**: clicking a transcript line sets the playback position and the current line is highlighted — plus a continuous player and a download of the whole recording as a single MP3
-- 🔁 **Analyse again** (summary only) and **recreate the transcript** (speech recognition + summary) with one click — every analysis adds another **version** you can switch between
+- 🔁 **Analyse again** (summary only, with a freely chosen template — also for older recordings) and **recreate the transcript** (speech recognition + summary) with one click — every analysis adds another **version** you can switch between
 - ⏱️ **Processing time window** (STT/LLM at night, for example) plus "Analyse now"
 - 📊 **Queue overview for admins**: the **Processing** tab shows what is waiting, what is running, recent failures with their reason, the duration of each step, and whether the time window is open — failed jobs can be retried from there
 - 🧪 **Connection tests** for Whisper and the LLM right in the admin area

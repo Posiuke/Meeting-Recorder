@@ -765,6 +765,30 @@ Fassung soll ein zweiter Versuch nicht kosten, und ob eine andere Vorlage die
 bessere Zusammenfassung liefert, lässt sich nur beurteilen, wenn beide noch da
 sind.
 
+### Mit anderer Vorlage neu auswerten
+
+Jede Aufnahme, die schon eine Zusammenfassung hat, lässt sich jederzeit neu
+auswerten — auch ältere, die lange vor einer neuen Vorlage entstanden sind.
+Der Einstieg steht an zwei Stellen: als **„Erneut auswerten"** oben auf der
+Detailseite und als Hinweis **„Mit anderer Vorlage neu auswerten"** direkt über
+der Zusammenfassung. Beide öffnen denselben Dialog:
+
+- Die **Vorlage** ist mit der an der Aufnahme hinterlegten vorbelegt; dort lässt
+  sich jede integrierte (z.B. „✨ Automatisch erkennen", „🪄 Freie Struktur")
+  oder eigene Vorlage wählen. Der Prompt der Auswahl lässt sich vorab ansehen.
+- Eine andere Wahl wird an der Aufnahme gespeichert und gilt damit auch für
+  spätere Auswertungen. Länge, Sprache und Modell bleiben unverändert; wer die
+  ändern will, kommt aus dem Dialog direkt zu **„Auswertung anpassen"**.
+- Ausgewertet wird aus dem vorhandenen Transkript, die Spracherkennung läuft
+  nicht erneut. Das Ergebnis kommt als neue Fassung neben die bisherigen.
+
+Auch **„Auswertung anpassen"** zeigt die hinterlegte Vorlage jetzt an, statt
+immer „Meeting (Standard)". Passt der gespeicherte Prompt zu keiner Vorlage
+mehr (von Hand geändert oder aus einer älteren Vorlagenfassung), steht dort
+„Eigener Prompt (angepasst)" — er bleibt dann unverändert.
+
+### Fassungen auswählen
+
 Im Reiter **Zusammenfassung** steht dafür über dem Text eine Auswahl der
 Fassungen, beschriftet mit **Vorlage, Modell und Zeitpunkt** (und dem Hinweis
 *bearbeitet*, wenn Handarbeit darin steckt). Der Prompt, mit dem eine Fassung

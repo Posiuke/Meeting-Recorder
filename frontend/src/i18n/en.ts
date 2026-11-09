@@ -699,6 +699,7 @@ export const en: typeof de = {
     presetDefault: 'Meeting (default)',
     presetBuiltIn: 'Built-in templates',
     presetMine: 'My templates',
+    presetCustom: 'Custom prompt (edited)',
     templatesError: 'Your own templates could not be loaded: {{message}}',
     manageTemplates: 'Edit templates',
     manageTemplatesHint: '– opens the “Templates” tab in a new browser tab.',
@@ -864,9 +865,19 @@ export const en: typeof de = {
     modeImmediate: 'Immediate',
     modeWindow: 'Time window',
     modeTranscribeOnly: ' · transcript only',
-    confirmReprocessTitle: 'Analyse recording again',
-    confirmReprocessMessage:
-      'The summary will be recreated from the existing transcript and becomes the current version. The previous one is kept as an earlier version and can be brought back at any time. Continue?',
+    reanalyzeTitle: 'Analyse recording again',
+    reanalyzeIntro:
+      'Creates a new summary from the existing transcript – with the same or a different template, for example “✨ Detect automatically”. The new version becomes the current one; all earlier versions are kept and can be brought back at any time.',
+    reanalyzeCurrentHint: 'Preselected is the template stored with this recording.',
+    reanalyzeChangedHint:
+      'The new template is stored with the recording and also applies to later analyses. Length, language and model stay as they are.',
+    reanalyzePromptPreview: 'Show prompt',
+    reanalyzeMoreOptions: 'Length, language, model … (Customise analysis)',
+    reanalyzeStart: 'Analyse again',
+    reanalyzeBusy: 'Starting …',
+    reanalyzeBar:
+      'Structure not quite right? Analyse the recording again with a different template – such as “✨ Detect automatically”. The previous version is kept.',
+    reanalyzeBarButton: 'Analyse again with another template',
     confirmRetranscribeTitle: 'Recreate transcript',
     confirmRetranscribeTranscribed:
       'Caution: speech recognition runs again for all segments and the existing transcript will be replaced – this cannot be undone. You then start the AI analysis separately again. Continue?',

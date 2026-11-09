@@ -1213,6 +1213,24 @@ tbody tr:hover {
 
 /* Auswahl der Fassung: Die Beschriftungen sind lang (Vorlage, Modell,
    Zeitpunkt), darum ein Auswahlfeld statt einer Reiterleiste. */
+/* Neu auswerten: sichtbarer Einstieg über der Zusammenfassung */
+.reanalyze-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+}
+
+.reanalyze-bar span {
+  flex: 1 1 24rem;
+}
+
 .summary-versions {
   display: flex;
   flex-wrap: wrap;
