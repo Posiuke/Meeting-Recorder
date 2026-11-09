@@ -581,7 +581,7 @@ export const en: typeof de = {
     uploading: 'Uploading… {{percent}}%',
     presetLabel: 'Analysis template',
     presetHelp:
-      'Determines how the AI analyses the content – "Meeting (default)" is geared towards meetings (decisions, action items). For talks, interviews or voice notes a different template fits better. The choice already applies to the first analysis; it can be changed later under "Customise analysis".',
+      'Determines how the AI analyses the content – "Meeting (default)" is geared towards meetings (decisions, action items). For talks, interviews or voice notes a different template fits better – or "Detect automatically": the AI then determines the kind of content itself and structures the summary accordingly. The choice already applies to the first analysis; it can be changed later under "Customise analysis".',
     presetChosenHint:
       'This template will be used for the analysis and is visible afterwards under "Customise analysis".',
   },
@@ -695,7 +695,7 @@ export const en: typeof de = {
       'These settings apply to this recording only and are used for the next analysis ("Analyse now", "Analyse again" or "Recreate transcript"). Empty fields mean: use the administrator default.',
     presetLabel: 'Template',
     presetHelp:
-      'Pre-fills the analysis prompt with a template – built-in ones for typical content types (e.g. a meeting, a talk or a voice note) or one of your own saved templates. The template can be edited freely afterwards. Difference to “Meeting (default)”: there the prompt stays empty and always follows the administrator’s current setting, whereas a template pins the text.',
+      'Pre-fills the analysis prompt with a template – built-in ones for typical content types (e.g. a meeting, a talk or a voice note) or one of your own saved templates. “Detect automatically” lets the AI determine the kind of content itself and names it with a symbol at the top of the summary. The template can be edited freely afterwards. Difference to “Meeting (default)”: there the prompt stays empty and always follows the administrator’s current setting, whereas a template pins the text.',
     presetDefault: 'Meeting (default)',
     presetBuiltIn: 'Built-in templates',
     presetMine: 'My templates',
@@ -745,6 +745,9 @@ export const en: typeof de = {
     confirmDeleteTemplateMessage:
       'The template "{{name}}" will be deleted irrevocably. The prompt stays in the input field. Continue?',
     presets: {
+      autoLabel: 'Detect automatically',
+      autoPrompt:
+        'You are an assistant that summarises recordings precisely. First determine from the entire content what kind of recording this is, and choose exactly one of these kinds:\n- 👥 Meeting: several participants coordinate, make decisions or assign tasks\n- 🎤 Talk / training: mainly one person presents or explains a topic, possibly with questions from the audience\n- 💬 Interview / conversation: questions and answers or an exchange between a few people\n- 📝 Dictation / voice note: a single person dictates thoughts, notes or tasks\n- 📄 Other: fits none of these kinds\n\nStart the summary with exactly one line of the form "**Detected content:** <symbol> <kind>" (e.g. "**Detected content:** 🎤 Talk / training") and then structure it as follows:\n- Meeting: 1. Executive summary (max. 5 sentences) 2. Participants & roles 3. Decisions and action items (with owners and deadlines, where mentioned) 4. Open questions 5. Chronological course of the meeting (as bullet points)\n- Talk / training: 1. Key statements (max. 5 sentences) 2. Topics covered with the most important content per topic 3. Examples, recommendations and practical notes 4. Questions from the audience and the answers given\n- Interview / conversation: 1. Brief overview: who is speaking, what it is about (max. 3 sentences) 2. Questions or topics with the key statements of the answers 3. Notable statements (paraphrased, no invented quotes) 4. Open points and agreed next steps\n- Dictation / voice note: 1. Key points as bullet points 2. Tasks and reminders (if mentioned) 3. The prepared content as ordered prose without filler words and slips of the tongue\n- Other: 1. Brief overview (max. 5 sentences) 2. The most important content grouped by topic 3. Results, tasks and open points (if any)\nWhen partial summaries are merged, decide the kind from the overall picture and state it only once.\nImportant: invent nothing. Mark unclear passages explicitly as unclear.',
       meetingLabel: 'Meeting',
       meetingPrompt:
         'You are an assistant that summarises meetings precisely. Produce a structured summary with the following sections:\n1. Executive summary (max. 5 sentences)\n2. Participants & roles\n3. Decisions and action items (with owners and deadlines, where mentioned)\n4. Open questions\n5. Chronological course of the meeting (as bullet points)\nImportant: invent nothing. Mark unclear passages explicitly as unclear.',

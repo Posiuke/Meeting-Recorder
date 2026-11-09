@@ -598,7 +598,7 @@ export const de = {
     uploading: 'Wird hochgeladen… {{percent}}%',
     presetLabel: 'Auswertungs-Vorlage',
     presetHelp:
-      'Bestimmt, wie die KI den Inhalt auswertet – „Meeting (Standard)" ist auf Besprechungen ausgelegt (Beschlüsse, Aufgaben). Für Vorträge, Interviews oder Sprachnotizen passt eine andere Vorlage besser. Die Wahl gilt schon für die erste Auswertung; sie lässt sich später unter „Auswertung anpassen" ändern.',
+      'Bestimmt, wie die KI den Inhalt auswertet – „Meeting (Standard)" ist auf Besprechungen ausgelegt (Beschlüsse, Aufgaben). Für Vorträge, Interviews oder Sprachnotizen passt eine andere Vorlage besser – oder „Automatisch erkennen": Dann bestimmt die KI die Art des Inhalts selbst und gliedert die Zusammenfassung passend. Die Wahl gilt schon für die erste Auswertung; sie lässt sich später unter „Auswertung anpassen" ändern.',
     presetChosenHint:
       'Diese Vorlage wird bei der Auswertung verwendet und ist danach unter „Auswertung anpassen" sichtbar.',
   },
@@ -716,7 +716,7 @@ export const de = {
       'Diese Einstellungen gelten nur für diese Aufnahme und werden bei der nächsten Auswertung verwendet („Jetzt auswerten", „Erneut auswerten" oder „Transkription neu erstellen"). Leere Felder bedeuten: Standardvorgabe des Administrators.',
     presetLabel: 'Vorlage',
     presetHelp:
-      'Füllt den Auswertungs-Prompt mit einer Vorlage vor – integriert für typische Inhaltstypen (z.B. Meeting, Vortrag oder Sprachnotiz) oder eine deiner eigenen gespeicherten Vorlagen. Die Vorlage kann anschließend frei angepasst werden. Unterschied zu „Meeting (Standard)": Dort bleibt der Prompt leer und folgt immer der aktuellen Vorgabe des Administrators, während eine Vorlage den Text festschreibt.',
+      'Füllt den Auswertungs-Prompt mit einer Vorlage vor – integriert für typische Inhaltstypen (z.B. Meeting, Vortrag oder Sprachnotiz) oder eine deiner eigenen gespeicherten Vorlagen. „Automatisch erkennen" lässt die KI die Art des Inhalts selbst bestimmen und nennt sie samt Symbol am Anfang der Zusammenfassung. Die Vorlage kann anschließend frei angepasst werden. Unterschied zu „Meeting (Standard)": Dort bleibt der Prompt leer und folgt immer der aktuellen Vorgabe des Administrators, während eine Vorlage den Text festschreibt.',
     presetDefault: 'Meeting (Standard)',
     presetBuiltIn: 'Integrierte Vorlagen',
     presetMine: 'Meine Vorlagen',
@@ -766,6 +766,9 @@ export const de = {
     confirmDeleteTemplateMessage:
       'Die Vorlage „{{name}}" wird unwiderruflich gelöscht. Der Prompt bleibt im Eingabefeld erhalten. Fortfahren?',
     presets: {
+      autoLabel: 'Automatisch erkennen',
+      autoPrompt:
+        'Du bist ein Assistent, der Aufnahmen präzise zusammenfasst. Bestimme zuerst anhand des gesamten Inhalts, um welche Art von Aufnahme es sich handelt, und wähle genau eine dieser Arten:\n- 👥 Meeting / Besprechung: mehrere Beteiligte stimmen sich ab, treffen Entscheidungen oder verteilen Aufgaben\n- 🎤 Vortrag / Schulung: überwiegend eine Person präsentiert oder erklärt ein Thema, ggf. mit Fragen aus dem Publikum\n- 💬 Interview / Gespräch: Fragen und Antworten oder ein Austausch zwischen wenigen Personen\n- 📝 Diktat / Sprachnotiz: eine einzelne Person diktiert Gedanken, Notizen oder Aufgaben\n- 📄 Sonstiges: passt zu keiner dieser Arten\n\nBeginne die Zusammenfassung mit genau einer Zeile in der Form „**Erkannter Inhalt:** <Symbol> <Art>" (z.B. „**Erkannter Inhalt:** 🎤 Vortrag / Schulung") und gliedere sie danach so:\n- Meeting / Besprechung: 1. Management-Zusammenfassung (max. 5 Sätze) 2. Teilnehmer & Rollen 3. Beschlüsse und Aufgaben (mit Verantwortlichen und Fristen, falls genannt) 4. Offene Fragen 5. Chronologischer Ablauf (stichpunktartig)\n- Vortrag / Schulung: 1. Kernaussagen (max. 5 Sätze) 2. Behandelte Themen mit den wichtigsten Inhalten je Thema 3. Beispiele, Empfehlungen und Praxishinweise 4. Fragen aus dem Publikum und die Antworten darauf\n- Interview / Gespräch: 1. Kurzüberblick: Wer spricht, worum geht es (max. 3 Sätze) 2. Fragen bzw. Themen mit den Kernaussagen der Antworten 3. Bemerkenswerte Aussagen (sinngemäß, keine erfundenen Zitate) 4. Offene Punkte und vereinbarte nächste Schritte\n- Diktat / Sprachnotiz: 1. Kernpunkte in Stichworten 2. Aufgaben und Erinnerungen (falls genannt) 3. Der aufbereitete Inhalt als geordneter Fließtext ohne Füllwörter und Versprecher\n- Sonstiges: 1. Kurzüberblick (max. 5 Sätze) 2. Die wichtigsten Inhalte nach Themen gegliedert 3. Ergebnisse, Aufgaben und offene Punkte (falls vorhanden)\nWerden Teil-Zusammenfassungen zusammengeführt, entscheide die Art anhand des Gesamtbilds und nenne sie nur einmal.\nWichtig: Erfinde nichts. Markiere unklare Stellen ausdrücklich als unklar.',
       meetingLabel: 'Meeting / Besprechung',
       meetingPrompt:
         'Du bist ein Assistent, der Meetings präzise zusammenfasst. Erstelle eine strukturierte Zusammenfassung mit folgenden Abschnitten:\n1. Management-Zusammenfassung (max. 5 Sätze)\n2. Teilnehmer & Rollen\n3. Beschlüsse und Aufgaben (mit Verantwortlichen und Fristen, falls genannt)\n4. Offene Fragen\n5. Chronologischer Ablauf (stichpunktartig)\nWichtig: Erfinde nichts. Markiere unklare Stellen ausdrücklich als unklar.',

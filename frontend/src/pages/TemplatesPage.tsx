@@ -349,7 +349,9 @@ export default function TemplatesPage() {
                     )
                   }
                 >
-                  <span className="template-list-name">{t(preset.labelKey)}</span>
+                  <span className="template-list-name">
+                    {preset.icon} {t(preset.labelKey)}
+                  </span>
                   <span className="template-list-meta">{t('templates.builtInAction')}</span>
                 </button>
               </li>

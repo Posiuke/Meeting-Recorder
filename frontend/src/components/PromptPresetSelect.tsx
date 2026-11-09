@@ -12,10 +12,15 @@ import type { PromptTemplateView, SummarySelection } from '../types';
  * der aktuellen Vorgabe des Administrators.
  */
 export const PRESET_KEYS = [
-  { key: 'meeting', labelKey: 'summaryOptions.presets.meetingLabel', promptKey: 'summaryOptions.presets.meetingPrompt' },
-  { key: 'talk', labelKey: 'summaryOptions.presets.talkLabel', promptKey: 'summaryOptions.presets.talkPrompt' },
-  { key: 'interview', labelKey: 'summaryOptions.presets.interviewLabel', promptKey: 'summaryOptions.presets.interviewPrompt' },
-  { key: 'note', labelKey: 'summaryOptions.presets.noteLabel', promptKey: 'summaryOptions.presets.notePrompt' },
+  // „Automatisch erkennen": Der Prompt lässt die KI zuerst die Art des Inhalts
+  // bestimmen (dieselben Arten wie die übrigen Vorlagen) und dann deren
+  // Gliederung verwenden. Die erkannte Art steht samt demselben Symbol wie
+  // hier in der ersten Zeile der Zusammenfassung.
+  { key: 'auto', icon: '✨', labelKey: 'summaryOptions.presets.autoLabel', promptKey: 'summaryOptions.presets.autoPrompt' },
+  { key: 'meeting', icon: '👥', labelKey: 'summaryOptions.presets.meetingLabel', promptKey: 'summaryOptions.presets.meetingPrompt' },
+  { key: 'talk', icon: '🎤', labelKey: 'summaryOptions.presets.talkLabel', promptKey: 'summaryOptions.presets.talkPrompt' },
+  { key: 'interview', icon: '💬', labelKey: 'summaryOptions.presets.interviewLabel', promptKey: 'summaryOptions.presets.interviewPrompt' },
+  { key: 'note', icon: '📝', labelKey: 'summaryOptions.presets.noteLabel', promptKey: 'summaryOptions.presets.notePrompt' },
 ] as const;
 
 /** Eigene Vorlage zur Auswahl, sofern eine gewählt ist (Auswahl `tpl:<id>`). */
@@ -120,7 +125,7 @@ export default function PromptPresetSelect({
       <optgroup label={t('summaryOptions.presetBuiltIn')}>
         {PRESET_KEYS.map((p) => (
           <option key={p.key} value={p.key}>
-            {t(p.labelKey)}
+            {p.icon} {t(p.labelKey)}
           </option>
         ))}
       </optgroup>
