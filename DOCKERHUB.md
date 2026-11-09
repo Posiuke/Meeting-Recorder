@@ -1,27 +1,33 @@
 # Meeting Recorder
 
-Recording bot for **BigBlueButton** meetings — including rooms fronted by the
-**Nextcloud BBB integration**: the bot joins through the ready-made room URL (no
-BBB API or checksums needed), records the meeting and offers playback, a
-transcript and an AI summary in the web UI. Existing audio/video files can be
-analysed by upload, without a bot.
+Self-hosted tool for **meeting recordings, transcripts and AI summaries**.
+Bring recordings in by **file upload** or record your **screen right in the
+browser** (Teams, Zoom, WebEx, in-person …); the recorder transcribes them with
+Whisper and summarises them with any OpenAI-compatible LLM — on your own servers
+or via a cloud API.
 
-Frontend (React) and backend (Spring Boot, Java 21, Playwright) run together in
-**one** container; PostgreSQL runs separately.
+Optionally, a **BigBlueButton integration** can be switched on (`BBB_ON=true`):
+bots then join BBB rooms — including rooms fronted by the Nextcloud BBB
+integration — and record the meeting themselves.
+
+Frontend (React) and backend (Spring Boot, Java 21) run together in **one**
+container; PostgreSQL runs separately.
+
+> **Coming from `posiuke/bbb-recorder`?** That image is no longer maintained —
+> this is its successor (version 1.0.0 onwards). Switch the image name, add
+> `BBB_ON: "true"` if you use the bots, and pull. Database and volumes are taken
+> over unchanged. Details: [Switching from posiuke/bbb-recorder](#switching-from-posiukebbb-recorder).
 
 ## Features
 
-- 🎙️ **Audio recording** of the meeting (mixed participant streams), segmented into MP3
-- 🎬 **Optional video recording** of the meeting view as MP4 (playback & download in the UI)
-- 🤖 **Bot templates**: save a room you record regularly once — URL, bot name and settings — then it is just "Start bot". With an optional **schedule** (e.g. Mon/Wed/Fri 09:00–10:00) the bot joins and leaves on its own, and each template picks the **analysis template** used afterwards. Templates are per user and visible to nobody else
 - 📤 **File upload**: take existing audio/video files (MP3, WAV, M4A, MP4, MKV …) in as a recording and analyse them — the analysis template can be picked right in the upload dialog
-- 🖥️ **Screen recording in the browser**: capture a screen, window or tab including system audio and an optional microphone, straight from the tool — for meetings without a bot (Teams/Zoom/WebEx, in-person). **Requires HTTPS** and Chrome/Edge, see [docs/SCREEN_CAPTURE.md](https://github.com/Posiuke/Meeting-Recorder/blob/master/docs/SCREEN_CAPTURE.md)
+- 🖥️ **Screen recording in the browser**: capture a screen, window or tab including system audio and an optional microphone, straight from the tool — for any meeting (Teams/Zoom/WebEx, in-person). **Requires HTTPS** and Chrome/Edge, see [docs/SCREEN_CAPTURE.md](https://github.com/Posiuke/Meeting-Recorder/blob/master/docs/SCREEN_CAPTURE.md)
 - 📝 **Transcription** either through **your own Whisper server** (optionally with speaker separation via WhisperX) or an **OpenAI-compatible cloud API** — with continuous timestamps across the whole recording and a structured view in the UI
 - ✨ **AI smoothing of the transcript** before the analysis (filler words, punctuation, recognition errors) — the original is kept and can be toggled in the transcript tab; plus a **personal and a shared glossary** for abbreviations and domain terms
 - 🧠 **AI summary** through any **OpenAI-compatible** chat endpoint — local (vLLM, Ollama) or cloud (OpenAI, Anthropic, Google Gemini, Groq, Mistral …)
 - 📎 **Attached documents**: upload the agenda, slides or papers for a recording — their text feeds into the summary (PDF/Office/OCR through an Apache Tika server)
 - 🏷️ **Tags & search**: tag recordings, filter by tag, and search titles, meeting URLs, tags and — on request — **transcript and summary**
-- 📚 **Paged list with filters**: the recordings list loads page by page and filters by period, source (bot, upload, screen) and owner, sorted by date or title
+- 📚 **Paged list with filters**: the recordings list loads page by page and filters by period, source (upload, screen, bot with `BBB_ON`) and owner, sorted by date or title
 - 🎛️ **Analysis adjustable per recording**: your own analysis prompt (with templates for talks, interviews, voice notes), maximum length, summary language — and the language of the speech recognition (including "detect automatically")
 - 📄 **Download as Markdown or Word**: transcript (smoothed or original) and summary as `.md` or as `.doc`, which Word and LibreOffice open directly — and can save as DOCX or PDF from there
 - ▶️ **Jump from the transcript into the recording**: clicking a transcript line sets the playback position and the current line is highlighted — plus a continuous player and a download of the whole recording as a single MP3
@@ -35,11 +41,17 @@ Frontend (React) and backend (Spring Boot, Java 21, Playwright) run together in
 - 🔐 **Sign-in** with a local account **or** LDAP/Active Directory — fully configurable and testable in the admin area
 - 🧹 **Housekeeping**: retention period for old recordings, cleanup of recordings that got stuck
 
+**Optional with `BBB_ON=true`** (BigBlueButton integration):
+
+- 🎙️ **Recording bots** join a BBB room through its ready-made URL (no BBB API or checksums needed) and record the audio (mixed participant streams), optionally the **video** of the meeting view as MP4
+- 🤖 **Bot templates**: save a room you record regularly once — URL, bot name and settings — then it is just "Start bot". With an optional **schedule** (e.g. Mon/Wed/Fri 09:00–10:00) the bot joins and leaves on its own
+- 💬 **Chat commands** and an **anonymous stop link** so participants can decline a recording
+
 ## Tags
 
 - `latest` — current state
+- `1.0.0`, … — releases (version from the project, recommended for production)
 - `<git-hash>` — a specific commit (reproducible deployments)
-- version tags such as `v3.0.0` where applicable
 
 ## Ports & volumes
 
@@ -56,13 +68,39 @@ Frontend (React) and backend (Spring Boot, Java 21, Playwright) run together in
 | `ADMIN_USERNAME`, `ADMIN_INITIAL_PASSWORD` | Local admin account on first start (a password change is enforced) |
 | `STORAGE_DIR` | Recording directory (default `/data/recordings`) |
 | `MAX_UPLOAD_SIZE` | Maximum size for file uploads (default `4GB`) |
-| `MAX_CONCURRENT_BOTS` | Maximum concurrent bots (default 5) |
-| `INSECURE_TLS` | Accept self-signed certificates on an intranet |
+| `BBB_ON` | `true` switches the optional **BigBlueButton integration** on (default `false`, see below) |
+| `MAX_CONCURRENT_BOTS` | Maximum concurrent bots (default 5; only with `BBB_ON`) |
+| `INSECURE_TLS` | Bots accept self-signed certificates on an intranet (only with `BBB_ON`) |
 | `SERVER_PORT` | HTTP port inside the container (default 8080) |
 
 > Everything else (Whisper, LLM, time window, bot behaviour, screen recording,
 > retention, LDAP) is configured **at runtime in the admin area** and stored in
 > the database — no container restarts needed.
+
+## BigBlueButton integration (`BBB_ON`)
+
+By default the Meeting Recorder is a pure upload / screen recording /
+transcription tool, and everything around BigBlueButton is hidden. Set the
+environment variable **`BBB_ON=true`** on the app container to switch the
+integration on:
+
+- the **Bots** tab appears (start bots, bot templates, schedules, history),
+- the admin settings show the *Bot behaviour* group,
+- the bot API (`/api/bots`, `/api/bot-templates`) and the anonymous stop link
+  become available — without `BBB_ON` they answer `404`, and stored schedules
+  rest.
+
+Switching it off again keeps existing bot templates and bot recordings; the
+recordings stay playable and can still be analysed.
+
+```yaml
+  app:
+    image: posiuke/meeting-recorder:latest
+    environment:
+      BBB_ON: "true"
+      # …
+    shm_size: "1gb"   # Chromium for the bots needs shared memory
+```
 
 ## Reverse proxy / HTTPS
 
@@ -88,7 +126,7 @@ services:
       - pgdata:/var/lib/postgresql/data
 
   app:
-    image: posiuke/bbb-recorder:latest
+    image: posiuke/meeting-recorder:latest
     depends_on:
       - db
     environment:
@@ -99,6 +137,7 @@ services:
       ADMIN_USERNAME: admin
       ADMIN_INITIAL_PASSWORD: please-change-me
       STORAGE_DIR: /data/recordings
+      # BBB_ON: "true"   # optional: BigBlueButton bots, see above
     ports:
       - "8090:8080"
     volumes:
@@ -108,6 +147,18 @@ services:
 volumes:
   pgdata:
 ```
+
+## Switching from `posiuke/bbb-recorder`
+
+Up to version 3.x the image was published as `posiuke/bbb-recorder`. That
+repository is no longer maintained. To switch:
+
+1. Change the image to `posiuke/meeting-recorder:latest` (or a version tag such as `1.0.0`).
+2. If you use the BigBlueButton bots, add `BBB_ON: "true"` to the app's
+   environment — the integration is now off by default.
+3. `docker compose pull && docker compose up -d`
+
+Database, volumes and settings are taken over unchanged; no migration is needed.
 
 ## First sign-in
 
@@ -198,7 +249,7 @@ well. There is nothing to configure; the search only ever returns your own and
 shared recordings.
 
 The list loads **page by page** ("Load more") and can be narrowed by **period**,
-**source** (bot in the meeting, upload, screen recording) and **owner**, sorted
+**source** (upload, screen recording, bot in the meeting with `BBB_ON`) and **owner**, sorted
 by date or title. Slicing, filtering and sorting happen in the database, so the
 browser only ever holds what it displays.
 

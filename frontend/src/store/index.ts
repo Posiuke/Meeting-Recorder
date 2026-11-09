@@ -8,6 +8,7 @@ import admin from './adminSlice';
 import promptTemplates from './promptTemplatesSlice';
 import glossary from './glossarySlice';
 import apiKeys from './apiKeysSlice';
+import features from './featuresSlice';
 
 export const store = configureStore({
   reducer: {
@@ -20,6 +21,7 @@ export const store = configureStore({
     promptTemplates,
     glossary,
     apiKeys,
+    features,
   },
 });
 

@@ -8,6 +8,7 @@ export default function Layout() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const user = useAppSelector((s) => s.auth.user);
+  const bbbEnabled = useAppSelector((s) => s.features.bbbEnabled);
   const { t, language } = useI18n();
 
   const handleLogout = () => {
@@ -26,7 +27,7 @@ export default function Layout() {
           <nav className="app-nav">
             <NavLink to="/recordings">{t('app.nav.recordings')}</NavLink>
             <NavLink to="/groups">{t('app.nav.groups')}</NavLink>
-            <NavLink to="/bots">{t('app.nav.bots')}</NavLink>
+            {bbbEnabled && <NavLink to="/bots">{t('app.nav.bots')}</NavLink>}
             <NavLink to="/templates">{t('app.nav.templates')}</NavLink>
             <NavLink to="/glossary">{t('app.nav.glossary')}</NavLink>
             <NavLink to="/developer">{t('app.nav.api')}</NavLink>

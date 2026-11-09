@@ -22,6 +22,7 @@ export default function ApiPage() {
   const { t, language } = useI18n();
   const dispatch = useAppDispatch();
   const { items, loading, error } = useAppSelector((s) => s.apiKeys);
+  const bbbEnabled = useAppSelector((s) => s.features.bbbEnabled);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<ApiKeyView | null>(null);
@@ -162,7 +163,9 @@ export default function ApiPage() {
 
       <section>
         <h2>{t('api.docsHeading')}</h2>
-        {docs.sections.map((section) => {
+        {docs.sections
+          .filter((section) => bbbEnabled || section.id !== 'bots')
+          .map((section) => {
           const open = openSections.includes(section.id);
           return (
             <div className="card api-section" key={section.id}>

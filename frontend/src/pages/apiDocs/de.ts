@@ -6,18 +6,18 @@ export const apiDocsDe: ApiDocs = {
     intro:
       'Die API kann alles, was diese Weboberfläche kann – es sind dieselben Endpunkte. Sie brauchen nur einen Schlüssel (oben anlegen) und geben ihn bei jedem Aufruf im Header mit. Antworten sind JSON, Zeitangaben ISO-8601 in UTC.',
     baseUrlLabel: 'Basis-URL dieser Installation',
-    example: `export BBB="https://bbb.example.intern"
+    example: `export RECORDER="https://recorder.example.intern"
 export KEY="bbb_..."
 
 # Aufnahmen auflisten
-curl -s -H "X-API-Key: $KEY" "$BBB/api/recordings"
+curl -s -H "X-API-Key: $KEY" "$RECORDER/api/recordings"
 
 # Zusammenfassung einer Aufnahme lesen
-curl -s -H "X-API-Key: $KEY" "$BBB/api/recordings/<id>/summary"
+curl -s -H "X-API-Key: $KEY" "$RECORDER/api/recordings/<id>/summary"
 
 # Datei transkribieren und auf das Ergebnis warten
 curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
-  "$BBB/api/transcriptions?wait=300"`,
+  "$RECORDER/api/transcriptions?wait=300"`,
   },
 
   auth: {
@@ -56,7 +56,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
             { name: 'dir', description: 'asc oder desc' },
           ],
           example: `curl -s -H "X-API-Key: $KEY" \\
-  "$BBB/api/recordings?q=technik&content=true"`,
+  "$RECORDER/api/recordings?q=technik&content=true"`,
           response: `[
   {
     "id": "8f14e45f-...",
@@ -80,7 +80,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
             { name: 'size', description: 'Treffer pro Seite, 1 bis 200 (Vorgabe 25)' },
           ],
           example: `curl -s -H "X-API-Key: $KEY" \\
-  "$BBB/api/recordings/page?page=0&size=25&source=BOT&from=2026-08-01&sort=title&dir=asc"`,
+  "$RECORDER/api/recordings/page?page=0&size=25&source=BOT&from=2026-08-01&sort=title&dir=asc"`,
           response: `{
   "items": [ { "id": "8f14e45f-...", "title": "Abstimmung Projekt Nord", ... } ],
   "page": 0, "size": 25, "total": 137, "totalPages": 6, "hasMore": true
@@ -91,7 +91,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
           path: '/api/recordings/processing-info',
           summary:
             'Wann die Verarbeitung läuft – für jeden angemeldeten Nutzer lesbar. Die Aufnahme-Detailseite nennt damit eine Uhrzeit statt „irgendwann nachts". Warteschlangenlängen und Fehlerquoten bleiben dem Admin-Bereich (/api/admin/processing).',
-          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/recordings/processing-info"`,
+          example: `curl -s -H "X-API-Key: $KEY" "$RECORDER/api/recordings/processing-info"`,
           response: `{ "windowStart": "20:00", "windowEnd": "06:00", "windowOpen": false }`,
         },
         {
@@ -99,14 +99,14 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
           path: '/api/recordings/owners',
           summary:
             'Die Nutzer, die Ihnen Aufnahmen freigegeben haben – die Auswahlliste des Besitzerfilters. Leer, solange nichts geteilt wurde.',
-          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/recordings/owners"`,
+          example: `curl -s -H "X-API-Key: $KEY" "$RECORDER/api/recordings/owners"`,
         },
         {
           method: 'GET',
           path: '/api/recordings/{id}',
           summary:
             'Eine Aufnahme mit Segmenten, Zusammenfassungen, Jobs und Teilnehmern. Die Segment-IDs brauchen Sie für den Audio-Download.',
-          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/recordings/$ID"`,
+          example: `curl -s -H "X-API-Key: $KEY" "$RECORDER/api/recordings/$ID"`,
         },
         {
           method: 'POST',
@@ -132,20 +132,20 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
           ],
           example: `curl -s -H "X-API-Key: $KEY" \\
   -F file=@besprechung.mp3 -F title="Jour Fixe" -F processNow=true \\
-  "$BBB/api/recordings/upload"`,
+  "$RECORDER/api/recordings/upload"`,
         },
         {
           method: 'DELETE',
           path: '/api/recordings/{id}',
           summary: 'Aufnahme samt Dateien löschen (nur Besitzer). Nicht umkehrbar.',
-          example: `curl -s -X DELETE -H "X-API-Key: $KEY" "$BBB/api/recordings/$ID"`,
+          example: `curl -s -X DELETE -H "X-API-Key: $KEY" "$RECORDER/api/recordings/$ID"`,
         },
         {
           method: 'PUT',
           path: '/api/recordings/{id}/title',
           summary: 'Aufnahme umbenennen (nur Besitzer, 1–512 Zeichen). Antwort: die geänderte Aufnahme.',
           example: `curl -s -X PUT -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
-  -d '{"title":"Jour fixe KW 40"}' "$BBB/api/recordings/$ID/title"`,
+  -d '{"title":"Jour fixe KW 40"}' "$RECORDER/api/recordings/$ID/title"`,
         },
         {
           method: 'GET',
@@ -157,7 +157,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
           path: '/api/recordings/{id}/tags',
           summary: 'Schlagwort setzen (nur Besitzer). Antwort: die neue Liste.',
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
-  -d '{"name":"Projekt Nord"}' "$BBB/api/recordings/$ID/tags"`,
+  -d '{"name":"Projekt Nord"}' "$RECORDER/api/recordings/$ID/tags"`,
         },
         {
           method: 'DELETE',
@@ -177,7 +177,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
           method: 'GET',
           path: '/api/recordings/{id}/transcript',
           summary: 'Transkript in beiden Fassungen, als Text und als Einträge mit Zeitstempel.',
-          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/recordings/$ID/transcript"`,
+          example: `curl -s -H "X-API-Key: $KEY" "$RECORDER/api/recordings/$ID/transcript"`,
           response: `{
   "transcript": "[00:05] ähm also guten morgen ...",
   "correctedTranscript": "[00:05] Guten Morgen ...",
@@ -198,14 +198,14 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
             { name: 'format', description: 'md (Standard) oder doc für die Word-Fassung' },
           ],
           example: `curl -s -H "X-API-Key: $KEY" -OJ \\
-  "$BBB/api/recordings/$ID/transcript/download?variant=original&format=doc"`,
+  "$RECORDER/api/recordings/$ID/transcript/download?variant=original&format=doc"`,
         },
         {
           method: 'POST',
           path: '/api/recordings/{id}/transcribe',
           summary:
             'Nur transkribieren (Schritt 1), ohne Zusammenfassung. Läuft sofort. Antwort: der Job.',
-          example: `curl -s -X POST -H "X-API-Key: $KEY" "$BBB/api/recordings/$ID/transcribe"`,
+          example: `curl -s -X POST -H "X-API-Key: $KEY" "$RECORDER/api/recordings/$ID/transcribe"`,
           response: `{ "id": "3d2b...", "status": "PENDING", "immediate": true, "transcribeOnly": true }`,
         },
         {
@@ -221,7 +221,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
             'Erkannten Sprecher umbenennen (nur Besitzer). Wirkt in der Anzeige, in transcript.md und in künftigen Zusammenfassungen.',
           example: `curl -s -X PUT -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
   -d '{"displayName":"Frau Meier"}' \\
-  "$BBB/api/recordings/$ID/participants/$PID"`,
+  "$RECORDER/api/recordings/$ID/participants/$PID"`,
         },
       ],
     },
@@ -236,7 +236,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
           method: 'GET',
           path: '/api/recordings/{id}/summary',
           summary: 'Aktuelle Fassung als Markdown. 404, wenn es noch keine gibt.',
-          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/recordings/$ID/summary"`,
+          example: `curl -s -H "X-API-Key: $KEY" "$RECORDER/api/recordings/$ID/summary"`,
           response: `{
   "id": "b21f...",
   "status": "DONE",
@@ -259,14 +259,14 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
             { name: 'format', description: 'md (Standard) oder doc für die Word-Fassung' },
           ],
           example: `curl -s -H "X-API-Key: $KEY" -OJ \\
-  "$BBB/api/recordings/$ID/summary/download?format=doc"`,
+  "$RECORDER/api/recordings/$ID/summary/download?format=doc"`,
         },
         {
           method: 'POST',
           path: '/api/recordings/{id}/process',
           summary:
             'Jetzt auswerten: transkribieren (falls nötig) und zusammenfassen, ohne auf das Nachtfenster zu warten.',
-          example: `curl -s -X POST -H "X-API-Key: $KEY" "$BBB/api/recordings/$ID/process"`,
+          example: `curl -s -X POST -H "X-API-Key: $KEY" "$RECORDER/api/recordings/$ID/process"`,
         },
         {
           method: 'POST',
@@ -282,7 +282,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
   -d '{"prompt":"Nur Beschlüsse und Aufgaben.","templateName":"Nur Beschlüsse","maxWords":300,
        "language":"de","model":"qwen2.5-72b-instruct","temperature":0.1}' \\
-  "$BBB/api/recordings/$ID/summary-options"`,
+  "$RECORDER/api/recordings/$ID/summary-options"`,
         },
         {
           method: 'PUT',
@@ -291,7 +291,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
             'Eine Fassung händisch überschreiben (nur Besitzer). Die Bearbeitung bleibt erhalten – eine erneute Auswertung legt eine weitere Fassung daneben.',
           example: `curl -s -X PUT -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
   -d '{"markdown":"# Ergebnis\\n- Beschluss A"}' \\
-  "$BBB/api/recordings/$ID/summaries/$SID"`,
+  "$RECORDER/api/recordings/$ID/summaries/$SID"`,
         },
         {
           method: 'POST',
@@ -299,7 +299,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
           summary:
             'Diese Fassung wird die aktuelle (nur Besitzer): Download, /summary, Freigabe-Ansicht und summary.md folgen ihr. Antwort: alle Fassungen.',
           example: `curl -s -X POST -H "X-API-Key: $KEY" \\
-  "$BBB/api/recordings/$ID/summaries/$SID/current"`,
+  "$RECORDER/api/recordings/$ID/summaries/$SID/current"`,
         },
         {
           method: 'DELETE',
@@ -328,7 +328,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
           method: 'GET',
           path: '/api/recordings/{id}/documents',
           summary: 'Unterlagen der Aufnahme (ohne den extrahierten Text selbst).',
-          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/recordings/$ID/documents"`,
+          example: `curl -s -H "X-API-Key: $KEY" "$RECORDER/api/recordings/$ID/documents"`,
           response: `[
   { "id": "8c2a...", "filename": "tagesordnung.md", "sizeBytes": 1240,
     "status": "READY", "textChars": 830, "error": null }
@@ -340,7 +340,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
           summary:
             'Unterlage hinzufügen (multipart/form-data, Feld file; nur Besitzer). Antwort: alle Unterlagen. Die Textextraktion läuft danach im Hintergrund.',
           example: `curl -s -H "X-API-Key: $KEY" -F file=@tagesordnung.pdf \\
-  "$BBB/api/recordings/$ID/documents"`,
+  "$RECORDER/api/recordings/$ID/documents"`,
         },
         {
           method: 'GET',
@@ -353,7 +353,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
           path: '/api/recordings/{id}/documents/{documentId}/download',
           summary: 'Die Originaldatei.',
           example: `curl -s -H "X-API-Key: $KEY" -OJ \\
-  "$BBB/api/recordings/$ID/documents/$DOCID/download"`,
+  "$RECORDER/api/recordings/$ID/documents/$DOCID/download"`,
         },
         {
           method: 'POST',
@@ -393,11 +393,11 @@ curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
           ],
           example: `# kurze Datei: in einem Aufruf
 curl -s -H "X-API-Key: $KEY" -F file=@notiz.m4a \\
-  "$BBB/api/transcriptions?wait=300"
+  "$RECORDER/api/transcriptions?wait=300"
 
 # lange Aufnahme: starten und später abholen
 curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
-  "$BBB/api/transcriptions"`,
+  "$RECORDER/api/transcriptions"`,
           response: `{ "id": "a1b2c3d4-...", "status": "PENDING" }`,
         },
         {
@@ -406,7 +406,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           summary:
             'Zustand und – sobald fertig – das Transkript. status ist PENDING, RUNNING, DONE oder FAILED; wait= wartet auch hier.',
           params: [{ name: 'wait', description: 'Sekunden warten (0 = sofort antworten, max. 600)' }],
-          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/transcriptions/$ID?wait=60"`,
+          example: `curl -s -H "X-API-Key: $KEY" "$RECORDER/api/transcriptions/$ID?wait=60"`,
           response: `{
   "id": "a1b2c3d4-...",
   "status": "DONE",
@@ -422,7 +422,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           path: '/api/recordings/{id}',
           summary:
             'Aufräumen: Wenn Sie das Transkript haben und die Aufnahme nicht behalten wollen, löschen Sie sie mit derselben ID.',
-          example: `curl -s -X DELETE -H "X-API-Key: $KEY" "$BBB/api/recordings/$ID"`,
+          example: `curl -s -X DELETE -H "X-API-Key: $KEY" "$RECORDER/api/recordings/$ID"`,
         },
       ],
     },
@@ -437,7 +437,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           method: 'GET',
           path: '/api/glossary',
           summary: 'Alle eigenen Einträge, alphabetisch.',
-          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/glossary"`,
+          example: `curl -s -H "X-API-Key: $KEY" "$RECORDER/api/glossary"`,
           response: `[
   { "id": "c7f1...", "term": "RZ", "meaning": "Rechenzentrum", "createdAt": "2026-07-20T09:12:00Z" }
 ]`,
@@ -447,14 +447,14 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           path: '/api/glossary',
           summary: 'Begriff anlegen. 409, wenn er (unabhängig von Groß-/Kleinschreibung) schon existiert.',
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
-  -d '{"term":"RZ","meaning":"Rechenzentrum"}' "$BBB/api/glossary"`,
+  -d '{"term":"RZ","meaning":"Rechenzentrum"}' "$RECORDER/api/glossary"`,
         },
         {
           method: 'PUT',
           path: '/api/glossary/{id}',
           summary: 'Begriff oder Bedeutung ändern.',
           example: `curl -s -X PUT -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
-  -d '{"term":"RZ","meaning":"Rechenzentrum Nord"}' "$BBB/api/glossary/$GID"`,
+  -d '{"term":"RZ","meaning":"Rechenzentrum Nord"}' "$RECORDER/api/glossary/$GID"`,
         },
         {
           method: 'DELETE',
@@ -465,7 +465,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           method: 'GET',
           path: '/api/glossary/export',
           summary: 'Ganzes Glossar als CSV (Begriff;Bedeutung, UTF-8 mit BOM).',
-          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/glossary/export" -o glossar.csv`,
+          example: `curl -s -H "X-API-Key: $KEY" "$RECORDER/api/glossary/export" -o glossar.csv`,
         },
         {
           method: 'POST',
@@ -473,7 +473,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           summary:
             'CSV einlesen (multipart/form-data, Feld file). Führt zusammen: vorhandene Begriffe werden aktualisiert, neue angelegt, nichts gelöscht.',
           example: `curl -s -H "X-API-Key: $KEY" -F file=@glossar.csv \\
-  "$BBB/api/glossary/import"`,
+  "$RECORDER/api/glossary/import"`,
           response: `{ "created": 12, "updated": 3, "unchanged": 40, "skipped": 1,
   "warnings": ["Zeile 8: kein Begriff angegeben"] }`,
         },
@@ -481,14 +481,14 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           method: 'GET',
           path: '/api/glossary/shared',
           summary: 'Gemeinsames Glossar der Installation, alphabetisch. Für alle lesbar.',
-          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/glossary/shared"`,
+          example: `curl -s -H "X-API-Key: $KEY" "$RECORDER/api/glossary/shared"`,
         },
         {
           method: 'POST',
           path: '/api/glossary/shared',
           summary: 'Gemeinsamen Begriff anlegen. Nur Admins (sonst 403).',
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
-  -d '{"term":"Projekt Nord","meaning":"Ablösung der Altanlage"}' "$BBB/api/glossary/shared"`,
+  -d '{"term":"Projekt Nord","meaning":"Ablösung der Altanlage"}' "$RECORDER/api/glossary/shared"`,
         },
         {
           method: 'PUT',
@@ -504,7 +504,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           method: 'GET',
           path: '/api/glossary/shared/export',
           summary: 'Gemeinsames Glossar als CSV. Für alle lesbar.',
-          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/glossary/shared/export" -o gemeinsam.csv`,
+          example: `curl -s -H "X-API-Key: $KEY" "$RECORDER/api/glossary/shared/export" -o gemeinsam.csv`,
         },
         {
           method: 'POST',
@@ -512,7 +512,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           summary:
             'CSV ins gemeinsame Glossar einlesen (Feld file). Führt zusammen wie der eigene Import. Nur Admins.',
           example: `curl -s -H "X-API-Key: $KEY" -F file=@gemeinsam.csv \\
-  "$BBB/api/glossary/shared/import"`,
+  "$RECORDER/api/glossary/shared/import"`,
         },
       ],
     },
@@ -527,7 +527,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           method: 'GET',
           path: '/api/bots',
           summary: 'Aktive Bots mit Zustand, Teilnehmerzahl und laufender Aufnahme.',
-          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/bots"`,
+          example: `curl -s -H "X-API-Key: $KEY" "$RECORDER/api/bots"`,
         },
         {
           method: 'POST',
@@ -539,7 +539,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
        "botName":"Protokoll-Bot","autoRecord":true,
        "recordVideo":false,"aiAnalysis":true,"diarize":false,
        "sttLanguage":"de"}' \\
-  "$BBB/api/bots"`,
+  "$RECORDER/api/bots"`,
           response: `{ "sessionId": "9a7c...", "status": "STARTING", "roomName": "Technikrunde" }`,
         },
         {
@@ -552,7 +552,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           path: '/api/bots/{sessionId}/recording/stop',
           summary: 'Aufnahme beenden. Mit ?discard=true wird sie verworfen statt ausgewertet.',
           example: `curl -s -X POST -H "X-API-Key: $KEY" \\
-  "$BBB/api/bots/$SID/recording/stop"`,
+  "$RECORDER/api/bots/$SID/recording/stop"`,
         },
         {
           method: 'POST',
@@ -560,7 +560,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           summary:
             'Bot, der nach Zeitplan läuft, verlängern: {"minutes":30} ab dem bisherigen Ende (1–720) oder {"untilStopped":true} für kein geplantes Ende. Gilt nur für diesen Termin.',
           example: `curl -s -X POST -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
-  -d '{"minutes":30}' "$BBB/api/bots/$SID/schedule/extend"`,
+  -d '{"minutes":30}' "$RECORDER/api/bots/$SID/schedule/extend"`,
         },
         {
           method: 'DELETE',
@@ -577,7 +577,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           path: '/api/bot-templates',
           summary:
             'Bot-Vorlagen auflisten: benannte Meetingräume samt Einstellungen. Erst die eigenen, dann die mit Ihnen geteilten (mine=false, ownerName = Besitzer). Geteilte lassen sich starten, aber nicht ändern.',
-          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/bot-templates"`,
+          example: `curl -s -H "X-API-Key: $KEY" "$RECORDER/api/bot-templates"`,
         },
         {
           method: 'POST',
@@ -593,7 +593,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
        "schedule":{"enabled":true,"days":["MONDAY","WEDNESDAY","FRIDAY"],
                    "start":"09:00","end":"10:00","timeZone":"Europe/Berlin"},
        "summaryPreset":"tpl:3c1e..."}' \\
-  "$BBB/api/bot-templates"`,
+  "$RECORDER/api/bot-templates"`,
           response: `{ "id": "b71f...", "name": "Jour fixe",
   "schedule": { "enabled": true, "days": ["MONDAY","WEDNESDAY","FRIDAY"],
                 "start": "09:00:00", "end": "10:00:00", "timeZone": "Europe/Berlin",
@@ -623,7 +623,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           path: '/api/bots/from-template/{id}',
           summary:
             'Bot aus einer eigenen Bot-Vorlage starten, samt ihrer Auswertungs-Vorlage. Läuft gerade ein Termin ihres Zeitplans, verlässt der Bot den Raum zu dessen Endzeit.',
-          example: `curl -s -X POST -H "X-API-Key: $KEY" "$BBB/api/bots/from-template/$TID"`,
+          example: `curl -s -X POST -H "X-API-Key: $KEY" "$RECORDER/api/bots/from-template/$TID"`,
         },
       ],
     },
@@ -642,7 +642,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           path: '/api/recordings/{id}/shares',
           summary: 'Mit einem Nutzer oder einer Gruppe teilen – genau eines von userId/groupId angeben.',
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
-  -d '{"userId":"4f2a..."}' "$BBB/api/recordings/$ID/shares"`,
+  -d '{"userId":"4f2a..."}' "$RECORDER/api/recordings/$ID/shares"`,
         },
         {
           method: 'DELETE',
@@ -669,7 +669,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
             },
           ],
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
-  -d '{"expiresInDays":30}' "$BBB/api/recordings/$ID/share-links"`,
+  -d '{"expiresInDays":30}' "$RECORDER/api/recordings/$ID/share-links"`,
           response: `{
   "id": "0c9d1e2f-...",
   "token": "brqk6JmNhZf9oO55m_98lBOZoRskgzRh7K3fBMY12Ok",
@@ -692,7 +692,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           summary:
             'Kontogebundenen Freigabe-Link einlösen: Die Aufnahme wird mit dem angemeldeten Nutzer geteilt (mehrfaches Einlösen erzeugt nur eine Freigabe); zurück kommt ihre Kennung. Bei einem Link ohne Anmeldepflicht wird bewusst keine Freigabe angelegt.',
           example: `curl -s -X POST -H "X-API-Key: $KEY" \\
-  "$BBB/api/share-links/$SHARE_TOKEN/claim"`,
+  "$RECORDER/api/share-links/$SHARE_TOKEN/claim"`,
           response: `{"recordingId":"8f14e45f-...","title":"Jour Fixe","shared":true}`,
         },
         {
@@ -705,7 +705,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           path: '/api/public/shares/{token}',
           summary:
             'Inhalt eines Freigabe-Links: Kopfdaten, Audio-Segmente, Transkript und Zusammenfassung. Braucht KEINEN Schlüssel – dazu /video, /video/download, /segments/{segmentId}/audio und /summary/download. Unbekannte, abgelaufene und widerrufene Tokens antworten gleich mit 404; ein kontogebundener Link mit 403 (dann über /api/share-links/{token}/claim einlösen).',
-          example: `curl -s "$BBB/api/public/shares/$SHARE_TOKEN"`,
+          example: `curl -s "$RECORDER/api/public/shares/$SHARE_TOKEN"`,
         },
         {
           method: 'GET',
@@ -717,7 +717,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           path: '/api/groups',
           summary: 'Gruppe anlegen.',
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
-  -d '{"name":"Technik"}' "$BBB/api/groups"`,
+  -d '{"name":"Technik"}' "$RECORDER/api/groups"`,
         },
         {
           method: 'GET',
@@ -738,7 +738,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           method: 'GET',
           path: '/api/users/search?q=…',
           summary: 'Nutzer suchen (ab 2 Zeichen) – liefert die IDs für Freigaben und Gruppen.',
-          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/users/search?q=mei"`,
+          example: `curl -s -H "X-API-Key: $KEY" "$RECORDER/api/users/search?q=mei"`,
         },
       ],
     },
@@ -763,7 +763,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           example: `curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
   -d '{"name":"Nur Aufgaben","prompt":"Liste ausschließlich Aufgaben mit Zuständigkeit.",
        "model":"qwen2.5-72b-instruct","temperature":0.1}' \\
-  "$BBB/api/prompt-templates"`,
+  "$RECORDER/api/prompt-templates"`,
         },
         { method: 'PUT', path: '/api/prompt-templates/{id}', summary: 'Vorlage ändern.' },
         { method: 'DELETE', path: '/api/prompt-templates/{id}', summary: 'Vorlage löschen.' },
@@ -781,20 +781,20 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           path: '/api/recordings/{id}/audio',
           summary:
             'Die ganze Aufnahme als eine MP3 – die Segmente werden dafür beim ersten Abruf zusammengefügt und danach wiederverwendet. Unterstützt Range-Requests, taugt also direkt als Quelle für einen Player.',
-          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/recordings/$ID/audio" -o aufnahme.mp3`,
+          example: `curl -s -H "X-API-Key: $KEY" "$RECORDER/api/recordings/$ID/audio" -o aufnahme.mp3`,
         },
         {
           method: 'GET',
           path: '/api/recordings/{id}/audio/download',
           summary: 'Dieselbe Tonspur mit Download-Namen (Aufnahmedatum und Kurz-Kennung).',
-          example: `curl -s -H "X-API-Key: $KEY" -OJ "$BBB/api/recordings/$ID/audio/download"`,
+          example: `curl -s -H "X-API-Key: $KEY" -OJ "$RECORDER/api/recordings/$ID/audio/download"`,
         },
         {
           method: 'GET',
           path: '/api/recordings/{id}/segments/{segmentId}/audio',
           summary: 'Ein einzelnes Audiosegment als MP3.',
           example: `curl -s -H "X-API-Key: $KEY" \\
-  "$BBB/api/recordings/$ID/segments/$SEGID/audio" -o segment.mp3`,
+  "$RECORDER/api/recordings/$ID/segments/$SEGID/audio" -o segment.mp3`,
         },
         {
           method: 'GET',
@@ -822,7 +822,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           method: 'GET',
           path: '/api/auth/me',
           summary: 'Wer bin ich? Guter erster Aufruf, um einen Schlüssel zu prüfen.',
-          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/auth/me"`,
+          example: `curl -s -H "X-API-Key: $KEY" "$RECORDER/api/auth/me"`,
           response: `{ "id": "5d34...", "username": "m.mustermann", "admin": false, "local": false }`,
         },
         {
@@ -835,7 +835,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           path: '/api/admin/settings',
           summary:
             'Alle Einstellungen (Whisper, LLM, Zeitfenster, Bots) – nur mit Admin-Recht. Änderungen per PUT mit demselben Format.',
-          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/admin/settings"`,
+          example: `curl -s -H "X-API-Key: $KEY" "$RECORDER/api/admin/settings"`,
         },
         {
           method: 'GET',
@@ -871,7 +871,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           path: '/api/admin/processing',
           summary:
             'Zustand der Verarbeitungs-Warteschlange – nur mit Admin-Recht. Was wartet, was läuft, die letzten Fehlschläge mit Grund, die Dauer der Schritte (Median und Maximum der letzten 50 fertigen Aufträge) und ob das Zeitfenster gerade offen ist. waitsForWindow=true heißt: Der Auftrag steht nur, weil das Fenster zu ist.',
-          example: `curl -s -H "X-API-Key: $KEY" "$BBB/api/admin/processing"`,
+          example: `curl -s -H "X-API-Key: $KEY" "$RECORDER/api/admin/processing"`,
           response: `{
   "windowOpen": false, "windowStart": "20:00", "windowEnd": "06:00",
   "pending": 3, "running": 0, "failed": 1, "done": 128,
@@ -892,7 +892,7 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
           summary:
             'Einen gescheiterten Auftrag erneut anstoßen – nur mit Admin-Recht. Der Versuchszähler beginnt neu, und der Auftrag läuft sofort (ohne Rücksicht auf das Zeitfenster). Antwort ist die vollständige Übersicht. 409, wenn der Auftrag nicht gescheitert ist.',
           example: `curl -s -X POST -H "X-API-Key: $KEY" \\
-  "$BBB/api/admin/processing/jobs/$JOB/retry"`,
+  "$RECORDER/api/admin/processing/jobs/$JOB/retry"`,
         },
       ],
     },

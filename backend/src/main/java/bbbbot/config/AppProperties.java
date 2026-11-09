@@ -9,6 +9,18 @@ public class AppProperties {
     private Bots bots = new Bots();
     private Media media = new Media();
     private Auth auth = new Auth();
+    private Bbb bbb = new Bbb();
+
+    /**
+     * BigBlueButton-Anbindung (Bots, Bot-Vorlagen, Zeitplaene, Stopp-Link).
+     * Standard: aus - der Recorder ist dann ein reines Upload-/Bildschirm-
+     * aufnahme-Werkzeug. Einschalten per Umgebungsvariable BBB_ON=true.
+     */
+    public static class Bbb {
+        private boolean enabled = false;
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    }
 
     public static class Storage {
         private String rootDir = "./data/recordings";
@@ -75,5 +87,7 @@ public class AppProperties {
     public Media getMedia() { return media; }
     public void setMedia(Media media) { this.media = media; }
     public Auth getAuth() { return auth; }
+    public Bbb getBbb() { return bbb; }
+    public void setBbb(Bbb bbb) { this.bbb = bbb; }
     public void setAuth(Auth auth) { this.auth = auth; }
 }

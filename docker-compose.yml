@@ -1,4 +1,4 @@
-# BBB Recorder v3 - Gesamt-Stack
+# Meeting Recorder 1.0 - Gesamt-Stack
 #
 # Secrets (DB-Passwort, JWT-Secret, Admin-Passwort) stehen NICHT mehr in
 # dieser Datei, sondern in einer lokalen `.env` (nicht in Git). Einrichtung:
@@ -49,8 +49,9 @@ services:
   app:
     # Fertiges Image aus der Registry (per scripts/docker-push.sh gepusht).
     # In Offline-/Intranet-Umgebungen auf den internen Mirror umstellen,
-    # z.B. registry.example.com/posiuke/bbb-recorder:latest
-    image: posiuke/bbb-recorder:latest
+    # z.B. registry.example.com/posiuke/meeting-recorder:latest
+    # (Das fruehere Image posiuke/bbb-recorder wird nicht mehr gepflegt.)
+    image: posiuke/meeting-recorder:latest
     container_name: bbbbot-app
     depends_on:
       db:
@@ -76,7 +77,11 @@ services:
       # Maximale Groesse fuer hochgeladene Audio-/Videodateien
       MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-4GB}
 
-      # --- Bots ---
+      # --- BigBlueButton-Bots (optional) ---
+      # Standardmaessig aus. Mit BBB_ON=true erscheinen Bots-Reiter,
+      # Bot-Vorlagen und Zeitplaene (siehe DOCKERHUB.md). Die beiden Werte
+      # darunter wirken nur bei eingeschalteter BBB-Anbindung.
+      # BBB_ON: "true"
       MAX_CONCURRENT_BOTS: "5"
       # Self-Signed-Zertifikate im Intranet akzeptieren
       INSECURE_TLS: "true"
@@ -88,7 +93,7 @@ services:
       - "8090:8080"
     volumes:
       - ./data/recordings:/data/recordings
-    # Chromium braucht ausreichend Shared Memory
+    # Chromium (BBB-Bots) braucht ausreichend Shared Memory
     shm_size: "1gb"
     restart: unless-stopped
 

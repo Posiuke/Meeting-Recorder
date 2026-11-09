@@ -55,6 +55,9 @@ const SETTING_GROUPS: SettingsGroupDef[] = [
   { titleKey: 'admin.groupCleanup', prefix: 'cleanup.' },
 ];
 
+/** Einstellungen, die nur mit der BigBlueButton-Anbindung (BBB_ON) Sinn ergeben. */
+const isBbbSetting = (key: string) => key.startsWith('bot.') || key === 'speakers.bbbActivity';
+
 /** Ersatz, falls das Backend für einen Schlüssel (noch) keinen Typ liefert. */
 const TEXT_SPEC: SettingSpec = { type: 'TEXT', min: null, max: null, options: null, optional: true };
 
@@ -463,6 +466,7 @@ function SettingsTab() {
   const { t } = useI18n();
   const dispatch = useAppDispatch();
   const { settings, defaults, schema, settingsLoading, settingsError } = useAppSelector((s) => s.admin);
+  const bbbEnabled = useAppSelector((s) => s.features.bbbEnabled);
   const [values, setValues] = useState<Record<string, string>>({});
   const [messages, setMessages] = useState<
     Record<string, { kind: 'success' | 'error'; text: string }>
@@ -511,12 +515,15 @@ function SettingsTab() {
   const groupedKeys = useMemo(() => {
     if (!settings) return [];
     // Der Anbieter-Umschalter steht oben in seiner Gruppe: Er entscheidet,
-    // welche Felder darunter überhaupt gelten.
-    const allKeys = Object.keys(settings).sort((a, b) => {
-      const pa = a.endsWith('.provider') ? 0 : 1;
-      const pb = b.endsWith('.provider') ? 0 : 1;
-      return pa - pb || a.localeCompare(b);
-    });
+    // welche Felder darunter überhaupt gelten. Ohne BBB_ON fallen die
+    // Bot-Einstellungen weg - es gibt dann keinen Bot, den sie steuern.
+    const allKeys = Object.keys(settings)
+      .filter((k) => bbbEnabled || !isBbbSetting(k))
+      .sort((a, b) => {
+        const pa = a.endsWith('.provider') ? 0 : 1;
+        const pb = b.endsWith('.provider') ? 0 : 1;
+        return pa - pb || a.localeCompare(b);
+      });
     const used = new Set<string>();
     const result: { def: SettingsGroupDef; keys: string[] }[] = [];
     for (const def of SETTING_GROUPS) {
@@ -531,7 +538,7 @@ function SettingsTab() {
       result.push({ def: { titleKey: 'admin.groupOther', prefix: '' }, keys: rest });
     }
     return result;
-  }, [settings]);
+  }, [settings, bbbEnabled]);
 
   if (settingsLoading && !settings) {
     return <Spinner label={t('admin.settingsLoading')} />;

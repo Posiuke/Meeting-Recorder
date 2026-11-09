@@ -41,6 +41,10 @@ management:
       enabled: false
 
 bbbbot:
+  bbb:
+    # BigBlueButton-Anbindung (Bots, Bot-Vorlagen, Zeitplaene). Standard aus:
+    # Ohne BBB_ON=true verschwindet der Bots-Reiter und die Bot-API antwortet 404.
+    enabled: ${BBB_ON:false}
   storage:
     # Wurzelverzeichnis fuer Aufnahmen, Transkripte und Zusammenfassungen
     root-dir: ${STORAGE_DIR:./data/recordings}

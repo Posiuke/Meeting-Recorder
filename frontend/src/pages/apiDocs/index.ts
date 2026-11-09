@@ -18,7 +18,7 @@ export interface ApiEndpointDoc {
   path: string;
   summary: string;
   params?: ApiParamDoc[];
-  /** curl-Beispiel; `$BBB` und `$KEY` sind im Schnellstart gesetzt. */
+  /** curl-Beispiel; `$RECORDER` und `$KEY` sind im Schnellstart gesetzt. */
   example?: string;
   /** Gekürzte Beispielantwort. */
   response?: string;

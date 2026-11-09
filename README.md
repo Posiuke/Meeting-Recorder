@@ -1,9 +1,18 @@
 # Meeting Recorder
 
-Bot-System für BigBlueButton im Intranet: Bots treten Meeting-Räumen bei,
-zeichnen Audio auf, transkribieren per Whisper und erstellen KI-Zusammenfassungen
-(vLLM/Qwen). Verwaltung komplett über eine Weboberfläche mit
-Active-Directory-Anmeldung.
+Aufnahmen von Meetings, Vorträgen und Gesprächen — per Datei-Upload oder
+Bildschirmaufnahme im Browser — werden per Whisper transkribiert und von einem
+LLM zusammengefasst (eigener Server oder Cloud-API). Verwaltung komplett über
+eine Weboberfläche mit lokaler oder LDAP-/Active-Directory-Anmeldung.
+
+Optional lässt sich eine **BigBlueButton-Anbindung** einschalten
+(`BBB_ON=true`, siehe [BigBlueButton-Anbindung](#bigbluebutton-anbindung-optional-bbb_on)):
+Dann treten Bots Meeting-Räumen bei und zeichnen sie selbst auf.
+
+**Version 1.0.0.** Das Docker-Image heißt jetzt
+[`posiuke/meeting-recorder`](https://hub.docker.com/r/posiuke/meeting-recorder);
+das frühere `posiuke/bbb-recorder` wird nicht mehr gepflegt (Umstieg siehe
+[Schnellstart](#schnellstart-docker-compose)).
 
 ## Architektur
 
@@ -13,6 +22,9 @@ backend/    Spring Boot 3 (Java 21), Playwright-Bot-Engine, PostgreSQL;
             liefert zugleich das gebaute Frontend als statische Ressourcen aus
 docs/       Anleitungen (u.a. Whisper-Diarisierung), Alt-Dokumentation
 ```
+
+Die folgenden Punkte zu Bots, Bot-Vorlagen und Stopp-Link gelten nur mit
+eingeschalteter BigBlueButton-Anbindung (`BBB_ON=true`).
 
 - **Bot-Engine**: Jeder Bot ist eine eigene Headless-Chromium-Instanz
   (Playwright). Der Join erfolgt UI-basiert über die fertige Raum-URL —
@@ -132,7 +144,25 @@ das Backend wertet die `X-Forwarded-*`-Header bereits aus
 bricht der Start mit einer klaren Meldung ab — statt still mit einem
 Default-Secret zu laufen.
 
-Das Image selbst wird mit `./scripts/docker-push.sh` gebaut und gepusht.
+Das Image selbst wird mit `./scripts/docker-push.sh` gebaut und als
+`posiuke/meeting-recorder` gepusht — mit den Tags `latest`, dem kurzen Git-Hash
+und der Version aus `backend/pom.xml` (z.B. `1.0.0`). Danach übernimmt das
+Skript `DOCKERHUB.md` als Beschreibung auf Docker Hub.
+
+### Umstieg von `posiuke/bbb-recorder`
+
+Bis Version 3.x hieß das Image `posiuke/bbb-recorder`; dort steht jetzt nur
+noch ein Umzugshinweis (Text: `docs/DOCKERHUB_BBB_RECORDER_DEPRECATED.md`,
+gesetzt per `./scripts/dockerhub-legacy-notice.sh`). Umstieg:
+
+1. In der `docker-compose.yml` das Image auf `posiuke/meeting-recorder:latest`
+   ändern.
+2. Wer die BigBlueButton-Bots nutzt, ergänzt beim `app`-Service
+   `BBB_ON: "true"` — sonst sind Bots-Reiter, Bot-Vorlagen und Zeitpläne weg.
+3. `docker compose pull && docker compose up -d`
+
+Datenbank, Volumes und Einstellungen bleiben unverändert; eine Migration ist
+nicht nötig. Die Versionszählung beginnt mit dem neuen Namen bei 1.0.0.
 
 Der erste Admin wird über `BOOTSTRAP_ADMINS` (AD-Benutzername) bestimmt und
 kann weitere Admins im Frontend ernennen.
@@ -226,7 +256,8 @@ mvn test -Dtest=UiUploadSmokeTest -Dui.it.url="http://localhost:5173" \
 | `BOOTSTRAP_ADMINS` | Nutzer, die beim ersten Login Admin werden |
 | `JWT_SECRET` | Signaturschlüssel für Sessions (min. 32 Zeichen) |
 | `JWT_TTL_HOURS` | Login-Session-Dauer in Stunden (Standard 168 = 7 Tage) |
-| `MAX_CONCURRENT_BOTS` | Obergrenze paralleler Bots (Standard 5) |
+| `BBB_ON` | `true`: BigBlueButton-Anbindung einschalten (Bots, Bot-Vorlagen, Zeitpläne, Stopp-Link). Standard `false` |
+| `MAX_CONCURRENT_BOTS` | Obergrenze paralleler Bots (Standard 5, nur mit `BBB_ON`) |
 | `CHROME_PATH` | Optionaler Pfad zu einem System-Chromium |
 | `INSECURE_TLS` | `true`: Self-Signed-Zertifikate akzeptieren (Intranet) |
 | `STORAGE_DIR` | Ablage für Aufnahmen/Transkripte/Zusammenfassungen/beigefügte Unterlagen |
@@ -336,6 +367,27 @@ gelten die Werte des laufenden Versuchs, nicht die des vorigen.
 
 Per API: `GET /api/admin/processing` und
 `POST /api/admin/processing/jobs/{jobId}/retry` (beide nur mit Admin-Recht).
+
+## BigBlueButton-Anbindung (optional, `BBB_ON`)
+
+Standardmäßig ist der Meeting Recorder ein reines Werkzeug für Upload,
+Bildschirmaufnahme, Transkript und Zusammenfassung. Die Anbindung an
+BigBlueButton wird erst mit der Umgebungsvariable `BBB_ON=true` am
+`app`-Container eingeschaltet (in der `docker-compose.yml` steht die Zeile
+auskommentiert bereit; in `.env.example` taucht sie bewusst nicht auf).
+
+| | `BBB_ON` nicht gesetzt / `false` (Standard) | `BBB_ON=true` |
+|---|---|---|
+| Reiter **Bots** (inkl. Bot-Vorlagen, Zeitpläne, Historie) | ausgeblendet | sichtbar |
+| Admin → Einstellungen: Gruppe *Bot-Verhalten*, `speakers.bbbActivity` | ausgeblendet | sichtbar |
+| Quellfilter „Bot im Meeting", API-Doku-Abschnitt *Bots* | ausgeblendet | sichtbar |
+| `/api/bots/**`, `/api/bot-templates/**`, `/api/public/bot-stop/**` | 404 | aktiv |
+| Zeitpläne gespeicherter Bot-Vorlagen | ruhen | werden ausgeführt |
+
+Das Frontend fragt den Schalter über `GET /api/public/features`
+(`{"bbbEnabled": true|false}`) ab. Beim Ausschalten bleiben vorhandene
+Bot-Vorlagen und Bot-Aufnahmen erhalten — die Aufnahmen sind weiter
+abspielbar und auswertbar; nur neue Bots lassen sich nicht mehr starten.
 
 ## Bot-Vorlagen
 

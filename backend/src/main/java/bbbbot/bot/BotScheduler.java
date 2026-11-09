@@ -1,5 +1,6 @@
 package bbbbot.bot;
 
+import bbbbot.config.AppProperties;
 import bbbbot.domain.BotSession;
 import bbbbot.domain.BotTemplate;
 import bbbbot.repository.Repositories.BotSessionRepo;
@@ -48,12 +49,14 @@ public class BotScheduler {
     private final BotSessionRepo sessionRepo;
     private final BotManager botManager;
     private final BotTemplateLauncher launcher;
+    private final AppProperties props;
 
     /** Termin (Beginn), fuer den ein Startproblem schon gemeldet wurde - gegen Log-Flut. */
     private final Map<UUID, Instant> warnedWindows = new ConcurrentHashMap<>();
 
     public BotScheduler(BotTemplateRepo templateRepo, BotSessionRepo sessionRepo,
-                        BotManager botManager, BotTemplateLauncher launcher) {
+                        BotManager botManager, BotTemplateLauncher launcher, AppProperties props) {
+        this.props = props;
         this.templateRepo = templateRepo;
         this.sessionRepo = sessionRepo;
         this.botManager = botManager;
@@ -63,6 +66,10 @@ public class BotScheduler {
     @Scheduled(fixedDelayString = "${bbbbot.bots.schedule-check-ms:30000}",
             initialDelayString = "${bbbbot.bots.schedule-check-ms:30000}")
     public void tick() {
+        // Ohne BBB_ON keine Bots - auch keine aus gespeicherten Zeitplaenen.
+        if (!props.getBbb().isEnabled()) {
+            return;
+        }
         tick(Instant.now());
     }
 

@@ -53,7 +53,7 @@ class BotSchedulerTest {
         sessionRepo = mock(BotSessionRepo.class);
         botManager = mock(BotManager.class);
         launcher = mock(BotTemplateLauncher.class);
-        scheduler = new BotScheduler(templateRepo, sessionRepo, botManager, launcher);
+        scheduler = new BotScheduler(templateRepo, sessionRepo, botManager, launcher, new bbbbot.config.AppProperties());
 
         template = BotTemplate.create(UUID.randomUUID(), "Jour fixe",
                 "https://bbb.example.org/b/jf", "RecorderBot");

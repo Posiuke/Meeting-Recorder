@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from './store/hooks';
 import { fetchMe } from './store/authSlice';
+import { fetchFeatures } from './store/featuresSlice';
 import { isLanguage, setLanguage } from './i18n';
 import Layout from './components/Layout';
 import RequireAuth from './components/RequireAuth';
@@ -18,6 +19,7 @@ import GlossaryPage from './pages/GlossaryPage';
 import ApiPage from './pages/ApiPage';
 import AdminPage from './pages/AdminPage';
 import ChangePassword from './pages/ChangePassword';
+import Spinner from './components/Spinner';
 
 /** Erzwingt die Passwort-Aenderung, solange ein Initialpasswort aktiv ist. */
 function PasswordGate({ children }: { children: ReactNode }) {
@@ -29,10 +31,31 @@ function PasswordGate({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Bereiche der BigBlueButton-Anbindung gibt es nur mit BBB_ON am Server.
+ * Bis die Angabe da ist, warten statt umzuleiten - sonst landet ein Neuladen
+ * von /bots kurz auf der Startseite.
+ */
+function RequireBbb({ children }: { children: ReactNode }) {
+  const { loaded, bbbEnabled } = useAppSelector((s) => s.features);
+  if (!loaded) return <Spinner />;
+  if (!bbbEnabled) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 export default function App() {
   const dispatch = useAppDispatch();
   const status = useAppSelector((s) => s.auth.status);
   const userLanguage = useAppSelector((s) => s.auth.user?.language);
+
+  const featuresLoaded = useAppSelector((s) => s.features.loaded);
+
+  // Optionale Bereiche (z.B. BigBlueButton) - öffentlich, daher unabhängig vom Login.
+  useEffect(() => {
+    if (!featuresLoaded) {
+      dispatch(fetchFeatures());
+    }
+  }, [featuresLoaded, dispatch]);
 
   // Beim App-Start: gespeichertes Token über /api/auth/me validieren.
   useEffect(() => {
@@ -55,7 +78,14 @@ export default function App() {
       {/* Freigabe-Link: bewusst ohne RequireAuth - die Berechtigung steckt im Token */}
       <Route path="/share/:token" element={<SharePage />} />
       {/* Anonymer Stopp-Link aus dem Aufnahme-Hinweis des Bots - ohne Anmeldung */}
-      <Route path="/stop/:token" element={<StopRecordingPage />} />
+      <Route
+        path="/stop/:token"
+        element={
+          <RequireBbb>
+            <StopRecordingPage />
+          </RequireBbb>
+        }
+      />
       <Route
         element={
           <RequireAuth>
@@ -69,7 +99,14 @@ export default function App() {
         <Route path="/" element={<Navigate to="/recordings" replace />} />
         <Route path="/recordings" element={<RecordingsPage />} />
         <Route path="/recordings/:id" element={<RecordingDetailPage />} />
-        <Route path="/bots" element={<BotsPage />} />
+        <Route
+          path="/bots"
+          element={
+            <RequireBbb>
+              <BotsPage />
+            </RequireBbb>
+          }
+        />
         <Route path="/groups" element={<GroupsPage />} />
         <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/glossary" element={<GlossaryPage />} />

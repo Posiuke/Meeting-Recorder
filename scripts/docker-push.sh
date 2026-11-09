@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 # Baut das kombinierte App-Image (Frontend + Backend) und pusht es in die
-# konfigurierte Registry.
+# konfigurierte Registry - auf Docker Hub als <namespace>/meeting-recorder.
 #
 # Konfiguration (in .env im Repo-Root oder als Umgebungsvariablen):
-#   DOCKER_NAMESPACE   Pflicht. Docker-Hub-Benutzer/Organisation, z.B. "michaelmaciuch"
+#   DOCKER_NAMESPACE   Pflicht. Docker-Hub-Benutzer/Organisation, z.B. "posiuke"
 #   DOCKER_REGISTRY    Optional. Registry-Host (leer = Docker Hub).
 #                      Fuer interne Registry z.B. "registry.example.com"
-#   IMAGE_TAG          Optional. Zusaetzlicher Tag (Default: kurzer Git-Hash).
+#   IMAGE_TAG          Optional. Zusaetzlicher Tag.
 #   DOCKERHUB_USERNAME Optional. Fuer automatischen Login (sonst: vorher `docker login`).
 #   DOCKERHUB_TOKEN    Optional. Access-Token/Passwort fuer den automatischen Login.
 #   DOCKER_SHORT_DESCRIPTION  Optional. Kurzbeschreibung (max. 100 Zeichen) fuer Docker Hub.
+#
+# Tags: Immer "latest", der kurze Git-Hash und die Version aus backend/pom.xml
+# (z.B. "1.0.0"). Ein Argument bzw. IMAGE_TAG kommt als weiterer Tag hinzu.
 #
 # Docker-Hub-Beschreibung:
 #   Nur bei Docker Hub (DOCKER_REGISTRY leer) und gesetzten DOCKERHUB_USERNAME/
@@ -17,30 +20,33 @@
 #   Langbeschreibung aus DOCKERHUB.md, Kurzbeschreibung aus DOCKER_SHORT_DESCRIPTION.
 #   Benoetigt `curl` und `jq`; fehlt etwas, wird der Schritt uebersprungen (Push bleibt ok).
 #
+# Das fruehere Image <namespace>/bbb-recorder wird nicht mehr gebaut; den
+# Umzugshinweis dort setzt scripts/dockerhub-legacy-notice.sh.
+#
 # Aufruf:  ./scripts/docker-push.sh [tag]
-#   Ohne Argument werden "latest" und der Git-Hash getaggt und gepusht.
-#   Mit Argument (z.B. "v3.0.0") zusaetzlich dieser Tag.
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
+# shellcheck source=lib/dockerhub.sh
+source "$REPO_ROOT/scripts/lib/dockerhub.sh"
+load_env "$REPO_ROOT"
 
-# .env laden (falls vorhanden), ohne bereits gesetzte Variablen zu ueberschreiben
-if [[ -f .env ]]; then
-  while IFS='=' read -r key value; do
-    [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
-    [[ -n "${!key:-}" ]] || export "$key=$value"
-  done < <(grep -v '^\s*#' .env | grep '=')
-fi
-
+IMAGE_NAME="meeting-recorder"
 DOCKER_NAMESPACE="${DOCKER_NAMESPACE:-}"
 DOCKER_REGISTRY="${DOCKER_REGISTRY:-}"
 EXTRA_TAG="${1:-${IMAGE_TAG:-}}"
 GIT_TAG="$(git rev-parse --short HEAD 2>/dev/null || echo dev)"
+# Projektversion: das erste <version> nach <artifactId>bbb-bot-backend</artifactId>
+VERSION_TAG="$(sed -n '/<artifactId>bbb-bot-backend<\/artifactId>/,/<\/version>/s:.*<version>\(.*\)</version>.*:\1:p' backend/pom.xml | head -n1)"
 
 if [[ -z "$DOCKER_NAMESPACE" ]]; then
   echo "FEHLER: DOCKER_NAMESPACE ist nicht gesetzt (in .env eintragen, z.B. DOCKER_NAMESPACE=meinbenutzer)" >&2
+  exit 1
+fi
+if [[ -z "$VERSION_TAG" ]]; then
+  echo "FEHLER: Version aus backend/pom.xml nicht lesbar" >&2
   exit 1
 fi
 
@@ -50,55 +56,13 @@ if [[ -n "$DOCKER_REGISTRY" ]]; then
   PREFIX="$DOCKER_REGISTRY/$DOCKER_NAMESPACE"
 fi
 
-APP_IMAGE="$PREFIX/bbb-recorder"
-REPO_SLUG="$DOCKER_NAMESPACE/bbb-recorder"
+APP_IMAGE="$PREFIX/$IMAGE_NAME"
+REPO_SLUG="$DOCKER_NAMESPACE/$IMAGE_NAME"
 
-# Aktualisiert Kurz- und Langbeschreibung des Docker-Hub-Repos ueber die Hub-API.
-# Nicht-fatal: schlaegt der Schritt fehl, bleibt der Image-Push davon unberuehrt.
-update_dockerhub_description() {
-  if [[ -n "$DOCKER_REGISTRY" ]]; then
-    return 0  # nur Docker Hub, nicht fuer eigene Registries
-  fi
-  local desc_file="$REPO_ROOT/DOCKERHUB.md"
-  if [[ -z "${DOCKERHUB_USERNAME:-}" || -z "${DOCKERHUB_TOKEN:-}" ]]; then
-    echo ">> Hinweis: DOCKERHUB_USERNAME/DOCKERHUB_TOKEN fehlen - Beschreibung wird nicht aktualisiert."
-    return 0
-  fi
-  if [[ ! -f "$desc_file" ]]; then
-    echo ">> Hinweis: $desc_file fehlt - Beschreibung wird nicht aktualisiert."
-    return 0
-  fi
-  if ! command -v curl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
-    echo ">> Hinweis: curl und jq werden fuer die Beschreibung benoetigt - uebersprungen."
-    return 0
-  fi
-
-  local short="${DOCKER_SHORT_DESCRIPTION:-BBB-Recorder: Aufnahme-Bot fuer BigBlueButton-Meetings mit Transkript & KI-Zusammenfassung.}"
-  short="${short:0:100}"
-
-  echo ">> Aktualisiere Docker-Hub-Beschreibung ($REPO_SLUG)"
-  local token
-  token="$(curl -s -H 'Content-Type: application/json' \
-      -d "$(jq -n --arg u "$DOCKERHUB_USERNAME" --arg p "$DOCKERHUB_TOKEN" '{username:$u,password:$p}')" \
-      https://hub.docker.com/v2/users/login/ | jq -r '.token // empty' || true)"
-  if [[ -z "$token" ]]; then
-    echo ">> WARNUNG: Docker-Hub-Login fuer die Beschreibung fehlgeschlagen - uebersprungen." >&2
-    return 0
-  fi
-
-  local payload http_code
-  payload="$(jq -n --arg d "$short" --rawfile f "$desc_file" \
-      '{description:$d, full_description:$f}')"
-  http_code="$(curl -s -o /dev/null -w '%{http_code}' -X PATCH \
-      -H "Authorization: JWT $token" -H 'Content-Type: application/json' \
-      -d "$payload" \
-      "https://hub.docker.com/v2/repositories/$REPO_SLUG/" || true)"
-  if [[ "$http_code" == "200" ]]; then
-    echo ">> Docker-Hub-Beschreibung aktualisiert."
-  else
-    echo ">> WARNUNG: Beschreibung-Update lieferte HTTP ${http_code:-?}." >&2
-  fi
-}
+TAGS=(latest "$GIT_TAG" "$VERSION_TAG")
+if [[ -n "$EXTRA_TAG" && ! " ${TAGS[*]} " =~ " $EXTRA_TAG " ]]; then
+  TAGS+=("$EXTRA_TAG")
+fi
 
 # Optionaler automatischer Login (sonst muss vorher `docker login` gelaufen sein)
 if [[ -n "${DOCKERHUB_USERNAME:-}" && -n "${DOCKERHUB_TOKEN:-}" ]]; then
@@ -108,22 +72,29 @@ if [[ -n "${DOCKERHUB_USERNAME:-}" && -n "${DOCKERHUB_TOKEN:-}" ]]; then
 fi
 
 # Build-Kontext ist das Repo-Root, Dockerfile liegt unter backend/
-echo ">> Baue App-Image ($APP_IMAGE) - Frontend + Backend"
-docker build -f backend/Dockerfile -t "$APP_IMAGE:latest" -t "$APP_IMAGE:$GIT_TAG" .
-
-if [[ -n "$EXTRA_TAG" ]]; then
-  docker tag "$APP_IMAGE:latest" "$APP_IMAGE:$EXTRA_TAG"
-fi
+echo ">> Baue App-Image ($APP_IMAGE, Version $VERSION_TAG) - Frontend + Backend"
+TAG_ARGS=()
+for tag in "${TAGS[@]}"; do
+  TAG_ARGS+=(-t "$APP_IMAGE:$tag")
+done
+docker build -f backend/Dockerfile \
+    --label "org.opencontainers.image.title=Meeting Recorder" \
+    --label "org.opencontainers.image.version=$VERSION_TAG" \
+    --label "org.opencontainers.image.revision=$GIT_TAG" \
+    --label "org.opencontainers.image.source=https://github.com/Posiuke/Meeting-Recorder" \
+    "${TAG_ARGS[@]}" .
 
 echo ">> Pushe Image"
-docker push "$APP_IMAGE:latest"
-docker push "$APP_IMAGE:$GIT_TAG"
-if [[ -n "$EXTRA_TAG" ]]; then
-  docker push "$APP_IMAGE:$EXTRA_TAG"
-fi
+for tag in "${TAGS[@]}"; do
+  docker push "$APP_IMAGE:$tag"
+done
 
-update_dockerhub_description
+if [[ -z "$DOCKER_REGISTRY" ]]; then
+  dockerhub_update_description "$REPO_SLUG" \
+    "${DOCKER_SHORT_DESCRIPTION:-Meeting Recorder: recordings, transcripts & AI summaries. Optional BigBlueButton bots.}" \
+    "$REPO_ROOT/DOCKERHUB.md" || true
+fi
 
 echo
 echo "Fertig. Gepusht:"
-echo "  $APP_IMAGE  (latest, $GIT_TAG${EXTRA_TAG:+, $EXTRA_TAG})"
+echo "  $APP_IMAGE  ($(IFS=', '; echo "${TAGS[*]}"))"

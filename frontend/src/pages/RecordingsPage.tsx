@@ -56,6 +56,7 @@ export default function RecordingsPage() {
     owners,
     cleanupCandidates,
   } = useAppSelector((s) => s.recordings);
+  const bbbEnabled = useAppSelector((s) => s.features.bbbEnabled);
 
   const [confirmCleanup, setConfirmCleanup] = useState(false);
   const [cleaning, setCleaning] = useState(false);
@@ -262,7 +263,7 @@ export default function RecordingsPage() {
                 onChange={(e) => setSource(e.target.value as RecordingSource | '')}
               >
                 <option value="">{t('common.all')}</option>
-                {SOURCES.map((s) => (
+                {SOURCES.filter((s) => bbbEnabled || s !== 'BOT').map((s) => (
                   <option key={s} value={s}>
                     {t(`recordings.source.${s}`)}
                   </option>

@@ -119,7 +119,7 @@ class BotScheduleExtendTest {
         when(manager.listActive()).thenReturn(java.util.List.of(bot));
         BotScheduler scheduler = new BotScheduler(
                 mock(bbbbot.repository.Repositories.BotTemplateRepo.class), sessionRepo,
-                manager, mock(BotTemplateLauncher.class));
+                manager, mock(BotTemplateLauncher.class), new AppProperties());
 
         scheduler.tick(NOW.plus(Duration.ofMinutes(29)));
         verify(manager, never()).stopBot(any());
