@@ -28,9 +28,9 @@ eingeschalteter BigBlueButton-Anbindung (`BBB_ON=true`).
 
 - **Bot-Engine**: Jeder Bot ist eine eigene Headless-Chromium-Instanz
   (Playwright). Der Join erfolgt UI-basiert über die fertige Raum-URL —
-  bewusst ohne BBB-API/Checksums, weil die Intranet-Umgebung (Nextcloud-
-  BBB-Integration) so angebunden ist. Audio wird im Browser per WebAudio +
-  MediaRecorder gemischt und segmentweise ins Backend gestreamt.
+  bewusst ohne BBB-API/Checksums. So funktioniert er auch mit Räumen hinter
+  der Nextcloud-BBB-Integration, für die es keinen API-Zugang gibt. Audio
+  wird im Browser per WebAudio + MediaRecorder gemischt und segmentweise ins Backend gestreamt.
 - **Steuerung**: über das Frontend (Raum-URL eingeben, Aufnahme
   starten/stoppen) und weiterhin per Chat-Befehl im Meeting
   (`STARTRECORDING`/`STOPRECORDING`, Zwei-Marker-System gegen Selbst-Trigger).
@@ -164,15 +164,27 @@ gesetzt per `./scripts/dockerhub-legacy-notice.sh`). Umstieg:
 Datenbank, Volumes und Einstellungen bleiben unverändert; eine Migration ist
 nicht nötig. Die Versionszählung beginnt mit dem neuen Namen bei 1.0.0.
 
-Der erste Admin wird über `BOOTSTRAP_ADMINS` (AD-Benutzername) bestimmt und
-kann weitere Admins im Frontend ernennen.
+### Erste Anmeldung
+
+Beim allerersten Start legt die Anwendung ein lokales Admin-Konto an
+(`ADMIN_USERNAME`, Standard `admin`, mit dem Passwort aus
+`ADMIN_INITIAL_PASSWORD`). Bei der ersten Anmeldung muss das Passwort geändert
+werden. Danach lassen sich unter **Admin → Benutzer** weitere lokale Konten
+anlegen und Admins ernennen.
+
+LDAP/Active Directory ist optional und wird komplett im Frontend eingerichtet
+(**Admin → Authentifizierung**: einschalten, Verbindungsdaten eintragen, per
+Test-Login prüfen). Dort steht auch die Liste der Benutzer, die bei ihrer ersten
+LDAP-Anmeldung automatisch Admin werden. Das lokale Admin-Konto funktioniert
+unabhängig davon immer — auch wenn LDAP ausfällt.
 
 ## Entwicklung
 
 ```bash
 # Backend (braucht PostgreSQL, z.B. docker compose up -d db)
 cd backend
-AUTH_MODE=dev mvn spring-boot:run     # Login: admin/admin bzw. user/user
+mvn spring-boot:run                   # Login: admin/admin (Passwortwechsel beim ersten Login)
+# mit BigBlueButton-Bots:  BBB_ON=true mvn spring-boot:run
 
 # Frontend (Dev-Server mit Proxy auf localhost:8080)
 cd frontend
@@ -251,17 +263,20 @@ mvn test -Dtest=UiUploadSmokeTest -Dui.it.url="http://localhost:5173" \
 | Variable | Bedeutung |
 |---|---|
 | `DB_URL`, `DB_USER`, `DB_PASSWORD` | PostgreSQL-Verbindung |
-| `AUTH_MODE` | `ldap` (Active Directory) oder `dev` (lokale Testnutzer) |
-| `AD_DOMAIN`, `AD_URL`, `AD_ROOT_DN` | Active-Directory-Anbindung |
-| `BOOTSTRAP_ADMINS` | Nutzer, die beim ersten Login Admin werden |
 | `JWT_SECRET` | Signaturschlüssel für Sessions (min. 32 Zeichen) |
 | `JWT_TTL_HOURS` | Login-Session-Dauer in Stunden (Standard 168 = 7 Tage) |
+| `ADMIN_USERNAME`, `ADMIN_INITIAL_PASSWORD` | Lokales Admin-Konto, nur beim allerersten Start angelegt (Standard `admin`/`admin`, Passwortwechsel wird erzwungen) |
+| `MAX_UPLOAD_SIZE` | Höchstgröße für hochgeladene Dateien (Standard `4GB`) |
+| `SERVER_PORT` | HTTP-Port im Container (Standard 8080) |
 | `BBB_ON` | `true`: BigBlueButton-Anbindung einschalten (Bots, Bot-Vorlagen, Zeitpläne, Stopp-Link). Standard `false` |
 | `MAX_CONCURRENT_BOTS` | Obergrenze paralleler Bots (Standard 5, nur mit `BBB_ON`) |
 | `CHROME_PATH` | Optionaler Pfad zu einem System-Chromium |
-| `INSECURE_TLS` | `true`: Self-Signed-Zertifikate akzeptieren (Intranet) |
+| `INSECURE_TLS` | `true`: Bots akzeptieren Self-Signed-Zertifikate (nur mit `BBB_ON`) |
+| `FFMPEG_PATH`, `FFPROBE_PATH` | Optionale Pfade zu ffmpeg/ffprobe (im Image bereits vorhanden) |
 | `STORAGE_DIR` | Ablage für Aufnahmen/Transkripte/Zusammenfassungen/beigefügte Unterlagen |
 
+LDAP/Active Directory wird nicht über Umgebungsvariablen konfiguriert, sondern
+unter **Admin → Authentifizierung** (siehe [Erste Anmeldung](#erste-anmeldung)).
 Alle fachlichen Parameter (Whisper-URL und -Parameter, LLM-Endpunkt/Modell,
 Zeitfenster, Segmentlänge, Chat-Befehle, Reconnect-Verhalten, …) werden zur
 Laufzeit im Frontend unter **Admin → Einstellungen** gepflegt und in der
