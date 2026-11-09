@@ -9,7 +9,7 @@ Optional lässt sich eine **BigBlueButton-Anbindung** einschalten
 (`BBB_ON=true`, siehe [BigBlueButton-Anbindung](#bigbluebutton-anbindung-optional-bbb_on)):
 Dann treten Bots Meeting-Räumen bei und zeichnen sie selbst auf.
 
-**Version 1.0.0.** Das Docker-Image heißt jetzt
+**Version 1.2.0.** Das Docker-Image heißt jetzt
 [`posiuke/meeting-recorder`](https://hub.docker.com/r/posiuke/meeting-recorder);
 das frühere `posiuke/bbb-recorder` wird nicht mehr gepflegt (Umstieg siehe
 [Schnellstart](#schnellstart-docker-compose)).
