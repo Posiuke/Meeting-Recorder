@@ -12,11 +12,15 @@ import type { PromptTemplateView, SummarySelection } from '../types';
  * der aktuellen Vorgabe des Administrators.
  */
 export const PRESET_KEYS = [
+  // „Freie Struktur": Die KI erkennt den Inhalt und entwirft die Gliederung
+  // selbst – ohne Bindung an die integrierten Vorlagen. Die erkannte Art steht
+  // mit einem von der KI gewählten Symbol in der ersten Zeile.
+  { key: 'adaptive', icon: '🪄', labelKey: 'summaryOptions.presets.adaptiveLabel', promptKey: 'summaryOptions.presets.adaptivePrompt' },
   // „Automatisch erkennen": Der Prompt lässt die KI zuerst die Art des Inhalts
   // bestimmen (dieselben Arten wie die übrigen Vorlagen) und dann deren
   // Gliederung verwenden. Die erkannte Art steht samt demselben Symbol wie
   // hier in der ersten Zeile der Zusammenfassung.
-  { key: 'auto', icon: '✨', labelKey: 'summaryOptions.presets.autoLabel', promptKey: 'summaryOptions.presets.autoPrompt' },
+  { key: 'auto',icon: '✨', labelKey: 'summaryOptions.presets.autoLabel', promptKey: 'summaryOptions.presets.autoPrompt' },
   { key: 'meeting', icon: '👥', labelKey: 'summaryOptions.presets.meetingLabel', promptKey: 'summaryOptions.presets.meetingPrompt' },
   { key: 'talk', icon: '🎤', labelKey: 'summaryOptions.presets.talkLabel', promptKey: 'summaryOptions.presets.talkPrompt' },
   { key: 'interview', icon: '💬', labelKey: 'summaryOptions.presets.interviewLabel', promptKey: 'summaryOptions.presets.interviewPrompt' },
