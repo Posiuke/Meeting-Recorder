@@ -24,8 +24,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Client fuer das LLM: lokal ein OpenAI-kompatibler Server (vLLM mit Qwen) oder
- * die oeffentliche OpenAI-API (Einstellung llm.provider).
+ * Client fuer das LLM: lokal ein OpenAI-kompatibler Server (vLLM mit Qwen),
+ * die oeffentliche OpenAI-API oder Amazon Bedrock (Einstellung llm.provider).
  * Ruft /chat/completions mit Retry und exponentiellem Backoff auf;
  * Modell, Temperatur, Token-Limit und Timeouts kommen aus den Einstellungen.
  */
@@ -35,6 +35,7 @@ public class LlmClient {
     private static final Logger log = LoggerFactory.getLogger(LlmClient.class);
 
     private final SettingsService settings;
+    private final BedrockChat bedrock;
     private static final ObjectMapper JSON = new ObjectMapper();
     private final ObjectMapper mapper = JSON;
 
@@ -49,8 +50,9 @@ public class LlmClient {
      */
     private volatile HttpClient httpClient;
 
-    public LlmClient(SettingsService settings) {
+    public LlmClient(SettingsService settings, BedrockChat bedrock) {
         this.settings = settings;
+        this.bedrock = bedrock;
     }
 
     private HttpClient client() {
@@ -113,6 +115,9 @@ public class LlmClient {
     }
 
     public LlmResult chat(String systemPrompt, String userPrompt, Overrides overrides) {
+        if (settings.isLlmBedrock()) {
+            return chatBedrock(systemPrompt, userPrompt, overrides);
+        }
         boolean cloud = settings.isLlmCloud();
         String baseUrl = settings.get(cloud ? SettingsService.LLM_OPENAI_URL : SettingsService.LLM_BASE_URL);
         String model = overrides.model() == null || overrides.model().isBlank()
@@ -200,6 +205,55 @@ public class LlmClient {
             }
         }
         return new LlmResult(false, null, lastError);
+    }
+
+    /**
+     * Gleiche Wiederholungslogik wie beim OpenAI-kompatiblen Weg, nur ueber die
+     * Converse-API von Bedrock. Lehnt ein Modell die Temperatur ab (manche
+     * Reasoning-Modelle), geht es sofort ohne sie weiter - wie bei OpenAI.
+     */
+    private LlmResult chatBedrock(String systemPrompt, String userPrompt, Overrides overrides) {
+        String model = overrides.model() == null || overrides.model().isBlank()
+                ? settings.llmModel() : overrides.model().trim();
+        String region = settings.get(SettingsService.LLM_BEDROCK_REGION);
+        Double temperature = overrides.temperature() != null
+                ? overrides.temperature() : settings.getDouble(SettingsService.LLM_TEMPERATURE);
+        int maxTokens = overrides.maxTokens() == null
+                ? settings.getInt(SettingsService.LLM_MAX_TOKENS) : overrides.maxTokens();
+        int timeoutSec = settings.getInt(SettingsService.LLM_TIMEOUT_SEC);
+        int retryAttempts = Math.max(1, settings.getInt(SettingsService.LLM_RETRY_ATTEMPTS));
+        long retryBaseMs = settings.getLong(SettingsService.LLM_RETRY_BASE_MS);
+        String key = "bedrock|" + region + "|" + model;
+        Set<String> rejected = rejectedParams.computeIfAbsent(key, k -> ConcurrentHashMap.newKeySet());
+
+        String lastError = null;
+        for (int attempt = 1; attempt <= retryAttempts; attempt++) {
+            BedrockChat.Reply reply = bedrock.converse(region, model, systemPrompt, userPrompt,
+                    rejected.contains("temperature") ? null : temperature, maxTokens, timeoutSec);
+            if (reply.temperatureRejected() && rejected.add("temperature")) {
+                log.info("Bedrock-Modell {} lehnt temperature ab - neuer Versuch ohne", model);
+                reply = bedrock.converse(region, model, systemPrompt, userPrompt, null, maxTokens, timeoutSec);
+            }
+            if (reply.content() != null) return new LlmResult(true, reply.content(), null);
+            lastError = reply.error();
+            log.warn("Bedrock-Versuch {}/{} fehlgeschlagen (Modell {}, max_tokens={}): {}",
+                    attempt, retryAttempts, model, maxTokens, lastError);
+            if (attempt < retryAttempts) {
+                try {
+                    Thread.sleep(retryBaseMs * (1L << (attempt - 1)));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return new LlmResult(false, null, "Unterbrochen");
+                }
+            }
+        }
+        return new LlmResult(false, null, lastError);
+    }
+
+    /** Modellliste von Bedrock (Inference-Profile und On-Demand-Modelle der Region). */
+    public ModelList listBedrockModels(String region) {
+        return bedrock.listModels(region == null || region.isBlank()
+                ? settings.get(SettingsService.LLM_BEDROCK_REGION) : region.trim());
     }
 
     /**

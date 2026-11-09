@@ -1122,10 +1122,10 @@ export const en: typeof de = {
     testAfterSave: 'Please save before testing.',
     groupWhisper: 'Speech recognition (Whisper)',
     groupWhisperNote:
-      'provider "local" uses the Whisper server on the intranet (setting url). provider "openai" uses an OpenAI-compatible cloud API (settings openaiUrl, openaiApiKey, openaiModel) – e.g. OpenAI or Groq. Caution: with cloud APIs the audio data leaves your own network. Speaker recognition (diarize) needs WhisperX locally and a diarisation model in the cloud (openaiDiarizeModel, gpt-4o-transcribe-diarize at OpenAI).',
+      'provider "local" uses the Whisper server on the intranet (setting url). provider "openai" uses an OpenAI-compatible cloud API (settings openaiUrl, openaiApiKey, openaiModel) – e.g. OpenAI or Groq. Caution: with cloud APIs the audio data leaves your own network. Speaker recognition (diarize) needs WhisperX locally and a diarisation model in the cloud (openaiDiarizeModel, gpt-4o-transcribe-diarize at OpenAI). provider "aws-transcribe" uses Amazon Transcribe (awsRegion, awsBucket, awsMaxSpeakers, awsVocabulary): the whole recording goes in one job, so speakers stay the same across all segments; signs in via the AWS role, no key.',
     groupLlm: 'AI model (LLM)',
     groupLlmNote:
-      'provider "local" uses your own LLM server (baseUrl, apiKey, model). provider "openai" uses a public cloud API (openaiUrl, openaiApiKey, openaiModel) – the model is picked from the provider\'s list ("Fetch models"). Besides OpenAI (https://api.openai.com/v1), compatible providers work too, e.g. Groq https://api.groq.com/openai/v1 or Mistral https://api.mistral.ai/v1. Parameters a model rejects are dropped automatically. Caution: with cloud APIs the transcript and chat log leave your own network.',
+      'provider "local" uses your own LLM server (baseUrl, apiKey, model). provider "openai" uses a public cloud API (openaiUrl, openaiApiKey, openaiModel) – the model is picked from the provider\'s list ("Fetch models"). Besides OpenAI (https://api.openai.com/v1), compatible providers work too, e.g. Groq https://api.groq.com/openai/v1 or Mistral https://api.mistral.ai/v1. Parameters a model rejects are dropped automatically. Caution: with cloud APIs the transcript and chat log leave your own network. provider "bedrock" uses Amazon Bedrock (bedrockRegion, bedrockModel) via the AWS role, no key.',
     groupCorrection: 'Transcript smoothing',
     groupCorrectionNote:
       'Intermediate step between speech recognition and analysis: the LLM smooths the raw transcript (filler words, punctuation, recognition errors) and receives the personal glossary of the recording owner. Smoothing happens sentence by sentence in steps of chunkChars characters – a sentence is never split across two steps. The original is kept; you can switch in the transcript tab. A failure is harmless: the analysis then continues with the original.',
@@ -1169,6 +1169,10 @@ export const en: typeof de = {
     providerOpenai: 'openai – OpenAI-compatible cloud API',
     llmProviderLocal: 'local – own LLM server (vLLM, llama.cpp, Ollama)',
     llmProviderOpenai: 'openai – public cloud API (OpenAI or compatible)',
+    vocabularySync: 'Transfer glossary',
+    vocabularySyncing: 'Transferring…',
+    llmProviderBedrock: 'bedrock – Amazon Bedrock (AWS, signs in via the task role)',
+    providerAwsTranscribe: 'aws-transcribe – Amazon Transcribe (AWS)',
     reasoningOff: 'off – do not send',
     reasoningNone: 'none – no reasoning',
     reasoningMinimal: 'minimal',
@@ -1243,6 +1247,18 @@ export const en: typeof de = {
     usersRunningNone: 'No recording is running – maintenance is safe.',
     usersUntitled: 'untitled',
     keyHelp: {
+      llmBedrockRegion:
+        'AWS region for Bedrock (only with provider = bedrock), e.g. eu-central-1. Empty = region from the environment (set automatically on AWS). Signing in uses the AWS SDK default chain – the task role on ECS, there is no key.',
+      llmBedrockModel:
+        'Model ID or inference profile on Bedrock, e.g. eu.anthropic.claude-sonnet-5-5 (eu.* = requests stay in EU regions). “Load models” lists what is available in the region; access to a model has to be enabled in the AWS account. Templates may pick a different model.',
+      whisperAwsRegion:
+        'AWS region for Amazon Transcribe (only with provider = aws-transcribe). Empty = region from the environment.',
+      whisperAwsBucket:
+        'S3 bucket through which Transcribe reads the audio file – it only stays there for the duration of the job. Empty = the storage bucket (STORAGE_BACKEND=s3); required without S3 storage.',
+      whisperAwsMaxSpeakers:
+        'Maximum number of speakers Transcribe tells apart (2–30). With more, voices get merged – rather choose a bit generously.',
+      whisperAwsVocabulary:
+        'Name of a custom vocabulary in Transcribe – improves proper names, technical terms and abbreviations. “Transfer glossary” creates or updates it from the shared glossary and enters the name here. Empty = none.',
       whisperDiarize:
         'Enable speaker recognition: users can then choose it per recording, upload and bot. Locally it needs WhisperX, in the cloud the model from openaiDiarizeModel.',
       whisperOpenaiDiarizeModel:

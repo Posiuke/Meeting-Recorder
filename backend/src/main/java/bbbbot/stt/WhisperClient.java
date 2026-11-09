@@ -79,6 +79,14 @@ public class WhisperClient {
         this.clipExtractor = clipExtractor;
     }
 
+    /** Amazon Transcribe (whisper.provider = aws-transcribe); optional, damit Tests ohne auskommen. */
+    private bbbbot.stt.transcribe.AwsTranscriber awsTranscriber;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setAwsTranscriber(bbbbot.stt.transcribe.AwsTranscriber awsTranscriber) {
+        this.awsTranscriber = awsTranscriber;
+    }
+
     public record TranscriptionResult(boolean success, String text, String error) {}
 
     /**
@@ -157,7 +165,7 @@ public class WhisperClient {
      * Vorgabe - der Parameter entfaellt dann in der Anfrage und Whisper
      * entscheidet selbst.
      */
-    private String resolveLanguage(String recordingLanguage) {
+    public String resolveLanguage(String recordingLanguage) {
         String language = recordingLanguage == null || recordingLanguage.isBlank()
                 ? settings.get(SettingsService.WHISPER_LANGUAGE)
                 : recordingLanguage.trim();
@@ -168,6 +176,9 @@ public class WhisperClient {
                                                   SpeakerContext speakers) {
         if ("openai".equalsIgnoreCase(settings.get(SettingsService.WHISPER_PROVIDER))) {
             return attemptTranscribeOpenAi(audioFile, diarize, language, speakers);
+        }
+        if (settings.isSttTranscribe()) {
+            return attemptTranscribeAws(audioFile, diarize, language);
         }
         return attemptTranscribeLocal(audioFile, diarize, language);
     }
@@ -331,6 +342,21 @@ public class WhisperClient {
                 try { Files.deleteIfExists(wav); } catch (IOException ignored) {}
             }
         }
+    }
+
+    /**
+     * Eine einzelne Datei ueber Amazon Transcribe (Verbindungstest, Rueckfall
+     * fuer sehr lange Aufnahmen). Die Auswertung ganzer Aufnahmen laeuft am
+     * Stueck ueber ProcessingService, damit die Sprecher stabil bleiben.
+     */
+    private TranscriptionResult attemptTranscribeAws(Path audioFile, boolean diarize, String language) {
+        if (awsTranscriber == null) {
+            return new TranscriptionResult(false, null, "Amazon Transcribe ist nicht verfuegbar");
+        }
+        bbbbot.stt.transcribe.AwsTranscriber.Result result = awsTranscriber.transcribe(audioFile, language, diarize);
+        if (!result.success()) return new TranscriptionResult(false, null, result.error());
+        return new TranscriptionResult(true,
+                bbbbot.stt.transcribe.SegmentSplitter.split(result.utterances(), List.of(0L)).get(0), null);
     }
 
     /** HTTP 4xx: die Anfrage selbst wurde abgelehnt (anders als Netz- oder Serverfehler). */

@@ -126,6 +126,9 @@ public class AdminController {
     @PostMapping("/settings/llm-models")
     public LlmClient.ModelList listLlmModels(@RequestBody(required = false) Map<String, String> request) {
         Map<String, String> params = request != null ? request : Map.of();
+        if ("bedrock".equalsIgnoreCase(params.get("provider"))) {
+            return llm.listBedrockModels(params.get("region"));
+        }
         return llm.listModels(params.get("baseUrl"), params.get("apiKey"));
     }
 

@@ -9,7 +9,7 @@ Optional lässt sich eine **BigBlueButton-Anbindung** einschalten
 (`BBB_ON=true`, siehe [BigBlueButton-Anbindung](#bigbluebutton-anbindung-optional-bbb_on)):
 Dann treten Bots Meeting-Räumen bei und zeichnen sie selbst auf.
 
-**Version 1.2.0.** Das Docker-Image heißt jetzt
+**Version 1.2.1.** Das Docker-Image heißt jetzt
 [`posiuke/meeting-recorder`](https://hub.docker.com/r/posiuke/meeting-recorder);
 das frühere `posiuke/bbb-recorder` wird nicht mehr gepflegt (Umstieg siehe
 [Schnellstart](#schnellstart-docker-compose)).
@@ -1216,6 +1216,36 @@ docker run -d -p 19090:9090 -e initialBuckets=recorder-test adobe/s3mock:3.12.0
 cd backend && S3_IT_ENDPOINT=http://localhost:19090 S3_IT_BUCKET=recorder-test \
   mvn test -Dtest=S3ObjectStoreIT
 ```
+
+## Amazon Bedrock und Amazon Transcribe
+
+Für Umgebungen, die ausschließlich AWS nutzen:
+
+- **`llm.provider = bedrock`**: Glättung, Zusammenfassung und Namensvorschläge
+  über die Converse-API von Bedrock (`llm/BedrockChat`). Anmeldung über die
+  Standardkette des AWS-SDK – auf ECS die Task-Rolle, kein Schlüssel. Modell ist
+  eine Modell-ID oder ein Inference-Profil (`eu.*` = Anfragen bleiben in der EU),
+  „Modelle abrufen“ listet die Region. Lehnt ein Modell die Temperatur ab (z. B.
+  Claude Sonnet 5.5), wird ohne sie wiederholt.
+- **`whisper.provider = aws-transcribe`**: Die ganze Aufnahme geht in **einem**
+  Auftrag an Transcribe (`stt/transcribe/`), das Ergebnis wird wieder auf die
+  Segmente verteilt – die Sprecher bleiben dadurch über die gesamte Aufnahme
+  stabil. Die Datei liegt nur für die Dauer des Auftrags im Bucket
+  (`whisper.awsBucket`, leer = Bucket der S3-Ablage), Auftrag und Datei werden
+  danach gelöscht. Über 4 Stunden: Segment für Segment.
+- **Glossar → Custom Vocabulary**: Admin → Einstellungen → „Glossar übertragen“
+  legt aus dem gemeinsamen Glossar das Vocabulary `meeting-recorder-de-DE` an
+  (Begriffe mit Ziffern/Sonderzeichen werden übersprungen). Zusätzlich korrigiert
+  die Glättung per Glossar, was Transcribe trotzdem falsch schreibt.
+
+Rechte der Task-Rolle: `bedrock:InvokeModel` (plus `bedrock:ListFoundationModels`,
+`bedrock:ListInferenceProfiles` für die Modellliste), `transcribe:StartTranscriptionJob`,
+`GetTranscriptionJob`, `DeleteTranscriptionJob`, `CreateVocabulary`,
+`UpdateVocabulary`, `GetVocabulary` sowie `s3:PutObject`/`GetObject`/`DeleteObject`
+unter `<präfix>/transcribe-tmp/`.
+
+Live-Test gegen Bedrock: `BEDROCK_IT_MODEL=eu.anthropic.claude-sonnet-5-5 mvn test -Dtest=BedrockChatIT`
+(AWS-Zugangsdaten in der Umgebung).
 
 ## Scale-to-zero (Leerlauf-Meldung)
 

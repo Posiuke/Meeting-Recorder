@@ -110,12 +110,19 @@ const PROVIDER_FIELDS: Record<string, { providerKey: string; only: Record<string
   'whisper.': {
     providerKey: 'whisper.provider',
     only: {
-      local: ['whisper.url'],
+      local: ['whisper.url', 'whisper.output', 'whisper.vadFilter', 'whisper.initialPrompt'],
       openai: [
+        'whisper.initialPrompt',
         'whisper.openaiUrl',
         'whisper.openaiApiKey',
         'whisper.openaiModel',
         'whisper.openaiDiarizeModel',
+      ],
+      'aws-transcribe': [
+        'whisper.awsRegion',
+        'whisper.awsBucket',
+        'whisper.awsMaxSpeakers',
+        'whisper.awsVocabulary',
       ],
     },
   },
@@ -129,17 +136,21 @@ const PROVIDER_FIELDS: Record<string, { providerKey: string; only: Record<string
         'llm.openaiModel',
         'llm.openaiReasoningEffort',
       ],
+      bedrock: ['llm.bedrockRegion', 'llm.bedrockModel'],
     },
   },
 };
 
-/** Ist das Feld beim aktuell gewählten Anbieter seiner Gruppe sichtbar? */
+/**
+ * Ist das Feld beim aktuell gewählten Anbieter seiner Gruppe sichtbar? Ein Feld
+ * kann zu mehreren Anbietern gehören (z. B. initialPrompt: local und openai).
+ */
 function visibleForProvider(key: string, values: Record<string, string>): boolean {
   for (const def of Object.values(PROVIDER_FIELDS)) {
-    const provider = values[def.providerKey] ?? '';
-    for (const [name, keys] of Object.entries(def.only)) {
-      if (keys.includes(key)) return name === provider;
-    }
+    const owners = Object.entries(def.only)
+      .filter(([, keys]) => keys.includes(key))
+      .map(([name]) => name);
+    if (owners.length > 0) return owners.includes(values[def.providerKey] ?? '');
   }
   return true;
 }
@@ -163,10 +174,12 @@ const SELECT_OPTIONS: Record<string, { value: string; labelKey: TranslationKey }
   'whisper.provider': [
     { value: 'local', labelKey: 'admin.providerLocal' },
     { value: 'openai', labelKey: 'admin.providerOpenai' },
+    { value: 'aws-transcribe', labelKey: 'admin.providerAwsTranscribe' },
   ],
   'llm.provider': [
     { value: 'local', labelKey: 'admin.llmProviderLocal' },
     { value: 'openai', labelKey: 'admin.llmProviderOpenai' },
+    { value: 'bedrock', labelKey: 'admin.llmProviderBedrock' },
   ],
   'llm.openaiReasoningEffort': [
     { value: 'off', labelKey: 'admin.reasoningOff' },
@@ -204,6 +217,12 @@ const KEY_HELP: Record<string, TranslationKey> = {
   'llm.openaiApiKey': 'admin.keyHelp.llmOpenaiApiKey',
   'llm.openaiModel': 'admin.keyHelp.llmOpenaiModel',
   'llm.openaiReasoningEffort': 'admin.keyHelp.llmOpenaiReasoningEffort',
+  'llm.bedrockRegion': 'admin.keyHelp.llmBedrockRegion',
+  'llm.bedrockModel': 'admin.keyHelp.llmBedrockModel',
+  'whisper.awsRegion': 'admin.keyHelp.whisperAwsRegion',
+  'whisper.awsBucket': 'admin.keyHelp.whisperAwsBucket',
+  'whisper.awsMaxSpeakers': 'admin.keyHelp.whisperAwsMaxSpeakers',
+  'whisper.awsVocabulary': 'admin.keyHelp.whisperAwsVocabulary',
   'documents.enabled': 'admin.keyHelp.documentsEnabled',
   'documents.maxMegabytes': 'admin.keyHelp.documentsMaxMegabytes',
   'documents.tikaUrl': 'admin.keyHelp.documentsTikaUrl',
@@ -477,6 +496,28 @@ function SettingsTab() {
   const [testingGroup, setTestingGroup] = useState<string | null>(null);
   const [llmModels, setLlmModels] = useState<LlmModelList | null>(null);
   const [llmModelsLoading, setLlmModelsLoading] = useState(false);
+  const [vocabularyBusy, setVocabularyBusy] = useState(false);
+  const [vocabularyMessage, setVocabularyMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Gemeinsames Glossar als Custom Vocabulary zu Amazon Transcribe übertragen.
+  const syncVocabulary = async () => {
+    setVocabularyBusy(true);
+    setVocabularyMessage(null);
+    try {
+      const result = await api<{ success: boolean; name: string | null; message: string }>(
+        '/api/admin/settings/transcribe-vocabulary',
+        { method: 'POST' },
+      );
+      setVocabularyMessage({ ok: result.success, text: result.message });
+      if (result.success && result.name) {
+        setValues((v) => ({ ...v, 'whisper.awsVocabulary': result.name ?? '' }));
+      }
+    } catch (e) {
+      setVocabularyMessage({ ok: false, text: errorMessage(e) });
+    } finally {
+      setVocabularyBusy(false);
+    }
+  };
 
   useEffect(() => {
     dispatch(fetchSettings());
@@ -487,10 +528,14 @@ function SettingsTab() {
   const loadLlmModels = async (baseUrl: string, apiKey: string) => {
     setLlmModelsLoading(true);
     try {
+      // Bei Bedrock fragt das Backend die Region ab (Task-Rolle, kein Schlüssel).
+      const bedrock = values['llm.provider'] === 'bedrock';
       setLlmModels(
         await api<LlmModelList>('/api/admin/settings/llm-models', {
           method: 'POST',
-          body: { baseUrl, apiKey },
+          body: bedrock
+            ? { provider: 'bedrock', region: values['llm.bedrockRegion'] ?? '' }
+            : { baseUrl, apiKey },
         }),
       );
     } catch (e) {
@@ -501,12 +546,15 @@ function SettingsTab() {
   };
 
   // Beim Umschalten auf die Cloud gleich einmal laden – dafür ist die Liste da.
-  const llmCloud = values['llm.provider'] === 'openai';
+  const llmProvider = values['llm.provider'];
+  const llmCloud = llmProvider === 'openai' || llmProvider === 'bedrock';
   useEffect(() => {
-    if (llmCloud && llmModels === null && !llmModelsLoading) {
+    // Die Liste gehört zum Anbieter – beim Wechsel neu laden.
+    setLlmModels(null);
+    if (llmCloud && !llmModelsLoading) {
       void loadLlmModels(values['llm.openaiUrl'] ?? '', values['llm.openaiApiKey'] ?? '');
     }
-  }, [llmCloud]);
+  }, [llmProvider]);
 
   useEffect(() => {
     if (settings) {
@@ -673,7 +721,29 @@ function SettingsTab() {
                         value={values[key] ?? ''}
                         onChange={(e) => setValue(e.target.value)}
                       />
-                    ) : key === 'llm.openaiModel' ? (
+                    ) : key === 'whisper.awsVocabulary' ? (
+                      <div className="model-picker">
+                        <input
+                          id={`setting-${key}`}
+                          type="text"
+                          value={values[key] ?? ''}
+                          onChange={(e) => setValue(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          disabled={vocabularyBusy}
+                          onClick={syncVocabulary}
+                        >
+                          {vocabularyBusy ? t('admin.vocabularySyncing') : t('admin.vocabularySync')}
+                        </button>
+                        {vocabularyMessage && (
+                          <span className={vocabularyMessage.ok ? 'muted' : 'field-error'}>
+                            {vocabularyMessage.text}
+                          </span>
+                        )}
+                      </div>
+                    ) : key === 'llm.openaiModel' || key === 'llm.bedrockModel' ? (
                       <div className="model-picker">
                         <select
                           id={`setting-${key}`}

@@ -36,6 +36,17 @@ public class SettingsService {
     public static final String WHISPER_TIMEOUT_SEC = "whisper.timeoutSec";
     public static final String WHISPER_RETRY_ATTEMPTS = "whisper.retryAttempts";
     public static final String WHISPER_RETRY_BASE_MS = "whisper.retryBaseMs";
+    /** Amazon Transcribe (whisper.provider = aws-transcribe): Region, leer = aus der Umgebung. */
+    public static final String WHISPER_AWS_REGION = "whisper.awsRegion";
+    /**
+     * Bucket, ueber den Transcribe die Audiodatei liest. Leer = der Bucket der
+     * Ablage (STORAGE_BACKEND=s3); ohne S3-Ablage Pflicht.
+     */
+    public static final String WHISPER_AWS_BUCKET = "whisper.awsBucket";
+    /** Hoechstzahl unterscheidbarer Sprecher bei Transcribe (2-30). */
+    public static final String WHISPER_AWS_MAX_SPEAKERS = "whisper.awsMaxSpeakers";
+    /** Name eines Custom Vocabulary in Transcribe (z.B. aus dem Glossar uebertragen); leer = keins. */
+    public static final String WHISPER_AWS_VOCABULARY = "whisper.awsVocabulary";
 
     /**
      * LLM-Anbieter: "local" = eigener OpenAI-kompatibler Server im Intranet (vLLM,
@@ -69,6 +80,10 @@ public class SettingsService {
     public static final String LLM_TIMEOUT_SEC = "llm.timeoutSec";
     public static final String LLM_RETRY_ATTEMPTS = "llm.retryAttempts";
     public static final String LLM_RETRY_BASE_MS = "llm.retryBaseMs";
+    /** Amazon Bedrock (llm.provider = bedrock): Region, leer = aus der Umgebung. */
+    public static final String LLM_BEDROCK_REGION = "llm.bedrockRegion";
+    /** Modell-ID oder Inference-Profil, z.B. eu.anthropic.claude-sonnet-5-5 */
+    public static final String LLM_BEDROCK_MODEL = "llm.bedrockModel";
 
     public static final String SUMMARY_LANGUAGE = "summary.language";
     public static final String SUMMARY_CHUNK_CHARS = "summary.chunkChars";
@@ -234,6 +249,10 @@ public class SettingsService {
         DEFAULTS.put(WHISPER_TIMEOUT_SEC, "600");
         DEFAULTS.put(WHISPER_RETRY_ATTEMPTS, "2");
         DEFAULTS.put(WHISPER_RETRY_BASE_MS, "2000");
+        DEFAULTS.put(WHISPER_AWS_REGION, "");
+        DEFAULTS.put(WHISPER_AWS_BUCKET, "");
+        DEFAULTS.put(WHISPER_AWS_MAX_SPEAKERS, "10");
+        DEFAULTS.put(WHISPER_AWS_VOCABULARY, "");
 
         DEFAULTS.put(LLM_PROVIDER, "local");
         DEFAULTS.put(LLM_BASE_URL, "http://localhost:11434/v1");
@@ -251,6 +270,9 @@ public class SettingsService {
         DEFAULTS.put(LLM_TIMEOUT_SEC, "300");
         DEFAULTS.put(LLM_RETRY_ATTEMPTS, "2");
         DEFAULTS.put(LLM_RETRY_BASE_MS, "1000");
+        DEFAULTS.put(LLM_BEDROCK_REGION, "");
+        // EU-Inference-Profil: Anfragen bleiben in EU-Regionen
+        DEFAULTS.put(LLM_BEDROCK_MODEL, "eu.anthropic.claude-sonnet-5-5");
 
         DEFAULTS.put(SUMMARY_LANGUAGE, "de");
         DEFAULTS.put(SUMMARY_CHUNK_CHARS, "12000");
@@ -343,7 +365,8 @@ public class SettingsService {
     private static final long NO_LIMIT = Integer.MAX_VALUE;
     private static final Map<String, SettingSpec> SPECS = new LinkedHashMap<>();
     static {
-        SPECS.put(WHISPER_PROVIDER, SettingSpec.choice("local", "openai"));
+        SPECS.put(WHISPER_PROVIDER, SettingSpec.choice("local", "openai", "aws-transcribe"));
+        SPECS.put(WHISPER_AWS_MAX_SPEAKERS, SettingSpec.integer(2, 30));
         SPECS.put(WHISPER_URL, SettingSpec.of(SettingType.URL));
         SPECS.put(WHISPER_OPENAI_URL, SettingSpec.of(SettingType.URL));
         SPECS.put(WHISPER_OPENAI_API_KEY, SettingSpec.of(SettingType.SECRET));
@@ -356,7 +379,7 @@ public class SettingsService {
         SPECS.put(WHISPER_RETRY_ATTEMPTS, SettingSpec.integer(1, 10));
         SPECS.put(WHISPER_RETRY_BASE_MS, SettingSpec.integer(0, 600_000));
 
-        SPECS.put(LLM_PROVIDER, SettingSpec.choice("local", "openai"));
+        SPECS.put(LLM_PROVIDER, SettingSpec.choice("local", "openai", "bedrock"));
         SPECS.put(LLM_BASE_URL, SettingSpec.of(SettingType.URL));
         SPECS.put(LLM_API_KEY, SettingSpec.of(SettingType.SECRET));
         SPECS.put(LLM_OPENAI_URL, SettingSpec.of(SettingType.URL));
@@ -461,7 +484,18 @@ public class SettingsService {
      * Vorlage verwendet und an der Zusammenfassung vermerkt wird.
      */
     public String llmModel() {
+        if (isLlmBedrock()) return get(LLM_BEDROCK_MODEL);
         return get(isLlmCloud() ? LLM_OPENAI_MODEL : LLM_MODEL);
+    }
+
+    /** true bei {@code llm.provider = bedrock}. */
+    public boolean isLlmBedrock() {
+        return "bedrock".equalsIgnoreCase(get(LLM_PROVIDER).trim());
+    }
+
+    /** true bei {@code whisper.provider = aws-transcribe}. */
+    public boolean isSttTranscribe() {
+        return "aws-transcribe".equalsIgnoreCase(get(WHISPER_PROVIDER).trim());
     }
 
     public int getInt(String key) { return Integer.parseInt(get(key).trim()); }

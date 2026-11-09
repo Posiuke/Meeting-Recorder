@@ -13,7 +13,7 @@
 
   <groupId>bbbbot</groupId>
   <artifactId>bbb-bot-backend</artifactId>
-  <version>1.2.0</version>
+  <version>1.2.1</version>
   <name>BBB Bot Backend</name>
   <description>Backend fuer den BigBlueButton Aufzeichnungs- und Auswertungs-Bot</description>
 
@@ -104,6 +104,52 @@
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>s3</artifactId>
+      <version>${awssdk.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>netty-nio-client</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <!-- HTTP-Client des AWS-SDK (Timeouts fuer lange LLM-Antworten einstellbar) -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>apache-client</artifactId>
+      <version>${awssdk.version}</version>
+    </dependency>
+
+    <!-- LLM ueber Amazon Bedrock (llm.provider=bedrock) -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>bedrockruntime</artifactId>
+      <version>${awssdk.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>netty-nio-client</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <!-- Modellliste von Bedrock fuer die Admin-Auswahl -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>bedrock</artifactId>
+      <version>${awssdk.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>netty-nio-client</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <!-- Spracherkennung ueber Amazon Transcribe (whisper.provider=aws-transcribe) -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>transcribe</artifactId>
       <version>${awssdk.version}</version>
       <exclusions>
         <exclusion>

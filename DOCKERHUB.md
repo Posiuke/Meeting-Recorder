@@ -53,7 +53,7 @@ container; PostgreSQL runs separately.
 - `latest` — current state
 - `1.0.0`, … — releases (version from the project, recommended for production)
 - `<git-hash>` — a specific commit (reproducible deployments)
-- `…-slim` (e.g. `latest-slim`, `1.2.0-slim`) — same version **without Chromium**: much smaller, faster start; only without `BBB_ON`
+- `…-slim` (e.g. `latest-slim`, `1.2.1-slim`) — same version **without Chromium**: much smaller, faster start; only without `BBB_ON`
 
 ## Ports & volumes
 
@@ -143,20 +143,24 @@ With `STORAGE_BACKEND=s3`, finished files go to the bucket; `STORAGE_DIR` is
 only a working directory and cache. Files are fetched back on demand, audio and
 video are streamed from the bucket with range requests, deleting a recording
 deletes its objects. Keys = paths relative to `STORAGE_DIR` (+ `S3_PREFIX`).
-Permissions: `s3:GetObject`, `PutObject`, `DeleteObject`, `AbortMultipartUpload`
-on the objects, `s3:ListBucket` on the bucket. Moving an existing installation:
+Moving an existing installation:
 stop, `aws s3 sync ./data/recordings s3://<bucket>/<prefix>/`, start with
 `STORAGE_BACKEND=s3`.
 
 ## Scale to zero
 
-With S3 the container is stateless and may be stopped when idle (a running
-screen recording is saved on shutdown and finished after the next start). With
+With S3 the container is stateless and may be stopped when idle. With
 `ACTIVITY_TOKEN` set, `GET /api/internal/activity` (header `X-Activity-Token`)
-returns `busy`, `reasons`, `idleSeconds` and — for analyses waiting for the
-processing window — `deferredJobs`/`nextWindowStart`. Stop only when `busy` is
-false. Automatic refreshes of an open browser tab do not count as activity.
-Pair it with the `-slim` image for fast starts.
+returns `busy`, `reasons`, `idleSeconds` and `deferredJobs`/`nextWindowStart`.
+Stop only when `busy` is false. Pair it with the `-slim` image.
+
+## Amazon Bedrock & Transcribe
+
+AWS-only setups: `llm.provider = bedrock` (Converse API, model ID or `eu.*`
+inference profile) and `whisper.provider = aws-transcribe` (whole recording in
+one job, so speakers stay stable; the file is in the bucket only during the
+job). Both sign in via the task role. "Transfer glossary" turns the shared
+glossary into a Transcribe custom vocabulary. Details: GitHub README.
 
 ## Quick start (docker compose)
 
