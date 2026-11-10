@@ -53,7 +53,7 @@ container; PostgreSQL runs separately.
 - `latest` — current state
 - `1.0.0`, … — releases (version from the project, recommended for production)
 - `<git-hash>` — a specific commit (reproducible deployments)
-- `…-slim` (e.g. `latest-slim`, `1.2.1-slim`) — same version **without Chromium**: much smaller, faster start; only without `BBB_ON`
+- `…-slim` (e.g. `latest-slim`, `1.3.0-slim`) — same version **without Chromium**: much smaller, faster start; only without `BBB_ON`
 
 ## Ports & volumes
 
