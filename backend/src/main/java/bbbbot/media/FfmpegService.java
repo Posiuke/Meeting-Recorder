@@ -455,6 +455,65 @@ public class FfmpegService {
         return null;
     }
 
+    /** Ein Teilstueck einer zerlegten Audiodatei und sein Beginn in der Quelldatei. */
+    public record AudioPart(Path path, double offsetSeconds) {}
+
+    /**
+     * Zerlegt eine Audiodatei ohne Neukodierung (-c copy) in {@code parts}
+     * etwa gleich lange Stuecke - z.B. wenn ein Segment die Upload-Grenze der
+     * Cloud-Spracherkennung (25 MB) ueberschreitet. Der Beginn jedes Stuecks
+     * wird aus den tatsaechlichen Laengen ermittelt, damit die Zeitstempel
+     * der Teil-Transkripte exakt verschoben werden koennen.
+     *
+     * @return die Stuecke in Reihenfolge, leer bei einem Fehler
+     */
+    public List<AudioPart> splitAudioIntoParts(Path source, int parts, Path outDir) {
+        Long durationMs = probeDurationMs(source);
+        if (durationMs == null || durationMs <= 0 || parts < 2) {
+            log.warn("{} laesst sich nicht zerlegen (Dauer unbekannt)", source.getFileName());
+            return List.of();
+        }
+        String name = source.getFileName().toString();
+        String ext = name.contains(".") ? name.substring(name.lastIndexOf('.')) : ".mp3";
+        // +1 s: mit -c copy wird an Frame-Grenzen geschnitten; ohne Aufschlag
+        // bliebe am Ende ein winziges, oft unlesbares Reststueck.
+        double segmentSeconds = durationMs / 1000.0 / parts + 1.0;
+        try {
+            ProcessResult result = run(List.of(props.getMedia().getFfmpegPath(), "-y",
+                    "-i", source.toString(),
+                    "-vn", "-map", "0:a:0", "-c", "copy",
+                    "-f", "segment",
+                    "-segment_time", String.format(java.util.Locale.ROOT, "%.3f", segmentSeconds),
+                    "-reset_timestamps", "1",
+                    outDir.resolve("part_%03d" + ext).toString()), 1800);
+            List<Path> files;
+            try (var list = Files.list(outDir)) {
+                files = list.filter(p -> p.getFileName().toString().matches("part_\\d{3}\\Q" + ext + "\\E"))
+                        .sorted().toList();
+            }
+            if (result.exitCode() != 0 || files.isEmpty()) {
+                log.warn("Zerlegen von {} fehlgeschlagen: {}", name, tail(result.stderr(), 300));
+                return List.of();
+            }
+            List<AudioPart> out = new ArrayList<>();
+            double offset = 0;
+            for (Path file : files) {
+                Long partMs = probeDurationMs(file);
+                // Reststueck ohne lesbaren Ton (wenige Frames) nicht hochladen.
+                if (partMs == null || partMs < 500) continue;
+                out.add(new AudioPart(file, offset));
+                offset += partMs / 1000.0;
+            }
+            return out;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return List.of();
+        } catch (IOException e) {
+            log.warn("Zerlegen von {} fehlgeschlagen: {}", name, e.getMessage());
+            return List.of();
+        }
+    }
+
     public record ProcessResult(int exitCode, String stdout, String stderr) {}
 
     public ProcessResult run(List<String> command, int timeoutSeconds) throws IOException, InterruptedException {

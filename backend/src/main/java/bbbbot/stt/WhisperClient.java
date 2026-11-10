@@ -54,9 +54,22 @@ public class WhisperClient {
     private static final double MIN_REFERENCE_SECONDS = 2.0;
     private static final double MAX_REFERENCE_SECONDS = 10.0;
 
+    /**
+     * Upload-Grenze der OpenAI-Audio-API: 25 MiB fuer die GESAMTE Anfrage
+     * (Datei + Multipart-Felder + Stimmproben). Dateien darueber werden vorab
+     * zerlegt; der Abstand faengt Felder und base64-Stimmproben ab.
+     */
+    static final long OPENAI_MAX_REQUEST_BYTES = 25L * 1024 * 1024;
+    private static final long OPENAI_REQUEST_RESERVE_BYTES = 2L * 1024 * 1024;
+    /** Hoechstzahl der Teilstuecke - schuetzt vor endlosem Zerlegen. */
+    private static final int MAX_SPLIT_PARTS = 32;
+
     private final SettingsService settings;
     private final ClipExtractor clipExtractor;
+    private final AudioSplitter audioSplitter;
     private final ObjectMapper mapper = new ObjectMapper();
+    /** Groesste Datei, die ungeteilt an die Cloud geht (in Tests kleiner). */
+    long openAiMaxFileBytes = OPENAI_MAX_REQUEST_BYTES - OPENAI_REQUEST_RESERVE_BYTES;
 
     /** Schneidet einen Audio-Ausschnitt als WAV heraus (ffmpeg); null = fehlgeschlagen. */
     @FunctionalInterface
@@ -64,19 +77,30 @@ public class WhisperClient {
         Path extract(Path source, double startSeconds, double durationSeconds, Path wav);
     }
 
+    /** Zerlegt eine Audiodatei in {@code parts} Stuecke (ffmpeg, ohne Neukodierung); leer = fehlgeschlagen. */
+    @FunctionalInterface
+    public interface AudioSplitter {
+        List<bbbbot.media.FfmpegService.AudioPart> split(Path source, int parts, Path outDir);
+    }
+
     /** Ohne Ausschnitt-Werkzeug: Cloud-Diarisierung ohne Stimmreferenzen (Tests). */
     public WhisperClient(SettingsService settings) {
-        this(settings, (ClipExtractor) null);
+        this(settings, (ClipExtractor) null, null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public WhisperClient(SettingsService settings, bbbbot.media.FfmpegService ffmpeg) {
-        this(settings, ffmpeg::extractWavClip);
+        this(settings, ffmpeg::extractWavClip, ffmpeg::splitAudioIntoParts);
     }
 
     WhisperClient(SettingsService settings, ClipExtractor clipExtractor) {
+        this(settings, clipExtractor, null);
+    }
+
+    WhisperClient(SettingsService settings, ClipExtractor clipExtractor, AudioSplitter audioSplitter) {
         this.settings = settings;
         this.clipExtractor = clipExtractor;
+        this.audioSplitter = audioSplitter;
     }
 
     /** Amazon Transcribe (whisper.provider = aws-transcribe); optional, damit Tests ohne auskommen. */
@@ -137,13 +161,151 @@ public class WhisperClient {
      */
     public TranscriptionResult transcribe(Path audioFile, boolean diarize, String language,
                                           SpeakerContext speakers) {
+        String effectiveLanguage = resolveLanguage(language);
+        if (!isOpenAi()) {
+            return transcribeWithRetry(audioFile, diarize, effectiveLanguage, speakers);
+        }
+        // Die Cloud nimmt hoechstens 25 MB je Anfrage an. Zu grosse Dateien
+        // gar nicht erst hochladen, sondern gleich zerlegen.
+        long size = fileSize(audioFile);
+        if (size > openAiMaxFileBytes) {
+            int parts = partsFor(size);
+            log.info("{} ist {} MB gross und liegt ueber der Upload-Grenze der Cloud - wird in {} Teile zerlegt",
+                    audioFile.getFileName(), size / (1024 * 1024), parts);
+            return transcribeInParts(audioFile, diarize, effectiveLanguage, speakers, parts);
+        }
+        TranscriptionResult result = transcribeWithRetry(audioFile, diarize, effectiveLanguage, speakers);
+        if (!result.success() && isTooLarge(result.error())) {
+            // Die Grenze des Anbieters liegt niedriger als angenommen (z.B. ein
+            // kompatibler Dienst): in zwei Teile zerlegen, notfalls weiter.
+            log.warn("STT-Endpunkt lehnt {} als zu gross ab - wird in 2 Teile zerlegt", audioFile.getFileName());
+            return transcribeInParts(audioFile, diarize, effectiveLanguage, speakers, 2);
+        }
+        return result;
+    }
+
+    /**
+     * Zerlegt die Datei, transkribiert die Stuecke nacheinander (gleiches
+     * Sprecher-Gedaechtnis) und setzt das Ergebnis mit verschobenen
+     * Zeitstempeln wieder zu EINEM Transkript zusammen - fuer den Rest der
+     * Verarbeitung sieht das Segment aus wie in einem Stueck transkribiert.
+     * Ein Stueck, das selbst noch zu gross ist, wird weiter zerlegt.
+     */
+    private TranscriptionResult transcribeInParts(Path audioFile, boolean diarize, String language,
+                                                  SpeakerContext speakers, int parts) {
+        if (audioSplitter == null) {
+            return new TranscriptionResult(false, null, audioFile.getFileName()
+                    + " ist zu gross fuer die Cloud-Spracherkennung und kann nicht zerlegt werden");
+        }
+        if (parts > MAX_SPLIT_PARTS) {
+            return new TranscriptionResult(false, null, audioFile.getFileName() + " ist auch in "
+                    + MAX_SPLIT_PARTS + " Teilen noch zu gross fuer die Cloud-Spracherkennung");
+        }
+        Path dir = null;
+        try {
+            dir = Files.createTempDirectory("bbbbot-stt-split-");
+            List<bbbbot.media.FfmpegService.AudioPart> pieces = audioSplitter.split(audioFile, parts, dir);
+            if (pieces.isEmpty()) {
+                return new TranscriptionResult(false, null, audioFile.getFileName()
+                        + " ist zu gross fuer die Cloud-Spracherkennung und konnte nicht zerlegt werden");
+            }
+            StringBuilder text = new StringBuilder();
+            for (int i = 0; i < pieces.size(); i++) {
+                var piece = pieces.get(i);
+                long size = fileSize(piece.path());
+                TranscriptionResult partResult;
+                if (size > openAiMaxFileBytes) {
+                    partResult = transcribeInParts(piece.path(), diarize, language, speakers,
+                            Math.max(2, partsFor(size)));
+                } else {
+                    partResult = transcribeWithRetry(piece.path(), diarize, language, speakers);
+                    if (!partResult.success() && isTooLarge(partResult.error())) {
+                        partResult = transcribeInParts(piece.path(), diarize, language, speakers, 2);
+                    }
+                }
+                if (!partResult.success()) {
+                    return new TranscriptionResult(false, null, "Teil " + (i + 1) + "/" + pieces.size()
+                            + " von " + audioFile.getFileName() + ": " + partResult.error());
+                }
+                String shifted = shiftTimestamps(partResult.text(), Math.round(piece.offsetSeconds()));
+                if (!shifted.isBlank()) {
+                    if (!text.isEmpty()) text.append('\n');
+                    text.append(shifted);
+                }
+            }
+            log.info("{} in {} Teilen transkribiert", audioFile.getFileName(), pieces.size());
+            return new TranscriptionResult(true, text.toString().trim(), null);
+        } catch (IOException e) {
+            return new TranscriptionResult(false, null,
+                    "Zerlegen von " + audioFile.getFileName() + " fehlgeschlagen: " + e.getMessage());
+        } finally {
+            deleteRecursively(dir);
+        }
+    }
+
+    private int partsFor(long size) {
+        return (int) Math.ceil((double) size / openAiMaxFileBytes);
+    }
+
+    /** [mm:ss] am Zeilenanfang, wie von {@link #renderJsonTranscript} erzeugt. */
+    private static final java.util.regex.Pattern TIMESTAMP =
+            java.util.regex.Pattern.compile("(?m)^\\[(\\d{1,4}):(\\d{2})]");
+
+    /** Verschiebt die [mm:ss]-Zeitstempel eines Teil-Transkripts um dessen Beginn. */
+    static String shiftTimestamps(String text, long offsetSeconds) {
+        if (text == null) return "";
+        if (offsetSeconds <= 0) return text;
+        java.util.regex.Matcher m = TIMESTAMP.matcher(text);
+        StringBuilder sb = new StringBuilder();
+        while (m.find()) {
+            long seconds = Long.parseLong(m.group(1)) * 60 + Long.parseLong(m.group(2)) + offsetSeconds;
+            m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement("[" + formatTime(seconds) + "]"));
+        }
+        m.appendTail(sb);
+        return sb.toString();
+    }
+
+    /** HTTP 413 bzw. die Groessenmeldung des Anbieters. */
+    static boolean isTooLarge(String error) {
+        return error != null && (error.startsWith("STT HTTP 413")
+                || error.contains("Maximum content size limit"));
+    }
+
+    private boolean isOpenAi() {
+        return "openai".equalsIgnoreCase(settings.get(SettingsService.WHISPER_PROVIDER));
+    }
+
+    private static long fileSize(Path file) {
+        try {
+            return Files.size(file);
+        } catch (IOException e) {
+            return 0;
+        }
+    }
+
+    private static void deleteRecursively(Path dir) {
+        if (dir == null) return;
+        try (var walk = Files.walk(dir)) {
+            walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (IOException ignored) {
+                }
+            });
+        } catch (IOException ignored) {
+        }
+    }
+
+    private TranscriptionResult transcribeWithRetry(Path audioFile, boolean diarize, String effectiveLanguage,
+                                                    SpeakerContext speakers) {
         int attempts = Math.max(1, settings.getInt(SettingsService.WHISPER_RETRY_ATTEMPTS));
         long baseMs = settings.getLong(SettingsService.WHISPER_RETRY_BASE_MS);
-        String effectiveLanguage = resolveLanguage(language);
         TranscriptionResult result = null;
         for (int attempt = 1; attempt <= attempts; attempt++) {
             result = attemptTranscribe(audioFile, diarize, effectiveLanguage, speakers);
             if (result.success()) return result;
+            // Zu gross bleibt zu gross - Wiederholen bringt nichts, der Aufrufer zerlegt.
+            if (isTooLarge(result.error())) return result;
             if (attempt < attempts) {
                 long wait = baseMs * (1L << (attempt - 1));
                 log.warn("Whisper-Versuch {}/{} fuer {} fehlgeschlagen ({}) - erneut in {} ms",
@@ -174,7 +336,7 @@ public class WhisperClient {
 
     private TranscriptionResult attemptTranscribe(Path audioFile, boolean diarize, String language,
                                                   SpeakerContext speakers) {
-        if ("openai".equalsIgnoreCase(settings.get(SettingsService.WHISPER_PROVIDER))) {
+        if (isOpenAi()) {
             return attemptTranscribeOpenAi(audioFile, diarize, language, speakers);
         }
         if (settings.isSttTranscribe()) {
@@ -207,7 +369,10 @@ public class WhisperClient {
             // Kennt der Anbieter das Diarisierungs-Modell nicht (z.B. ein
             // kompatibler Dienst ohne Sprechererkennung), lieber ein Transkript
             // ohne Sprecher als eine endlos scheiternde Auswertung.
-            if (diarized.success() || !isClientError(diarized.error())) return diarized;
+            // Zu gross ist kein Problem der Sprechererkennung: der Aufrufer zerlegt.
+            if (diarized.success() || !isClientError(diarized.error()) || isTooLarge(diarized.error())) {
+                return diarized;
+            }
             log.warn("Sprechererkennung in der Cloud abgelehnt ({}) - Transkript ohne Sprecher-Labels",
                     diarized.error());
         }

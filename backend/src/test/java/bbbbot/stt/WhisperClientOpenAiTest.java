@@ -244,6 +244,87 @@ class WhisperClientOpenAiTest {
         assertThat(result.text()).isEqualTo("Ohne Sprecher.");
     }
 
+    /** Fake-Splitter: schreibt {@code parts} kleine Dateien, Teil i beginnt bei i*600 s. */
+    private WhisperClient.AudioSplitter fakeSplitter(List<Integer> calls) {
+        return (source, parts, dir) -> {
+            calls.add(parts);
+            List<bbbbot.media.FfmpegService.AudioPart> out = new ArrayList<>();
+            try {
+                for (int i = 0; i < parts; i++) {
+                    Path part = dir.resolve("part_%03d.mp3".formatted(i));
+                    Files.write(part, ("teil-" + i).getBytes(StandardCharsets.UTF_8));
+                    out.add(new bbbbot.media.FfmpegService.AudioPart(part, i * 600.0));
+                }
+            } catch (IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+            return out;
+        };
+    }
+
+    @Test
+    void zuGrosseDateiWirdVorabZerlegtUndZeitstempelVerschoben() {
+        AtomicInteger requests = new AtomicInteger();
+        server.createContext("/v1/audio/transcriptions", exchange -> {
+            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            requests.incrementAndGet();
+            String label = body.contains("teil-1") ? "Zweiter Teil." : "Erster Teil.";
+            byte[] response = ("{\"segments\":[{\"start\":5.0,\"end\":6.0,\"text\":\"" + label + "\"}]}")
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        List<Integer> splits = new ArrayList<>();
+        WhisperClient client = new WhisperClient(settings, null, fakeSplitter(splits));
+        client.openAiMaxFileBytes = 8; // "fake-mp3-bytes" = 14 Bytes -> 2 Teile
+
+        var result = client.transcribe(audioFile, false);
+
+        assertThat(splits).containsExactly(2);
+        assertThat(requests.get()).isEqualTo(2);
+        assertThat(result.success()).isTrue();
+        assertThat(result.text()).isEqualTo("[00:05] Erster Teil.\n[10:05] Zweiter Teil.");
+    }
+
+    @Test
+    void http413FuehrtZumZerlegenStattZuWiederholungen() {
+        when(settings.getInt(anyString())).thenAnswer(inv -> switch (inv.getArgument(0, String.class)) {
+            case SettingsService.WHISPER_TIMEOUT_SEC -> 10;
+            case SettingsService.WHISPER_RETRY_ATTEMPTS -> 3;
+            default -> 0;
+        });
+        List<String> bodies = new ArrayList<>();
+        server.createContext("/v1/audio/transcriptions", exchange -> {
+            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            bodies.add(body);
+            boolean whole = body.contains("fake-mp3-bytes");
+            byte[] response = (whole
+                    ? "{\"error\":{\"message\":\"413: Maximum content size limit (26214400) exceeded\"}}"
+                    : "{\"segments\":[{\"start\":1.0,\"end\":2.0,\"text\":\"Teil.\"}]}")
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(whole ? 413 : 200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        List<Integer> splits = new ArrayList<>();
+
+        var result = new WhisperClient(settings, null, fakeSplitter(splits)).transcribe(audioFile, true);
+
+        // Genau ein Versuch mit der ganzen Datei (kein Retry, kein Rueckfall ohne Sprecher), dann 2 Teile.
+        assertThat(bodies).hasSize(3);
+        assertThat(bodies.get(1)).contains("diarized_json");
+        assertThat(splits).containsExactly(2);
+        assertThat(result.success()).isTrue();
+        assertThat(result.text()).contains("[00:01] Teil.").contains("[10:01] Teil.");
+    }
+
+    @Test
+    void verschiebtZeitstempelUeberDieStundeHinaus() {
+        assertThat(WhisperClient.shiftTimestamps("SPEAKER_00:\n[59:30] Hallo\n[00:10] Welt", 3600))
+                .isEqualTo("SPEAKER_00:\n[119:30] Hallo\n[60:10] Welt");
+    }
+
     /** Mock-Server antwortet immer mit {@code json}; liefert die Anfrage-Koerper. */
     private List<String> respondWith(String json) {
         List<String> bodies = new ArrayList<>();
