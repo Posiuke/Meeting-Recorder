@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import Modal from './Modal';
 import Alert from './Alert';
 import Spinner from './Spinner';
@@ -12,6 +12,7 @@ import {
   useScreenRecorder,
   type CaptureQuality,
 } from '../hooks/useScreenRecorder';
+import { useInputLevels } from '../hooks/useInputLevels';
 import type { RecordingView } from '../types';
 import { formatBytes, formatTimestamp } from '../utils/format';
 import { useI18n } from '../i18n';
@@ -45,8 +46,15 @@ export default function ScreenRecordDialog({ onClose, onFinished }: ScreenRecord
   // '' = Sprachvorgabe des Administrators
   const [sttLanguage, setSttLanguage] = useState('');
 
+  // Während der Aufnahme ist die Geräteliste eingeklappt – sie öffnet dafür
+  // jedes Mikrofon, was bei Bluetooth-Headsets den Klang verschlechtern kann.
+  const [showMicPicker, setShowMicPicker] = useState(false);
+
   const { phase, previewStream, result } = recorder;
   const busy = phase === 'recording' || phase === 'paused' || phase === 'finishing';
+  const live = phase === 'recording' || phase === 'paused';
+  const pickerVisible = useMic && recorder.micActive && (!live || showMicPicker);
+  const deviceLevels = useInputLevels(recorder.micDevices, pickerVisible);
 
   useEffect(() => {
     if (!support.supported) return;
@@ -170,8 +178,9 @@ export default function ScreenRecordDialog({ onClose, onFinished }: ScreenRecord
   }
 
   /**
-   * Mikrofon-Auswahl. Auch nach der Quellenauswahl noch bedienbar: Wer dort
-   * merkt, dass kein Systemton ankommt, greift oft aufs Mikrofon zurück.
+   * Mikrofon-Auswahl – vor und während der Aufnahme bedienbar. Wer nach der
+   * Quellenauswahl merkt, dass kein Systemton ankommt, greift oft aufs Mikrofon
+   * zurück; wer mitten in der Sitzung das Headset wechselt, ebenso.
    */
   function renderMicControls() {
     return (
@@ -186,24 +195,79 @@ export default function ScreenRecordDialog({ onClose, onFinished }: ScreenRecord
           {t('capture.useMic')}
         </label>
 
-        {useMic && recorder.micDevices.length > 0 && (
-          <div className="form-field">
-            <label htmlFor="capture-mic">{t('capture.micLabel')}</label>
-            <select
-              id="capture-mic"
-              value={recorder.micDeviceId}
-              disabled={phase === 'starting'}
-              onChange={(e) => void recorder.enableMic(e.target.value)}
-            >
-              {recorder.micDevices.map((device, index) => (
-                <option key={device.deviceId} value={device.deviceId}>
-                  {device.label || t('capture.micFallback', { index: index + 1 })}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        {pickerVisible && recorder.micDevices.length > 0 && renderMicPicker()}
       </>
+    );
+  }
+
+  /**
+   * Alle Eingänge mit Live-Pegel: Man sieht sofort, auf welchem Gerät gerade
+   * Ton ankommt – praktisch bei mehreren Headsets, Webcams oder einem
+   * virtuellen Loopback-Gerät für den Systemton.
+   */
+  function renderMicPicker() {
+    return (
+      <fieldset className="form-field capture-devices">
+        <legend>{t('capture.micLabel')}</legend>
+        <p className="muted capture-devices-hint">{t('capture.micPickerHint')}</p>
+        {recorder.micDevices.map((device, index) => {
+          const level = deviceLevels[device.deviceId];
+          const selected = device.deviceId === recorder.micDeviceId;
+          return (
+            <label
+              key={device.deviceId || index}
+              className={`capture-device${selected ? ' selected' : ''}`}
+            >
+              <input
+                type="radio"
+                name="capture-mic"
+                value={device.deviceId}
+                checked={selected}
+                disabled={phase === 'starting'}
+                onChange={() => void recorder.enableMic(device.deviceId)}
+              />
+              <span className="capture-device-name">
+                {device.label || t('capture.micFallback', { index: index + 1 })}
+              </span>
+              <span className="capture-level-bar">
+                <span
+                  className="capture-level-fill"
+                  style={{ width: `${Math.round((level ?? 0) * 100)}%` }}
+                />
+              </span>
+              <span className="capture-level-state muted">
+                {level === null ? t('capture.deviceUnavailable') : ''}
+              </span>
+            </label>
+          );
+        })}
+      </fieldset>
+    );
+  }
+
+  /** Pegel von Systemton und Mikrofon samt Stummschalter – vor und während der Aufnahme. */
+  function renderLevels() {
+    const muteButton = recorder.micActive ? (
+      <button
+        type="button"
+        className={`btn btn-sm ${recorder.micMuted ? 'btn-danger' : 'btn-ghost'}`}
+        aria-pressed={recorder.micMuted}
+        onClick={() => recorder.setMicMute(!recorder.micMuted)}
+      >
+        {recorder.micMuted ? t('capture.micUnmute') : t('capture.micMute')}
+      </button>
+    ) : null;
+    return (
+      <div className="capture-levels">
+        {renderLevel(t('capture.levelSystem'), recorder.levels.system, recorder.systemAudio, false)}
+        {renderLevel(
+          t('capture.levelMic'),
+          recorder.levels.mic,
+          recorder.micActive,
+          recorder.micMuted,
+          muteButton,
+        )}
+      </div>
     );
   }
 
@@ -286,6 +350,7 @@ export default function ScreenRecordDialog({ onClose, onFinished }: ScreenRecord
           </Alert>
         )}
 
+        {renderLevels()}
         {renderMicControls()}
 
         <p className="muted">{t('capture.readyHint')}</p>
@@ -313,10 +378,42 @@ export default function ScreenRecordDialog({ onClose, onFinished }: ScreenRecord
           <video className="capture-preview" ref={attachPreview} autoPlay muted playsInline />
         )}
 
-        <div className="capture-levels">
-          {renderLevel(t('capture.levelSystem'), recorder.levels.system, recorder.systemAudio)}
-          {renderLevel(t('capture.levelMic'), recorder.levels.mic, recorder.micActive)}
+        {renderLevels()}
+
+        {!recorder.systemAudio && (
+          <Alert kind="info">{t('capture.systemAudioMissingShort')}</Alert>
+        )}
+
+        <div className="capture-actions">
+          {recorder.canSwitchSource ? (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={recorder.switching}
+              onClick={() => void recorder.switchSource()}
+            >
+              {recorder.switching
+                ? t('capture.switching')
+                : recorder.withVideo
+                  ? t('capture.switchSource')
+                  : t('capture.switchSourceAudio')}
+            </button>
+          ) : (
+            <span className="muted">{t('capture.switchUnsupported')}</span>
+          )}
+          {useMic && recorder.micActive && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              aria-expanded={showMicPicker}
+              onClick={() => setShowMicPicker((open) => !open)}
+            >
+              {showMicPicker ? t('capture.micPickerHide') : t('capture.micPickerShow')}
+            </button>
+          )}
         </div>
+
+        {renderMicControls()}
 
         {limitReached && (
           <Alert kind="error">
@@ -329,9 +426,15 @@ export default function ScreenRecordDialog({ onClose, onFinished }: ScreenRecord
     );
   }
 
-  function renderLevel(label: string, level: number, active: boolean) {
+  function renderLevel(
+    label: string,
+    level: number,
+    active: boolean,
+    muted: boolean,
+    action?: ReactNode,
+  ) {
     return (
-      <div className="capture-level">
+      <div className={`capture-level${muted ? ' muted-source' : ''}`}>
         <span className="capture-level-label">{label}</span>
         <div className="capture-level-bar">
           <div
@@ -339,7 +442,10 @@ export default function ScreenRecordDialog({ onClose, onFinished }: ScreenRecord
             style={{ width: active ? `${Math.round(level * 100)}%` : '0%' }}
           />
         </div>
-        <span className="capture-level-state muted">{active ? '' : t('capture.levelOff')}</span>
+        <span className="capture-level-state muted">
+          {!active ? t('capture.levelOff') : muted ? t('capture.levelMuted') : ''}
+        </span>
+        {action}
       </div>
     );
   }

@@ -2229,6 +2229,81 @@ tbody tr:hover {
   font-size: 0.8rem;
 }
 
+/* Stummgeschaltetes Mikrofon: Pegel bleibt sichtbar, aber grau */
+.capture-level.muted-source .capture-level-fill {
+  background: var(--muted, #888);
+}
+
+.capture-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.5rem 0;
+}
+
+/* Mikrofonliste mit Live-Pegel je Gerät */
+.capture-devices {
+  border: 0;
+  padding: 0;
+  margin: 0.5rem 0;
+  min-width: 0;
+}
+
+.capture-devices legend {
+  padding: 0;
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
+
+.capture-devices-hint {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+}
+
+.capture-device {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.capture-device:hover {
+  background: var(--accent-soft);
+}
+
+.capture-device.selected {
+  outline: 1px solid var(--accent);
+}
+
+.capture-device-name {
+  flex: 0 1 45%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+
+.capture-device .capture-level-bar {
+  display: block;
+}
+
+.capture-device .capture-level-fill {
+  display: block;
+}
+
+@media (max-width: 560px) {
+  .capture-device-name {
+    flex-basis: 100%;
+  }
+  .capture-device {
+    flex-wrap: wrap;
+  }
+}
+
 /* ===== Suche und Schlagworte ===== */
 .search-bar {
   display: flex;

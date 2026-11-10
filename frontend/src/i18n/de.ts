@@ -677,6 +677,21 @@ export const de = {
     levelSystem: 'Systemton',
     levelMic: 'Mikrofon',
     levelOff: 'aus',
+    levelMuted: 'stumm',
+    micMute: 'Stummschalten',
+    micUnmute: 'Stumm aufheben',
+    micPickerHint:
+      'Die Balken zeigen, auf welchem Eingang gerade Ton ankommt – einfach kurz sprechen und das passende Gerät wählen.',
+    micPickerShow: 'Mikrofon wechseln',
+    micPickerHide: 'Mikrofonliste schließen',
+    deviceUnavailable: 'belegt',
+    switchSource: 'Bildschirm wechseln',
+    switchSourceAudio: 'Tonquelle wechseln',
+    switching: 'Auswahl ist offen…',
+    switchUnsupported:
+      'Den Bildschirm während der Aufnahme wechseln können nur Chrome und Edge.',
+    systemAudioMissingShort:
+      'Diese Quelle liefert keinen Systemton. Über „Bildschirm wechseln" lässt sie sich mit „Systemaudio übertragen" neu wählen.',
     readyHint:
       'Der Tab muss während der Aufnahme geöffnet bleiben. Die Daten werden laufend an den Server übertragen – ein Absturz kostet höchstens die letzten Sekunden.',
     runningHint:
@@ -701,6 +716,8 @@ export const de = {
       micDenied: 'Zugriff auf das Mikrofon wurde abgelehnt.',
       micFailed: 'Mikrofon konnte nicht geöffnet werden: {{message}}',
       displayFailed: 'Bildschirm konnte nicht geöffnet werden: {{message}}',
+      switchFailed:
+        'Quelle konnte nicht gewechselt werden: {{message}} — die Aufnahme läuft mit der bisherigen Quelle weiter.',
       noFormat: 'Dieser Browser unterstützt kein passendes Aufnahmeformat.',
       mixFailed: 'Tonmischung fehlgeschlagen: {{message}}',
       recorderAborted: 'Die Aufnahme wurde vom Browser abgebrochen.',

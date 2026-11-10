@@ -659,6 +659,20 @@ export const en: typeof de = {
     levelSystem: 'System audio',
     levelMic: 'Microphone',
     levelOff: 'off',
+    levelMuted: 'muted',
+    micMute: 'Mute',
+    micUnmute: 'Unmute',
+    micPickerHint:
+      'The bars show which input is currently receiving sound – just say something and pick the matching device.',
+    micPickerShow: 'Switch microphone',
+    micPickerHide: 'Close microphone list',
+    deviceUnavailable: 'in use',
+    switchSource: 'Switch screen',
+    switchSourceAudio: 'Switch audio source',
+    switching: 'Picker is open…',
+    switchUnsupported: 'Only Chrome and Edge can switch the screen while recording.',
+    systemAudioMissingShort:
+      'This source provides no system audio. Use "Switch screen" to pick it again with "Share system audio" ticked.',
     readyHint:
       'The tab must stay open while recording. Data is transferred to the server continuously – a crash costs at most the last few seconds.',
     runningHint:
@@ -684,6 +698,8 @@ export const en: typeof de = {
       micDenied: 'Access to the microphone was denied.',
       micFailed: 'The microphone could not be opened: {{message}}',
       displayFailed: 'The screen could not be opened: {{message}}',
+      switchFailed:
+        'The source could not be switched: {{message}} — recording continues with the previous source.',
       noFormat: 'This browser supports no suitable recording format.',
       mixFailed: 'Audio mixing failed: {{message}}',
       recorderAborted: 'The browser aborted the recording.',

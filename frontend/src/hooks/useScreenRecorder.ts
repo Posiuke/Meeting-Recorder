@@ -10,6 +10,8 @@ import {
   uploadCaptureChunk,
 } from '../api/capture';
 import type { RecordingView } from '../types';
+import { readLevel } from './useInputLevels';
+import { VideoRelay, videoRelaySupported } from './videoRelay';
 
 export type CapturePhase =
   | 'idle' // noch keine Quelle gewählt
@@ -81,6 +83,29 @@ interface DisplayMediaOptions extends DisplayMediaStreamOptions {
   surfaceSwitching?: 'include' | 'exclude';
 }
 
+/** Optionen für den Auswahldialog des Browsers – beim Start und beim Wechsel gleich. */
+function displayOptions(quality: CaptureQuality): DisplayMediaOptions {
+  const preset = QUALITY_PRESETS[quality];
+  return {
+    video: {
+      frameRate: { ideal: preset.frameRate, max: preset.frameRate },
+      width: { max: 1920 },
+      height: { max: 1080 },
+    },
+    // Für Sprache sind die Aufbereitungen des Browsers eher schädlich –
+    // sie sind für Mikrofone gedacht, nicht für einen Systemtonmitschnitt.
+    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+    systemAudio: 'include',
+    selfBrowserSurface: 'exclude',
+    surfaceSwitching: 'include',
+  };
+}
+
+/** Auswahldialog abgebrochen – kein Fehler, sondern eine Entscheidung des Nutzers. */
+function isUserAbort(e: unknown): boolean {
+  return e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'AbortError');
+}
+
 export interface BeginRecordingOptions {
   title: string;
   aiAnalysis: boolean;
@@ -105,6 +130,12 @@ export interface AudioLevels {
  * Graph gemischt (eine Datei trägt praktisch nur eine Tonspur, und zwei parallele
  * Recorder würden gegeneinander driften). Der `MediaRecorder` liefert alle
  * {@link CHUNK_MS} ein Stück, das eine strikt sequenzielle Warteschlange hochlädt.
+ *
+ * Quellen wechseln während der Aufnahme: Ein `MediaRecorder` bricht ab, sobald
+ * sich seine Spuren ändern. Er sieht deshalb nur Spuren, die gleich bleiben –
+ * den Ausgang des Mixers und (in Chrome/Edge) die Bildspur eines
+ * {@link VideoRelay}. Ein neues Mikrofon oder ein neuer Bildschirm wird nur
+ * dahinter umgehängt; die Datei bleibt ein einziger, durchgehender WebM-Strom.
  */
 export function useScreenRecorder() {
   const [phase, setPhase] = useState<CapturePhase>('idle');
@@ -117,6 +148,9 @@ export function useScreenRecorder() {
   const [micDeviceId, setMicDeviceId] = useState<string>('');
   const [micActive, setMicActive] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
+  const [micMuted, setMicMuted] = useState(false);
+  const [canSwitchSource, setCanSwitchSource] = useState(false);
+  const [switching, setSwitching] = useState(false);
   const [levels, setLevels] = useState<AudioLevels>({ system: 0, mic: 0 });
   const [elapsedMs, setElapsedMs] = useState(0);
   const [uploadedBytes, setUploadedBytes] = useState(0);
@@ -125,11 +159,22 @@ export function useScreenRecorder() {
 
   const displayStreamRef = useRef<MediaStream | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const systemAnalyserRef = useRef<AnalyserNode | null>(null);
-  const micAnalyserRef = useRef<AnalyserNode | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordingIdRef = useRef<string | null>(null);
+  const relayRef = useRef<VideoRelay | null>(null);
+  const withVideoRef = useRef(true);
+  const qualityRef = useRef<CaptureQuality>('standard');
+
+  // Tonmischer (siehe ensureMixer)
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const destinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const systemSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const micGainRef = useRef<GainNode | null>(null);
+  const micMutedRef = useRef(false);
+  const systemAnalyserRef = useRef<AnalyserNode | null>(null);
+  const micAnalyserRef = useRef<AnalyserNode | null>(null);
+  const levelTimerRef = useRef<number | null>(null);
 
   const queueRef = useRef<Blob[]>([]);
   const seqRef = useRef(0);
@@ -147,14 +192,111 @@ export function useScreenRecorder() {
     timersRef.current = [];
   }, []);
 
+  /**
+   * Tonmischer anlegen, falls noch keiner läuft. Er entsteht mit der ersten
+   * Quelle (nicht erst beim Start der Aufnahme), damit die Pegel schon vorher
+   * sichtbar sind und sich Quellen jederzeit umhängen lassen:
+   *
+   *   Systemton ──┬─ Analyser
+   *               └─────────────────────────┐
+   *   Mikrofon ───┬─ Analyser               ├─ Ziel → Recorder
+   *               └─ Gain (0 = stumm) ──────┘
+   *
+   * Der Analyser hängt vor der Stummschaltung: So sieht man auch stumm
+   * geschaltet, dass das Mikrofon Ton liefert.
+   */
+  const ensureMixer = useCallback((): AudioContext => {
+    const existing = audioCtxRef.current;
+    if (existing && existing.state !== 'closed') return existing;
+    const ctx = new AudioContext();
+    audioCtxRef.current = ctx;
+    const destination = ctx.createMediaStreamDestination();
+    destinationRef.current = destination;
+    const gain = ctx.createGain();
+    gain.gain.value = micMutedRef.current ? 0 : 1;
+    gain.connect(destination);
+    micGainRef.current = gain;
+    if (ctx.state === 'suspended') void ctx.resume().catch(() => undefined);
+    if (levelTimerRef.current === null) {
+      levelTimerRef.current = window.setInterval(() => {
+        setLevels({
+          system: readLevel(systemAnalyserRef.current),
+          mic: readLevel(micAnalyserRef.current),
+        });
+      }, 100);
+    }
+    return ctx;
+  }, []);
+
+  /** Systemton einer (neuen) Bildschirmquelle in den Mixer hängen – oder entfernen. */
+  const connectSystem = useCallback(
+    (stream: MediaStream | null) => {
+      systemSourceRef.current?.disconnect();
+      systemSourceRef.current = null;
+      systemAnalyserRef.current = null;
+      const tracks = stream?.getAudioTracks().filter((t) => t.readyState === 'live') ?? [];
+      if (tracks.length === 0) return;
+      const ctx = ensureMixer();
+      const source = ctx.createMediaStreamSource(new MediaStream(tracks));
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+      if (destinationRef.current) source.connect(destinationRef.current);
+      systemSourceRef.current = source;
+      systemAnalyserRef.current = analyser;
+    },
+    [ensureMixer],
+  );
+
+  /** Mikrofon in den Mixer hängen – oder entfernen. */
+  const connectMic = useCallback(
+    (stream: MediaStream | null) => {
+      micSourceRef.current?.disconnect();
+      micSourceRef.current = null;
+      micAnalyserRef.current = null;
+      if (!stream) return;
+      const ctx = ensureMixer();
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+      if (micGainRef.current) source.connect(micGainRef.current);
+      micSourceRef.current = source;
+      micAnalyserRef.current = analyser;
+    },
+    [ensureMixer],
+  );
+
+  /** Bildschirmquelle freigeben, ohne Mikrofon und Mixer anzutasten. */
+  const releaseDisplay = useCallback(() => {
+    displayStreamRef.current?.getTracks().forEach((t) => {
+      t.onended = null;
+      t.stop();
+    });
+    displayStreamRef.current = null;
+    connectSystem(null);
+    setPreviewStream(null);
+  }, [connectSystem]);
+
   /** Alle Medienressourcen freigeben (Freigabe-Hinweis des Browsers verschwindet). */
   const releaseMedia = useCallback(() => {
     clearTimers();
     recorderRef.current = null;
-    displayStreamRef.current?.getTracks().forEach((t) => t.stop());
+    relayRef.current?.stop();
+    relayRef.current = null;
+    displayStreamRef.current?.getTracks().forEach((t) => {
+      t.onended = null;
+      t.stop();
+    });
     displayStreamRef.current = null;
     micStreamRef.current?.getTracks().forEach((t) => t.stop());
     micStreamRef.current = null;
+    if (levelTimerRef.current !== null) window.clearInterval(levelTimerRef.current);
+    levelTimerRef.current = null;
+    systemSourceRef.current = null;
+    micSourceRef.current = null;
+    micGainRef.current = null;
+    destinationRef.current = null;
     systemAnalyserRef.current = null;
     micAnalyserRef.current = null;
     const ctx = audioCtxRef.current;
@@ -162,6 +304,7 @@ export function useScreenRecorder() {
     if (ctx && ctx.state !== 'closed') void ctx.close();
     setPreviewStream(null);
     setMicActive(false);
+    setCanSwitchSource(false);
     setLevels({ system: 0, mic: 0 });
   }, [clearTimers]);
 
@@ -200,18 +343,30 @@ export function useScreenRecorder() {
     }
   }, []);
 
+  // Neu angesteckte oder entfernte Geräte (Headset!) gleich in der Liste zeigen.
+  useEffect(() => {
+    const devices = navigator.mediaDevices;
+    if (!devices?.addEventListener) return;
+    const handler = () => void refreshMicDevices();
+    devices.addEventListener('devicechange', handler);
+    return () => devices.removeEventListener('devicechange', handler);
+  }, [refreshMicDevices]);
+
   /**
-   * Mikrofon aktivieren. Die Geräteliste trägt erst nach erteilter Berechtigung
-   * lesbare Namen – deshalb wird hier zuerst der Zugriff angefragt.
+   * Mikrofon aktivieren oder wechseln – auch während der Aufnahme. Die
+   * Geräteliste trägt erst nach erteilter Berechtigung lesbare Namen – deshalb
+   * wird hier zuerst der Zugriff angefragt. Das neue Gerät öffnet, bevor das alte
+   * schließt, damit beim Wechsel keine Lücke im Ton entsteht.
    */
   const enableMic = useCallback(
     async (deviceId?: string) => {
       setMicError(null);
       try {
-        micStreamRef.current?.getTracks().forEach((t) => t.stop());
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: deviceId ? { deviceId: { exact: deviceId } } : true,
         });
+        connectMic(stream);
+        micStreamRef.current?.getTracks().forEach((t) => t.stop());
         micStreamRef.current = stream;
         setMicActive(true);
         if (deviceId) setMicDeviceId(deviceId);
@@ -222,8 +377,8 @@ export function useScreenRecorder() {
         await refreshMicDevices();
         return true;
       } catch (e) {
-        micStreamRef.current = null;
-        setMicActive(false);
+        // Schlägt nur der Wechsel fehl, bleibt das bisherige Mikrofon aktiv.
+        setMicActive(micStreamRef.current !== null);
         setMicError(
           e instanceof DOMException && e.name === 'NotAllowedError'
             ? translate('capture.errors.micDenied')
@@ -232,14 +387,24 @@ export function useScreenRecorder() {
         return false;
       }
     },
-    [refreshMicDevices],
+    [connectMic, refreshMicDevices],
   );
 
   const disableMic = useCallback(() => {
+    connectMic(null);
     micStreamRef.current?.getTracks().forEach((t) => t.stop());
     micStreamRef.current = null;
     setMicActive(false);
     setMicError(null);
+  }, [connectMic]);
+
+  /** Mikrofon stumm schalten bzw. wieder freigeben – wirkt sofort, auch in der Aufnahme. */
+  const setMicMute = useCallback((muted: boolean) => {
+    micMutedRef.current = muted;
+    setMicMuted(muted);
+    const gain = micGainRef.current;
+    // Kurze Rampe statt hartem Sprung, sonst knackt es in der Aufnahme.
+    if (gain) gain.gain.setTargetAtTime(muted ? 0 : 1, gain.context.currentTime, 0.015);
   }, []);
 
   /**
@@ -251,27 +416,15 @@ export function useScreenRecorder() {
   const chooseSource = useCallback(
     async (video: boolean, selectedQuality: CaptureQuality) => {
       setError(null);
-      const preset = QUALITY_PRESETS[selectedQuality];
-      const options: DisplayMediaOptions = {
-        video: {
-          frameRate: { ideal: preset.frameRate, max: preset.frameRate },
-          width: { max: 1920 },
-          height: { max: 1080 },
-        },
-        // Für Sprache sind die Aufbereitungen des Browsers eher schädlich –
-        // sie sind für Mikrofone gedacht, nicht für einen Systemtonmitschnitt.
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-        systemAudio: 'include',
-        selfBrowserSurface: 'exclude',
-        surfaceSwitching: 'include',
-      };
       try {
-        const stream = await navigator.mediaDevices.getDisplayMedia(options);
-        displayStreamRef.current?.getTracks().forEach((t) => t.stop());
+        const stream = await navigator.mediaDevices.getDisplayMedia(displayOptions(selectedQuality));
+        releaseDisplay();
         displayStreamRef.current = stream;
         setSystemAudio(stream.getAudioTracks().length > 0);
         setWithVideo(video);
+        withVideoRef.current = video;
         setQuality(selectedQuality);
+        qualityRef.current = selectedQuality;
 
         if (video) {
           setPreviewStream(stream);
@@ -281,62 +434,54 @@ export function useScreenRecorder() {
           stream.getVideoTracks().forEach((t) => t.stop());
           setPreviewStream(null);
         }
+        connectSystem(stream);
         setPhase('ready');
         return true;
       } catch (e) {
-        if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'AbortError')) {
-          // Nutzer hat den Auswahldialog abgebrochen – kein Fehlerzustand.
-          return false;
-        }
+        if (isUserAbort(e)) return false;
         setError(translate('capture.errors.displayFailed', { message: errorMessage(e) }));
         return false;
       }
     },
-    [],
+    [connectSystem, releaseDisplay],
   );
 
-  /** Vorbereitete Quelle wieder freigeben (z.B. beim Schließen des Dialogs). */
+  /** Gewählten Bildschirm wieder freigeben; Mikrofon und dessen Auswahl bleiben. */
   const discardSource = useCallback(() => {
-    releaseMedia();
+    releaseDisplay();
     setSystemAudio(false);
     setPhase('idle');
-  }, [releaseMedia]);
+  }, [releaseDisplay]);
 
-  /** Ton der Quellen mischen und die Pegelmessung anhängen. */
-  const buildMixedStream = useCallback((): MediaStream => {
-    const display = displayStreamRef.current;
-    // Ein fehlgeschlagener Startversuch kann einen Kontext hinterlassen haben.
-    const previous = audioCtxRef.current;
-    if (previous && previous.state !== 'closed') void previous.close();
-    const ctx = new AudioContext();
-    audioCtxRef.current = ctx;
-    const destination = ctx.createMediaStreamDestination();
-
-    const systemTracks = display?.getAudioTracks() ?? [];
-    if (systemTracks.length > 0) {
-      const source = ctx.createMediaStreamSource(new MediaStream(systemTracks));
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 1024;
-      source.connect(analyser);
-      source.connect(destination);
-      systemAnalyserRef.current = analyser;
-    }
-    const micStream = micStreamRef.current;
-    if (micStream) {
-      const source = ctx.createMediaStreamSource(micStream);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 1024;
-      source.connect(analyser);
-      source.connect(destination);
-      micAnalyserRef.current = analyser;
-    }
-
+  /**
+   * Die Spuren für den Recorder: Mixer-Ausgang plus – bei Bild – die Bildspur.
+   * Wo der Browser es kann, ist das die Spur eines {@link VideoRelay}, damit sich
+   * der Bildschirm später wechseln lässt; sonst die Bildspur selbst.
+   */
+  const buildRecorderStream = useCallback((): MediaStream => {
+    ensureMixer();
+    const destination = destinationRef.current;
+    if (!destination) throw new Error('Mixer nicht verfügbar');
     const tracks: MediaStreamTrack[] = [];
-    const videoTrack = display?.getVideoTracks()[0];
-    if (withVideo && videoTrack) tracks.push(videoTrack);
+    let switchable = !withVideo;
+    const videoTrack = displayStreamRef.current?.getVideoTracks()[0];
+    if (withVideo && videoTrack) {
+      relayRef.current?.stop();
+      relayRef.current = null;
+      if (videoRelaySupported()) {
+        try {
+          relayRef.current = new VideoRelay(videoTrack);
+          switchable = true;
+        } catch {
+          relayRef.current = null;
+        }
+      }
+      tracks.push(relayRef.current?.track ?? videoTrack);
+    }
     tracks.push(...destination.stream.getAudioTracks());
+    setCanSwitchSource(switchable);
     return new MediaStream(tracks);
-  }, [withVideo]);
+  }, [ensureMixer, withVideo]);
 
   /** Ein Stück mit Wiederholungen hochladen; gibt bei endgültigem Fehler auf. */
   const uploadChunk = useCallback(async (recordingId: string, seq: number, blob: Blob) => {
@@ -454,7 +599,7 @@ export function useScreenRecorder() {
 
       let stream: MediaStream;
       try {
-        stream = buildMixedStream();
+        stream = buildRecorderStream();
       } catch (e) {
         setError(translate('capture.errors.mixFailed', { message: errorMessage(e) }));
         setPhase('error');
@@ -475,6 +620,8 @@ export function useScreenRecorder() {
       } catch (e) {
         // Quelle und Tonmischung stehen noch – der Nutzer kann es direkt
         // erneut versuchen, ohne den Bildschirm neu auszuwählen.
+        relayRef.current?.stop();
+        relayRef.current = null;
         setError(errorMessage(e));
         setPhase('ready');
         return;
@@ -500,16 +647,7 @@ export function useScreenRecorder() {
       };
       recorder.start(CHUNK_MS);
 
-      // Beendet der Nutzer die Freigabe über die Leiste des Browsers, ist das
-      // ein regulärer Stopp – die Aufnahme wird abgeschlossen, nicht verworfen.
-      // Bei „nur Ton" gibt es keine Bildspur mehr, dort endet die Tonspur.
-      // (Selbst gestoppte Spuren lösen kein `ended` aus, also kein Fehlalarm.)
-      displayStreamRef.current
-        .getTracks()
-        .filter((track) => track.readyState === 'live')
-        .forEach((track) => {
-          track.onended = () => void finish();
-        });
+      watchDisplayEnd(displayStreamRef.current, finish);
 
       startedAtRef.current = Date.now();
       pausedTotalRef.current = 0;
@@ -526,18 +664,62 @@ export function useScreenRecorder() {
           if (id) void captureHeartbeat(id).catch(() => undefined);
         }, HEARTBEAT_MS),
       );
-      timersRef.current.push(
-        window.setInterval(() => {
-          setLevels({
-            system: readLevel(systemAnalyserRef.current),
-            mic: readLevel(micAnalyserRef.current),
-          });
-        }, 100),
-      );
       setPhase('recording');
     },
-    [buildMixedStream, finish, pump, quality, withVideo],
+    [buildRecorderStream, finish, pump, quality, withVideo],
   );
+
+  /**
+   * Während der Aufnahme eine andere Bildschirmquelle wählen. Öffnet erneut den
+   * Auswahldialog des Browsers; die Aufnahme läuft solange weiter (das Bild
+   * steht kurz). Bricht der Nutzer ab, bleibt die bisherige Quelle.
+   */
+  const switchSource = useCallback(async () => {
+    if (!recordingIdRef.current || finishingRef.current) return false;
+    const video = withVideoRef.current;
+    if (video && !relayRef.current) return false;
+    setError(null);
+    setSwitching(true);
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia(displayOptions(qualityRef.current));
+    } catch (e) {
+      if (!isUserAbort(e)) {
+        setError(translate('capture.errors.switchFailed', { message: errorMessage(e) }));
+      }
+      return false;
+    } finally {
+      setSwitching(false);
+    }
+    // Die Aufnahme kann geendet haben, während der Dialog offen war.
+    if (!recordingIdRef.current || finishingRef.current) {
+      stream.getTracks().forEach((t) => t.stop());
+      return false;
+    }
+
+    if (video) {
+      const videoTrack = stream.getVideoTracks()[0];
+      if (!videoTrack || !relayRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return false;
+      }
+      relayRef.current.setSource(videoTrack);
+      setPreviewStream(stream);
+    } else {
+      stream.getVideoTracks().forEach((t) => t.stop());
+    }
+    // Erst jetzt die alte Quelle schließen – ohne Ende-Handler, sonst würde das
+    // als „Freigabe beendet" die ganze Aufnahme abschließen.
+    displayStreamRef.current?.getTracks().forEach((t) => {
+      t.onended = null;
+      t.stop();
+    });
+    displayStreamRef.current = stream;
+    connectSystem(stream);
+    setSystemAudio(stream.getAudioTracks().length > 0);
+    watchDisplayEnd(stream, finish);
+    return true;
+  }, [connectSystem, finish]);
 
   const pause = useCallback(() => {
     const recorder = recorderRef.current;
@@ -594,6 +776,9 @@ export function useScreenRecorder() {
     micDeviceId,
     micActive,
     micError,
+    micMuted,
+    canSwitchSource,
+    switching,
     levels,
     elapsedMs,
     uploadedBytes,
@@ -602,6 +787,8 @@ export function useScreenRecorder() {
     discardSource,
     enableMic,
     disableMic,
+    setMicMute,
+    switchSource,
     beginRecording,
     pause,
     resume,
@@ -610,17 +797,17 @@ export function useScreenRecorder() {
   };
 }
 
-/** Lautstärke einer Quelle als Wert zwischen 0 und 1 (Effektivwert). */
-function readLevel(analyser: AnalyserNode | null): number {
-  if (!analyser) return 0;
-  const data = new Uint8Array(analyser.fftSize);
-  analyser.getByteTimeDomainData(data);
-  let sum = 0;
-  for (let i = 0; i < data.length; i += 1) {
-    const deviation = (data[i] - 128) / 128;
-    sum += deviation * deviation;
-  }
-  const rms = Math.sqrt(sum / data.length);
-  // Etwas anheben, damit normale Sprache den Balken sichtbar bewegt.
-  return Math.min(1, rms * 3);
+/**
+ * Beendet der Nutzer die Freigabe über die Leiste des Browsers, ist das ein
+ * regulärer Stopp – die Aufnahme wird abgeschlossen, nicht verworfen. Bei „nur
+ * Ton" gibt es keine Bildspur mehr, dort endet die Tonspur. (Selbst gestoppte
+ * Spuren lösen kein `ended` aus, also kein Fehlalarm.)
+ */
+function watchDisplayEnd(stream: MediaStream, finish: () => Promise<void>) {
+  stream
+    .getTracks()
+    .filter((track) => track.readyState === 'live')
+    .forEach((track) => {
+      track.onended = () => void finish();
+    });
 }
