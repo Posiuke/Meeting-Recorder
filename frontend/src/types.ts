@@ -193,7 +193,7 @@ export interface BotTemplateView {
   sttLanguage: string | null;
   schedule: BotScheduleView;
   /**
-   * Auswahl der Auswertungs-Vorlage: null = „Meeting (Standard)", `tpl:<id>` =
+   * Auswahl der Auswertungs-Vorlage: null = „Standard" (Standardvorlage, sonst Admin-Vorgabe), `tpl:<id>` =
    * eigene Vorlage, sonst Schlüssel einer integrierten Vorlage.
    */
   summaryPreset: string | null;
@@ -556,6 +556,8 @@ export interface PromptTemplateView {
   temperature: number | null;
   createdAt: string;
   updatedAt: string | null;
+  /** Standardvorlage: gilt für jede Auswertung, bei der keine Vorlage gewählt ist. */
+  isDefault: boolean;
 }
 
 /** Eine Seite der Aufnahmenliste samt Gesamtzahl. */

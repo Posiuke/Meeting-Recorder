@@ -487,12 +487,20 @@ public final class Dtos {
      * @param temperature Temperatur dieser Vorlage (null = Admin-Vorgabe)
      */
     public record PromptTemplateView(UUID id, String name, String prompt, String model,
-                                     Double temperature, Instant createdAt, Instant updatedAt) {
-        public static PromptTemplateView of(PromptTemplate t) {
+                                     Double temperature, Instant createdAt, Instant updatedAt,
+                                     boolean isDefault) {
+        /**
+         * @param isDefault Standardvorlage des Nutzers: gilt fuer jede Auswertung
+         *                  ohne gewaehlte Vorlage
+         */
+        public static PromptTemplateView of(PromptTemplate t, boolean isDefault) {
             return new PromptTemplateView(t.getId(), t.getName(), t.getPrompt(), t.getModel(),
-                    t.getTemperature(), t.getCreatedAt(), t.getUpdatedAt());
+                    t.getTemperature(), t.getCreatedAt(), t.getUpdatedAt(), isDefault);
         }
     }
+
+    /** Standardvorlage des Nutzers; templateId null = Vorgabe des Administrators. */
+    public record DefaultTemplateRequest(UUID templateId) {}
 
     public record PromptTemplateRequest(String name, String prompt, String model,
                                         Double temperature) {}

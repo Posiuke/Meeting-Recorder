@@ -77,6 +77,9 @@ class MigrationSchemaIT {
     private RecordingRepo recordingRepo;
 
     @Autowired
+    private bbbbot.repository.Repositories.AppUserRepo userRepo;
+
+    @Autowired
     private RecordingTagRepo tagRepo;
 
     @Autowired
@@ -441,6 +444,34 @@ class MigrationSchemaIT {
         assertThatThrownBy(() -> templateShareRepo.saveAndFlush(
                 bbbbot.domain.BotTemplateShare.forUser(vorlage.getId(), direkt, owner)))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    /**
+     * Standardvorlage (V33): gezielt gesetzt, vom normalen Speichern des Kontos
+     * nicht ueberschrieben und beim Loeschen der Vorlage von selbst entfernt.
+     */
+    @Test
+    void standardvorlageWirdGesetztUndFaelltBeimLoeschenWeg() {
+        UUID owner = ownerId();
+        bbbbot.domain.PromptTemplate vorlage =
+                bbbbot.domain.PromptTemplate.create(owner, "Protokoll", "Schreibe ein Protokoll.");
+        em.persist(vorlage);
+        em.flush();
+
+        userRepo.setDefaultPromptTemplate(owner, vorlage.getId());
+        AppUser user = userRepo.findById(owner).orElseThrow();
+        assertThat(user.getDefaultPromptTemplateId()).isEqualTo(vorlage.getId());
+
+        // Letzte Aktivitaet speichern (wie bei jeder Anfrage) darf die Wahl nicht loeschen.
+        user.setLastSeenAt(java.time.Instant.now());
+        userRepo.saveAndFlush(user);
+        em.clear();
+        assertThat(userRepo.findById(owner).orElseThrow().getDefaultPromptTemplateId()).isEqualTo(vorlage.getId());
+
+        em.remove(em.find(bbbbot.domain.PromptTemplate.class, vorlage.getId()));
+        em.flush();
+        em.clear();
+        assertThat(userRepo.findById(owner).orElseThrow().getDefaultPromptTemplateId()).isNull();
     }
 
     /** Aufnahmen verweisen per Fremdschluessel auf app_user - Nutzer also zuerst anlegen. */

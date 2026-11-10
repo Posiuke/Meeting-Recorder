@@ -54,6 +54,7 @@ public class ProcessingService {
     private final SettingsService settings;
     private final bbbbot.storage.FileStore store;
     private final bbbbot.stt.transcribe.AwsTranscriber awsTranscriber;
+    private final bbbbot.stt.transcribe.ElevenLabsTranscriber elevenLabsTranscriber;
     private final bbbbot.media.FfmpegService ffmpeg;
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
@@ -71,6 +72,7 @@ public class ProcessingService {
                              bbbbot.recording.SpeakerNamingService speakerNaming, SettingsService settings,
                              bbbbot.storage.FileStore store,
                              bbbbot.stt.transcribe.AwsTranscriber awsTranscriber,
+                             bbbbot.stt.transcribe.ElevenLabsTranscriber elevenLabsTranscriber,
                              bbbbot.media.FfmpegService ffmpeg) {
         this.jobRepo = jobRepo;
         this.recordingRepo = recordingRepo;
@@ -84,6 +86,7 @@ public class ProcessingService {
         this.settings = settings;
         this.store = store;
         this.awsTranscriber = awsTranscriber;
+        this.elevenLabsTranscriber = elevenLabsTranscriber;
         this.ffmpeg = ffmpeg;
     }
 
@@ -283,11 +286,13 @@ public class ProcessingService {
             // Haelt die Sprecher ueber alle Segmente dieser Aufnahme stabil
             // (Stimmproben fuer die Cloud-Diarisierung, siehe SpeakerContext).
             WhisperClient.SpeakerContext speakers = new WhisperClient.SpeakerContext();
-            // Amazon Transcribe: die ganze Aufnahme in EINEM Auftrag, damit die
-            // Sprecher ueber alle Segmente dieselben sind. null = geht nicht am
-            // Stueck (zu lang, Datei fehlt) - dann wie bisher Segment fuer Segment.
-            WholeRecordingStt whole = settings.isSttTranscribe()
-                    ? transcribeWholeRecording(recording, segments, redoTranscripts, diarize, sttLanguage)
+            // Amazon Transcribe / ElevenLabs: die ganze Aufnahme in EINEM Auftrag,
+            // damit die Sprecher ueber alle Segmente dieselben sind. null = geht
+            // nicht am Stueck (zu lang, Datei fehlt) - dann Segment fuer Segment.
+            bbbbot.stt.transcribe.WholeFileTranscriber wholeTranscriber = wholeFileTranscriber();
+            WholeRecordingStt whole = wholeTranscriber != null
+                    ? transcribeWholeRecording(wholeTranscriber, recording, segments, redoTranscripts, diarize,
+                            sttLanguage)
                     : null;
             if (whole != null) {
                 transcribed = whole.transcribed();
@@ -573,14 +578,22 @@ public class ProcessingService {
     record WholeRecordingStt(int transcribed, String error) {}
 
     /**
-     * Schickt alle fertigen Segmente als eine Datei an Amazon Transcribe und
+     * Schickt alle fertigen Segmente als eine Datei an Amazon Transcribe bzw. ElevenLabs und
      * verteilt das Ergebnis wieder auf die Segmente ({@link
      * bbbbot.stt.transcribe.SegmentSplitter}). Nur die Segmente, die ein
      * Transkript brauchen, werden ueberschrieben.
      *
      * @return null, wenn es am Stueck nicht geht (Rueckfall auf Segment fuer Segment)
      */
-    WholeRecordingStt transcribeWholeRecording(Recording recording, List<RecordingSegment> segments,
+    /** Anbieter, der ganze Aufnahmen am Stueck verarbeitet; null = Segment fuer Segment (Whisper, OpenAI). */
+    private bbbbot.stt.transcribe.WholeFileTranscriber wholeFileTranscriber() {
+        if (settings.isSttTranscribe()) return awsTranscriber;
+        if (settings.isSttElevenLabs()) return elevenLabsTranscriber;
+        return null;
+    }
+
+    WholeRecordingStt transcribeWholeRecording(bbbbot.stt.transcribe.WholeFileTranscriber transcriber,
+                                               Recording recording, List<RecordingSegment> segments,
                                                boolean redoTranscripts, boolean diarize, String sttLanguage) {
         List<RecordingSegment> ready = segments.stream()
                 .filter(s -> s.getStatus() == RecordingSegment.Status.READY && s.getMp3Path() != null)
@@ -591,8 +604,9 @@ public class ProcessingService {
         if (targets.isEmpty()) return new WholeRecordingStt(0, null);
         if (ready.stream().anyMatch(s -> s.getDurationMs() == null)) return null;
         long totalMs = ready.stream().mapToLong(RecordingSegment::getDurationMs).sum();
-        if (totalMs > bbbbot.stt.transcribe.AwsTranscriber.MAX_DURATION_MS) {
-            log.info("Aufnahme {} ist laenger als 4 h - Transcribe Segment fuer Segment", recording.getId());
+        if (totalMs > transcriber.maxDurationMs()) {
+            log.info("Aufnahme {} ist fuer {} am Stueck zu lang - Segment fuer Segment", recording.getId(),
+                    transcriber.displayName());
             return null;
         }
         List<Path> parts = new java.util.ArrayList<>();
@@ -616,14 +630,15 @@ public class ProcessingService {
                 }
                 audio = combined;
             }
-            bbbbot.stt.transcribe.AwsTranscriber.Result result =
-                    awsTranscriber.transcribe(audio, whisper.resolveLanguage(sttLanguage), diarize);
+            bbbbot.stt.transcribe.WholeFileTranscriber.Result result =
+                    transcriber.transcribe(audio, whisper.resolveLanguage(sttLanguage), diarize);
             if (!result.success()) {
                 for (RecordingSegment s : targets) {
                     s.setError(result.error());
                     segmentRepo.save(s);
                 }
-                log.error("Transcribe fuer Aufnahme {} fehlgeschlagen: {}", recording.getId(), result.error());
+                log.error("{} fuer Aufnahme {} fehlgeschlagen: {}", transcriber.displayName(), recording.getId(),
+                        result.error());
                 return new WholeRecordingStt(0, result.error());
             }
             List<String> texts = bbbbot.stt.transcribe.SegmentSplitter.split(result.utterances(),
@@ -637,11 +652,12 @@ public class ProcessingService {
                 s.setError(null);
                 segmentRepo.save(s);
             }
-            log.info("Aufnahme {} per Transcribe am Stueck transkribiert ({} Segment(e), {} Aeusserungen, Sprache {})",
-                    recording.getId(), ready.size(), result.utterances().size(), result.languageCode());
+            log.info("Aufnahme {} per {} am Stueck transkribiert ({} Segment(e), {} Aeusserungen, Sprache {})",
+                    recording.getId(), transcriber.displayName(), ready.size(), result.utterances().size(),
+                    result.languageCode());
             return new WholeRecordingStt(targets.size(), null);
         } catch (java.io.IOException e) {
-            log.warn("Temporaere Datei fuer Transcribe nicht anlegbar: {} - Segment fuer Segment", e.getMessage());
+            log.warn("Temporaere Datei fuer die Spracherkennung nicht anlegbar: {} - Segment fuer Segment", e.getMessage());
             return null;
         } finally {
             if (combined != null) {

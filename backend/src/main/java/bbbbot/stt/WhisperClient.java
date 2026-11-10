@@ -111,6 +111,14 @@ public class WhisperClient {
         this.awsTranscriber = awsTranscriber;
     }
 
+    /** ElevenLabs Scribe (whisper.provider = elevenlabs); optional, damit Tests ohne auskommen. */
+    private bbbbot.stt.transcribe.ElevenLabsTranscriber elevenLabsTranscriber;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setElevenLabsTranscriber(bbbbot.stt.transcribe.ElevenLabsTranscriber elevenLabsTranscriber) {
+        this.elevenLabsTranscriber = elevenLabsTranscriber;
+    }
+
     public record TranscriptionResult(boolean success, String text, String error) {}
 
     /**
@@ -340,7 +348,10 @@ public class WhisperClient {
             return attemptTranscribeOpenAi(audioFile, diarize, language, speakers);
         }
         if (settings.isSttTranscribe()) {
-            return attemptTranscribeAws(audioFile, diarize, language);
+            return attemptTranscribeWhole(awsTranscriber, "Amazon Transcribe", audioFile, diarize, language);
+        }
+        if (settings.isSttElevenLabs()) {
+            return attemptTranscribeWhole(elevenLabsTranscriber, "ElevenLabs", audioFile, diarize, language);
         }
         return attemptTranscribeLocal(audioFile, diarize, language);
     }
@@ -510,15 +521,18 @@ public class WhisperClient {
     }
 
     /**
-     * Eine einzelne Datei ueber Amazon Transcribe (Verbindungstest, Rueckfall
-     * fuer sehr lange Aufnahmen). Die Auswertung ganzer Aufnahmen laeuft am
-     * Stueck ueber ProcessingService, damit die Sprecher stabil bleiben.
+     * Eine einzelne Datei ueber Amazon Transcribe oder ElevenLabs
+     * (Verbindungstest, Rueckfall fuer sehr lange Aufnahmen). Die Auswertung
+     * ganzer Aufnahmen laeuft am Stueck ueber ProcessingService, damit die
+     * Sprecher stabil bleiben.
      */
-    private TranscriptionResult attemptTranscribeAws(Path audioFile, boolean diarize, String language) {
-        if (awsTranscriber == null) {
-            return new TranscriptionResult(false, null, "Amazon Transcribe ist nicht verfuegbar");
+    private TranscriptionResult attemptTranscribeWhole(bbbbot.stt.transcribe.WholeFileTranscriber transcriber,
+                                                       String name, Path audioFile, boolean diarize,
+                                                       String language) {
+        if (transcriber == null) {
+            return new TranscriptionResult(false, null, name + " ist nicht verfuegbar");
         }
-        bbbbot.stt.transcribe.AwsTranscriber.Result result = awsTranscriber.transcribe(audioFile, language, diarize);
+        bbbbot.stt.transcribe.WholeFileTranscriber.Result result = transcriber.transcribe(audioFile, language, diarize);
         if (!result.success()) return new TranscriptionResult(false, null, result.error());
         return new TranscriptionResult(true,
                 bbbbot.stt.transcribe.SegmentSplitter.split(result.utterances(), List.of(0L)).get(0), null);

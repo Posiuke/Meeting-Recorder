@@ -764,6 +764,14 @@ curl -s -H "X-API-Key: $KEY" -F file=@meeting.mp4 \\
         },
         { method: 'PUT', path: '/api/prompt-templates/{id}', summary: 'Change a template.' },
         { method: 'DELETE', path: '/api/prompt-templates/{id}', summary: 'Delete a template.' },
+        {
+          method: 'PUT',
+          path: '/api/prompt-templates/default',
+          summary:
+            'Set the default template – it applies to every analysis without a chosen template. templateId null = the administrator’s default again. Response: the template list (isDefault marks the default).',
+          example: `curl -s -X PUT -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
+  -d '{"templateId":"<id>"}' "$RECORDER/api/prompt-templates/default"`,
+        },
       ],
     },
 

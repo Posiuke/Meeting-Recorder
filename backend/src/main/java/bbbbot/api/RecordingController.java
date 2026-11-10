@@ -872,16 +872,22 @@ public class RecordingController {
     }
 
     private Dtos.SummaryOptionsView summaryOptionsView(Recording recording) {
+        // "Standard" heisst: die Standardvorlage des Besitzers, sonst die
+        // Vorgabe des Administrators - genau das, was SummaryService nimmt.
+        var ownerDefault = summaryService.ownerDefaultTemplate(recording);
         return new Dtos.SummaryOptionsView(
                 recording.getSummaryPrompt(), recording.getSummaryTemplateName(),
                 recording.getSummaryMaxWords(), recording.getSummaryLanguage(),
                 recording.getSttLanguage(),
                 recording.getSummaryModel(), recording.getSummaryTemperature(),
-                settings.get(bbbbot.settings.SettingsService.SUMMARY_SYSTEM_PROMPT),
+                ownerDefault.map(bbbbot.domain.PromptTemplate::getPrompt)
+                        .orElseGet(() -> settings.get(bbbbot.settings.SettingsService.SUMMARY_SYSTEM_PROMPT)),
                 settings.get(bbbbot.settings.SettingsService.SUMMARY_LANGUAGE),
                 settings.get(bbbbot.settings.SettingsService.WHISPER_LANGUAGE),
-                settings.llmModel(),
-                settings.getDouble(bbbbot.settings.SettingsService.LLM_TEMPERATURE));
+                ownerDefault.map(bbbbot.domain.PromptTemplate::getModel)
+                        .filter(m -> !m.isBlank()).orElseGet(settings::llmModel),
+                ownerDefault.map(bbbbot.domain.PromptTemplate::getTemperature)
+                        .orElseGet(() -> settings.getDouble(bbbbot.settings.SettingsService.LLM_TEMPERATURE)));
     }
 
     /**

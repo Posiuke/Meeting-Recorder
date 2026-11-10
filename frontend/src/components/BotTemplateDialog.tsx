@@ -85,7 +85,7 @@ export default function BotTemplateDialog({
     template?.sttLanguage ?? prefill?.sttLanguage ?? '',
   );
   const [schedule, setSchedule] = useState(() => scheduleRequestOf(template?.schedule));
-  // '' = „Meeting (Standard)", 'tpl:<id>' = eigene Vorlage, sonst integrierte
+  // '' = „Standard", 'tpl:<id>' = eigene Vorlage, sonst integrierte
   const [preset, setPreset] = useState(
     template?.summaryPreset ?? prefill?.summaryPreset ?? '',
   );

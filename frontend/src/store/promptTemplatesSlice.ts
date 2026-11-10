@@ -90,6 +90,25 @@ export const updatePromptTemplate = createAsyncThunk<
   }
 });
 
+/**
+ * Standardvorlage festlegen (`null` = wieder die Vorgabe des Administrators).
+ * Der Server liefert die Liste mit der neuen Markierung zurück.
+ */
+export const setDefaultPromptTemplate = createAsyncThunk<
+  PromptTemplateView[],
+  string | null,
+  { rejectValue: string }
+>('promptTemplates/setDefault', async (templateId, { rejectWithValue }) => {
+  try {
+    return await api<PromptTemplateView[]>('/api/prompt-templates/default', {
+      method: 'PUT',
+      body: { templateId },
+    });
+  } catch (e) {
+    return rejectWithValue(errorMessage(e));
+  }
+});
+
 export const deletePromptTemplate = createAsyncThunk<string, string, { rejectValue: string }>(
   'promptTemplates/delete',
   async (id, { rejectWithValue }) => {
@@ -134,6 +153,9 @@ const promptTemplatesSlice = createSlice({
         state.items = sortByName(
           state.items.map((t) => (t.id === action.payload.id ? action.payload : t)),
         );
+      })
+      .addCase(setDefaultPromptTemplate.fulfilled, (state, action) => {
+        state.items = action.payload;
       })
       .addCase(deletePromptTemplate.fulfilled, (state, action) => {
         state.items = state.items.filter((t) => t.id !== action.payload);

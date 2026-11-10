@@ -36,6 +36,12 @@ public interface Repositories {
         Optional<AppUser> findByUsernameIgnoreCase(String username);
         Optional<AppUser> findByAuthProviderAndExternalSubject(String authProvider, String externalSubject);
         List<AppUser> findTop20ByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(String u, String d);
+
+        /** Standardvorlage setzen (null = keine) - gezielt, ohne das ganze Konto zu schreiben. */
+        @Transactional
+        @Modifying(clearAutomatically = true)
+        @Query("update AppUser u set u.defaultPromptTemplateId = :templateId where u.id = :userId")
+        int setDefaultPromptTemplate(@Param("userId") UUID userId, @Param("templateId") UUID templateId);
     }
 
     interface OidcProviderRepo extends JpaRepository<OidcProvider, UUID> {

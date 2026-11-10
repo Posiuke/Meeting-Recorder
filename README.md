@@ -468,8 +468,8 @@ Ausführung entscheidet der Start.
 
 Jede Bot-Vorlage (und auch das Startformular) wählt, mit welcher
 **Auswertungs-Vorlage** die Aufnahmen des Bots im Anschluss ausgewertet werden —
-dieselbe Auswahl wie beim Upload: „Meeting (Standard)" (folgt der Vorgabe des
-Admins), eine integrierte Vorlage (Meeting, Vortrag, Interview, Sprachnotiz) oder
+dieselbe Auswahl wie beim Upload: „Standard" (Standardvorlage des Besitzers,
+sonst die Vorgabe des Admins – ab Werk „Freie Struktur"), eine integrierte Vorlage (Meeting, Vortrag, Interview, Sprachnotiz) oder
 eine eigene Promptvorlage samt Modell und Temperatur. Die Wahl wandert über die
 Bot-Session an jede Aufnahme, bevor der Verarbeitungs-Job entsteht; schon die
 erste (auch sofortige) Auswertung läuft also mit ihr. Eine eigene Promptvorlage
@@ -793,7 +793,7 @@ der Zusammenfassung. Beide öffnen denselben Dialog:
   nicht erneut. Das Ergebnis kommt als neue Fassung neben die bisherigen.
 
 Auch **„Auswertung anpassen"** zeigt die hinterlegte Vorlage jetzt an, statt
-immer „Meeting (Standard)". Passt der gespeicherte Prompt zu keiner Vorlage
+immer „Standard". Passt der gespeicherte Prompt zu keiner Vorlage
 mehr (von Hand geändert oder aus einer älteren Vorlagenfassung), steht dort
 „Eigener Prompt (angepasst)" — er bleibt dann unverändert.
 
@@ -828,6 +828,20 @@ räumt in der Fassungsliste selbst auf.
 
 Bei Bestandsdaten (Migration V23) wird je Aufnahme die neueste fertige
 Zusammenfassung zur aktuellen — also genau die, die vorher überall gezeigt wurde.
+
+### Standardvorlage
+
+Im Tab **Vorlagen** lässt sich eine eigene Vorlage **„Als Standard verwenden“**.
+Sie gilt für jede Auswertung, bei der keine Vorlage gewählt ist — Bots ohne
+Auswertungs-Vorlage, Uploads mit „Standard“, Bildschirmaufnahmen, API — samt
+ihrem Modell und ihrer Temperatur. Reihenfolge: Vorlage der Aufnahme →
+Standardvorlage des **Besitzers** → Vorgabe des Admins (`summary.systemPrompt`,
+ab Werk wortgleich mit der integrierten Vorlage **„Freie Struktur“**: Die KI
+erkennt den Inhalt und entwirft die Gliederung selbst).
+Die Auswahlfelder zeigen dann „Standard: <Name>“. Die Vorlage wird bei jeder
+Auswertung frisch gelesen; wird sie gelöscht, fällt die Wahl weg (V33,
+`app_user.default_prompt_template_id … ON DELETE SET NULL`).
+API: `PUT /api/prompt-templates/default` mit `{"templateId": "<id>" | null}`.
 
 ### Modell und Temperatur je Vorlage und Aufnahme
 
@@ -1246,6 +1260,31 @@ unter `<präfix>/transcribe-tmp/`.
 
 Live-Test gegen Bedrock: `BEDROCK_IT_MODEL=eu.anthropic.claude-sonnet-5-5 mvn test -Dtest=BedrockChatIT`
 (AWS-Zugangsdaten in der Umgebung).
+
+## ElevenLabs Scribe
+
+**`whisper.provider = elevenlabs`** schickt die ganze Aufnahme in **einer**
+Anfrage an `POST /v1/speech-to-text` (`stt/transcribe/ElevenLabsTranscriber`) —
+wie bei Transcribe bleiben die Sprecher so über alle Segmente stabil, das
+Ergebnis wird wieder auf die Segmente verteilt. Kein Bucket, kein Auftrag zum
+Aufräumen; die Datei wird gestreamt (bis 15 Stunden am Stück).
+
+| Einstellung | Bedeutung |
+|---|---|
+| `whisper.elevenlabsApiKey` | API-Schlüssel (Berechtigung „Speech to Text“) |
+| `whisper.elevenlabsModel` | `scribe_v3` (Standard) oder `scribe_v2` |
+| `whisper.elevenlabsUrl` | Endpunkt; EU-Datenresidenz (Enterprise): `https://api.eu.residency.elevenlabs.io/v1/speech-to-text` |
+| `whisper.elevenlabsMaxSpeakers` | Höchstzahl Sprecher (1–32), `0` = Modell entscheidet |
+| `whisper.elevenlabsKeyterms` | Begriffe des gemeinsamen Glossars als `keyterms` mitschicken (max. 1000, je ≤ 50 Zeichen/5 Wörter; ElevenLabs berechnet einen Aufschlag) |
+| `whisper.elevenlabsZeroRetention` | `enable_logging=false` — ElevenLabs speichert nichts (nur Enterprise) |
+
+Gesendet werden außerdem `timestamps_granularity=word`, `tag_audio_events=false`
+(keine „(Lachen)“-Einschübe), `diarize` je Aufnahme und `language_code` (leer bei
+„automatisch“). Wartezeit mindestens 30 Minuten (`whisper.timeoutSec`, falls
+größer); Netzfehler, 429 und 5xx werden wie bei Whisper wiederholt
+(`whisper.retryAttempts`).
+
+> ⚠️ Audio verlässt das eigene Netz und geht an ElevenLabs (Standard: USA).
 
 ## Scale-to-zero (Leerlauf-Meldung)
 

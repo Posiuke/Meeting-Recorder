@@ -253,7 +253,7 @@ export const en: typeof de = {
     },
     presetLabel: 'Analysis template',
     presetHelp:
-      'The bot\'s recordings are analysed with this template afterwards – starting with the very first analysis. "Meeting (default)" follows the administrator\'s setting. An own template is read fresh on every start, so changes to it apply here too.',
+      'The bot\'s recordings are analysed with this template afterwards – starting with the very first analysis. "Default" uses your default template, otherwise the administrator\'s setting (out of the box "Free structure"). An own template is read fresh on every start, so changes to it apply here too.',
     presetMissing:
       'The selected own template "{{name}}" has been deleted – the bot analyses with its last saved state.',
     presetShort: 'Analysis: {{name}}',
@@ -490,6 +490,16 @@ export const en: typeof de = {
     discardDraft: 'Discard draft',
     duplicate: 'Duplicate',
     duplicateHint: 'Saves the current text as a new template – the original stays unchanged',
+    defaultBadge: 'Default',
+    makeDefault: 'Use as default',
+    makeDefaultHint:
+      'This template then applies to every analysis where no other template is chosen – bots without a template, uploads with “Default”, screen recordings and the API.',
+    clearDefault: 'No longer default',
+    clearDefaultHint: 'The administrator’s default applies again afterwards.',
+    defaultInfo: 'Default for your analyses: {{name}}',
+    defaultInfoNone: 'Default for your analyses: administrator’s default',
+    defaultInfoHelp:
+      'The default template applies whenever no template is chosen for a recording. If you pick a different template for a recording, that one takes precedence.',
     loadDefault: 'Load default',
     loadDefaultHint:
       'Writes the administrator’s default into the field – so you can adjust it as a starting point',
@@ -601,7 +611,7 @@ export const en: typeof de = {
     uploading: 'Uploading… {{percent}}%',
     presetLabel: 'Analysis template',
     presetHelp:
-      'Determines how the AI analyses the content – "Meeting (default)" is geared towards meetings (decisions, action items). For talks, interviews or voice notes a different template fits better – or "Free structure (automatic)": the AI then recognises the content itself and designs a fitting structure of its own ("Detect automatically", by contrast, picks the structure of one of the built-in templates). The choice already applies to the first analysis; it can be changed later under "Customise analysis".',
+      'Determines how the AI analyses the content – "Default" uses your default template from the "Templates" tab, otherwise "Free structure": the AI then recognises the content itself and designs a fitting structure of its own ("Detect automatically", by contrast, picks the structure of one of the built-in templates). The choice already applies to the first analysis; it can be changed later under "Customise analysis".',
     presetChosenHint:
       'This template will be used for the analysis and is visible afterwards under "Customise analysis".',
   },
@@ -715,8 +725,9 @@ export const en: typeof de = {
       'These settings apply to this recording only and are used for the next analysis ("Analyse now", "Analyse again" or "Recreate transcript"). Empty fields mean: use the administrator default.',
     presetLabel: 'Template',
     presetHelp:
-      'Pre-fills the analysis prompt with a template – built-in ones for typical content types (e.g. a meeting, a talk or a voice note) or one of your own saved templates. “Free structure (automatic)” lets the AI recognise the content and design the structure itself; “Detect automatically” determines the kind of content and uses the structure of the matching built-in template. Both name the detected content with a symbol at the top of the summary. The template can be edited freely afterwards. Difference to “Meeting (default)”: there the prompt stays empty and always follows the administrator’s current setting, whereas a template pins the text.',
-    presetDefault: 'Meeting (default)',
+      'Pre-fills the analysis prompt with a template – built-in ones for typical content types (e.g. a meeting, a talk or a voice note) or one of your own saved templates. “Free structure (automatic)” lets the AI recognise the content and design the structure itself; “Detect automatically” determines the kind of content and uses the structure of the matching built-in template. Both name the detected content with a symbol at the top of the summary. The template can be edited freely afterwards. Difference to “Default”: there the prompt stays empty and always follows your default template or the administrator’s current setting, whereas a template pins the text.',
+    presetDefault: 'Free structure (default)',
+    presetDefaultTemplate: 'Default: {{name}}',
     presetBuiltIn: 'Built-in templates',
     presetMine: 'My templates',
     presetCustom: 'Custom prompt (edited)',
@@ -1122,7 +1133,7 @@ export const en: typeof de = {
     testAfterSave: 'Please save before testing.',
     groupWhisper: 'Speech recognition (Whisper)',
     groupWhisperNote:
-      'provider "local" uses the Whisper server on the intranet (setting url). provider "openai" uses an OpenAI-compatible cloud API (settings openaiUrl, openaiApiKey, openaiModel) – e.g. OpenAI or Groq. Caution: with cloud APIs the audio data leaves your own network. Speaker recognition (diarize) needs WhisperX locally and a diarisation model in the cloud (openaiDiarizeModel, gpt-4o-transcribe-diarize at OpenAI). provider "aws-transcribe" uses Amazon Transcribe (awsRegion, awsBucket, awsMaxSpeakers, awsVocabulary): the whole recording goes in one job, so speakers stay the same across all segments; signs in via the AWS role, no key.',
+      'provider "local" uses the Whisper server on the intranet (setting url). provider "openai" uses an OpenAI-compatible cloud API (settings openaiUrl, openaiApiKey, openaiModel) – e.g. OpenAI or Groq. Caution: with cloud APIs the audio data leaves your own network. Speaker recognition (diarize) needs WhisperX locally and a diarisation model in the cloud (openaiDiarizeModel, gpt-4o-transcribe-diarize at OpenAI). provider "aws-transcribe" uses Amazon Transcribe (awsRegion, awsBucket, awsMaxSpeakers, awsVocabulary): the whole recording goes in one job, so speakers stay the same across all segments; signs in via the AWS role, no key. provider "elevenlabs" uses ElevenLabs Scribe (elevenlabsApiKey, elevenlabsModel – default scribe_v3): also the whole recording in one request, technical terms optionally from the shared glossary.',
     groupLlm: 'AI model (LLM)',
     groupLlmNote:
       'provider "local" uses your own LLM server (baseUrl, apiKey, model). provider "openai" uses a public cloud API (openaiUrl, openaiApiKey, openaiModel) – the model is picked from the provider\'s list ("Fetch models"). Besides OpenAI (https://api.openai.com/v1), compatible providers work too, e.g. Groq https://api.groq.com/openai/v1 or Mistral https://api.mistral.ai/v1. Parameters a model rejects are dropped automatically. Caution: with cloud APIs the transcript and chat log leave your own network. provider "bedrock" uses Amazon Bedrock (bedrockRegion, bedrockModel) via the AWS role, no key.',
@@ -1173,6 +1184,7 @@ export const en: typeof de = {
     vocabularySyncing: 'Transferring…',
     llmProviderBedrock: 'bedrock – Amazon Bedrock (AWS, signs in via the task role)',
     providerAwsTranscribe: 'aws-transcribe – Amazon Transcribe (AWS)',
+    providerElevenlabs: 'elevenlabs – ElevenLabs Scribe (cloud)',
     reasoningOff: 'off – do not send',
     reasoningNone: 'none – no reasoning',
     reasoningMinimal: 'minimal',
@@ -1257,6 +1269,17 @@ export const en: typeof de = {
         'S3 bucket through which Transcribe reads the audio file – it only stays there for the duration of the job. Empty = the storage bucket (STORAGE_BACKEND=s3); required without S3 storage.',
       whisperAwsMaxSpeakers:
         'Maximum number of speakers Transcribe tells apart (2–30). With more, voices get merged – rather choose a bit generously.',
+      whisperElevenlabsUrl:
+        'Endpoint of the ElevenLabs API. Default: https://api.elevenlabs.io/v1/speech-to-text. With EU data residency (Enterprise): https://api.eu.residency.elevenlabs.io/v1/speech-to-text.',
+      whisperElevenlabsApiKey: 'ElevenLabs API key (Profile → API Keys). It needs the “Speech to Text” permission.',
+      whisperElevenlabsModel:
+        'ElevenLabs model: scribe_v3 (current, best recognition) or scribe_v2. The whole recording goes in one request – speakers stay the same across all segments.',
+      whisperElevenlabsMaxSpeakers:
+        'Maximum number of speakers ElevenLabs tells apart (1–32). 0 = the model decides – usually the best choice.',
+      whisperElevenlabsKeyterms:
+        'Send terms from the shared glossary as “keyterms” – improves proper names and technical terms. ElevenLabs charges a surcharge for this (currently 20%).',
+      whisperElevenlabsZeroRetention:
+        'ElevenLabs stores neither audio nor transcript (enable_logging=false). Only available with an Enterprise contract – otherwise ElevenLabs rejects the request.',
       whisperAwsVocabulary:
         'Name of a custom vocabulary in Transcribe – improves proper names, technical terms and abbreviations. “Transfer glossary” creates or updates it from the shared glossary and enters the name here. Empty = none.',
       whisperDiarize:
@@ -1276,7 +1299,7 @@ export const en: typeof de = {
       botPublicUrl:
         'Optional: fixed address for the stop link (e.g. https://recorder.intern). Empty = automatically the address at which the bot was started or its template was saved. Only needed if participants reach the application under a different address than its users.',
       whisperProvider:
-        'Where speech recognition runs: "local" sends the audio segments to your own Whisper server on the intranet, "openai" to a cloud API in OpenAI format (e.g. OpenAI, Groq).',
+        'Where speech recognition runs: "local" sends the audio segments to your own Whisper server on the intranet, "openai" to a cloud API in OpenAI format (e.g. OpenAI, Groq), "aws-transcribe" to Amazon Transcribe, "elevenlabs" to ElevenLabs Scribe.',
       whisperUrl: 'Address of the Whisper ASR web service on the intranet (only for provider = local).',
       whisperOpenaiUrl:
         'Full URL of the cloud transcription endpoint (only for provider = openai). For OpenAI: https://api.openai.com/v1/audio/transcriptions – compatible providers accordingly.',

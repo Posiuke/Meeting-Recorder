@@ -22,7 +22,7 @@ container; PostgreSQL runs separately.
 
 - 📤 **File upload**: take existing audio/video files (MP3, WAV, M4A, MP4, MKV …) in as a recording and analyse them — the analysis template can be picked right in the upload dialog
 - 🖥️ **Screen recording in the browser**: capture a screen, window or tab including system audio and an optional microphone, straight from the tool — for any meeting (Teams/Zoom/WebEx, in-person). **Requires HTTPS** and Chrome/Edge, see [docs/SCREEN_CAPTURE.md](https://github.com/Posiuke/Meeting-Recorder/blob/master/docs/SCREEN_CAPTURE.md)
-- 📝 **Transcription** either through **your own Whisper server** (optionally with speaker separation via WhisperX) or an **OpenAI-compatible cloud API** — with continuous timestamps across the whole recording and a structured view in the UI
+- 📝 **Transcription** either through **your own Whisper server** (optionally with speaker separation via WhisperX) an **OpenAI-compatible cloud API**, Amazon Transcribe or **ElevenLabs Scribe** — with continuous timestamps across the whole recording and a structured view in the UI
 - ✨ **AI smoothing of the transcript** before the analysis (filler words, punctuation, recognition errors) — the original is kept and can be toggled in the transcript tab; plus a **personal and a shared glossary** for abbreviations and domain terms
 - 🧠 **AI summary** through any **OpenAI-compatible** chat endpoint — local (vLLM, Ollama) or cloud (OpenAI, Anthropic, Google Gemini, Groq, Mistral …)
 - 📎 **Attached documents**: upload the agenda, slides or papers for a recording — their text feeds into the summary (PDF/Office/OCR through an Apache Tika server)

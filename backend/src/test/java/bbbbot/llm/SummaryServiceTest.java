@@ -229,6 +229,69 @@ class SummaryServiceTest {
         assertThat(summary.getTemperature()).isEqualTo(0.3);
     }
 
+    /** Standardvorlage des Besitzers fuer den Test: das Feld ist nur ueber die Datenbank setzbar. */
+    private bbbbot.domain.PromptTemplate ownerDefault(String name, String prompt, String model, Double temperature) {
+        var userRepo = mock(bbbbot.repository.Repositories.AppUserRepo.class);
+        var templateRepo = mock(bbbbot.repository.Repositories.PromptTemplateRepo.class);
+        var template = bbbbot.domain.PromptTemplate.create(recording.getOwnerId(), name, prompt);
+        template.setModel(model);
+        template.setTemperature(temperature);
+        var owner = bbbbot.domain.AppUser.create("besitzer", "Besitzer", null);
+        try {
+            var id = bbbbot.domain.AppUser.class.getDeclaredField("id");
+            id.setAccessible(true);
+            id.set(owner, recording.getOwnerId());
+            var field = bbbbot.domain.AppUser.class.getDeclaredField("defaultPromptTemplateId");
+            field.setAccessible(true);
+            field.set(owner, template.getId());
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
+        when(userRepo.findById(recording.getOwnerId())).thenReturn(java.util.Optional.of(owner));
+        when(templateRepo.findById(template.getId())).thenReturn(java.util.Optional.of(template));
+        service.setTemplateRepos(userRepo, templateRepo);
+        return template;
+    }
+
+    private void standardSettings() {
+        when(settings.get(SettingsService.SUMMARY_SYSTEM_PROMPT)).thenReturn("Fasse zusammen.");
+        when(settings.get(SettingsService.SUMMARY_LANGUAGE)).thenReturn("de");
+        when(settings.getInt(SettingsService.SUMMARY_CHUNK_CHARS)).thenReturn(12_000);
+        when(settings.llmModel()).thenReturn("standard-modell");
+        when(settings.getDouble(SettingsService.LLM_TEMPERATURE)).thenReturn(0.3);
+        when(llm.chat(anyString(), anyString(), any(LlmClient.Overrides.class)))
+                .thenReturn(new LlmClient.LlmResult(true, "# Ergebnis", null));
+    }
+
+    /** Ohne Vorlage an der Aufnahme gilt die Standardvorlage des Besitzers - samt Modell und Name. */
+    @Test
+    void ohneVorlageGiltDieStandardvorlageDesBesitzers() {
+        standardSettings();
+        ownerDefault("Protokoll", "Schreibe ein Protokoll.", "protokoll-modell", 0.1);
+
+        Summary summary = service.summarize(recording, List.of());
+
+        assertThat(summary.getSystemPrompt()).isEqualTo("Schreibe ein Protokoll.");
+        assertThat(summary.getTemplateName()).isEqualTo("Protokoll");
+        assertThat(summary.getModel()).isEqualTo("protokoll-modell");
+        assertThat(summary.getTemperature()).isEqualTo(0.1);
+    }
+
+    /** Eine an der Aufnahme gewaehlte Vorlage geht der Standardvorlage vor. */
+    @Test
+    void gewaehlteVorlageGehtDerStandardvorlageVor() {
+        standardSettings();
+        ownerDefault("Protokoll", "Schreibe ein Protokoll.", "protokoll-modell", 0.1);
+        recording.setSummaryPrompt("Nur Aufgaben.");
+        recording.setSummaryTemplateName("Aufgaben");
+
+        Summary summary = service.summarize(recording, List.of());
+
+        assertThat(summary.getSystemPrompt()).isEqualTo("Nur Aufgaben.");
+        assertThat(summary.getTemplateName()).isEqualTo("Aufgaben");
+        assertThat(summary.getModel()).isEqualTo("standard-modell");
+    }
+
     /**
      * Beigefuegte Unterlagen gehen in JEDEN Aufruf ein - auch ins Konsolidieren.
      * Der Kontext wird in Bloecke geschnitten; stuende der Unterlagen-Abschnitt nur

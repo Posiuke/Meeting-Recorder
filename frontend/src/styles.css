@@ -2456,6 +2456,19 @@ tbody tr:hover {
   color: var(--text-muted);
 }
 
+.template-default-badge {
+  margin-left: 0.4rem;
+  vertical-align: middle;
+}
+
+.template-default-info {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0 0 1rem;
+  font-weight: 600;
+}
+
 .template-list-empty {
   margin: 0 0 0.5rem;
   font-size: 0.85rem;

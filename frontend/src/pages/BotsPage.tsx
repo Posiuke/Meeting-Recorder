@@ -93,7 +93,7 @@ export default function BotsPage() {
   // '' = Sprachvorgabe des Administrators
   const [sttLanguage, setSttLanguage] = useState('');
   const [defaultSttLanguage, setDefaultSttLanguage] = useState('');
-  // Auswertungs-Vorlage: '' = „Meeting (Standard)"
+  // Auswertungs-Vorlage: '' = „Standard"
   const [preset, setPreset] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);

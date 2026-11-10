@@ -53,6 +53,32 @@ public class SummaryService {
         this.store = store;
     }
 
+    /** Optional, damit Tests ohne Datenbank auskommen: Standardvorlage des Besitzers. */
+    private bbbbot.repository.Repositories.AppUserRepo userRepo;
+    private bbbbot.repository.Repositories.PromptTemplateRepo promptTemplateRepo;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setTemplateRepos(bbbbot.repository.Repositories.AppUserRepo userRepo,
+                          bbbbot.repository.Repositories.PromptTemplateRepo promptTemplateRepo) {
+        this.userRepo = userRepo;
+        this.promptTemplateRepo = promptTemplateRepo;
+    }
+
+    /**
+     * Standardvorlage des Besitzers, falls er eine festgelegt hat. Sie wird bei
+     * jeder Auswertung frisch gelesen - Aenderungen an der Vorlage oder an der
+     * Wahl wirken so auch bei einer spaeteren erneuten Auswertung.
+     */
+    public Optional<bbbbot.domain.PromptTemplate> ownerDefaultTemplate(Recording recording) {
+        if (userRepo == null || promptTemplateRepo == null || recording.getOwnerId() == null) {
+            return Optional.empty();
+        }
+        return userRepo.findById(recording.getOwnerId())
+                .map(bbbbot.domain.AppUser::getDefaultPromptTemplateId)
+                .flatMap(promptTemplateRepo::findById)
+                .filter(t -> t.getOwnerId().equals(recording.getOwnerId()));
+    }
+
     public SummaryService(LlmClient llm, SettingsService settings, SummaryRepo summaryRepo,
                           ParticipantService participantService,
                           RecordingDocumentService documentService) {
@@ -99,10 +125,23 @@ public class SummaryService {
      * bei mehreren Chunks ein konsolidierender Merge-Aufruf.
      */
     public Summary summarize(Recording recording, List<RecordingSegment> segments) {
-        // Pro-Aufnahme-Einstellungen gehen vor den Admin-Standards (null/leer = Standard)
-        String systemPrompt = recording.getSummaryPrompt() != null && !recording.getSummaryPrompt().isBlank()
-                ? recording.getSummaryPrompt().trim()
-                : settings.get(SettingsService.SUMMARY_SYSTEM_PROMPT);
+        // Reihenfolge: Vorlage der Aufnahme, dann die Standardvorlage des
+        // Besitzers, zuletzt die Vorgabe des Administrators.
+        boolean ownPrompt = recording.getSummaryPrompt() != null && !recording.getSummaryPrompt().isBlank();
+        Optional<bbbbot.domain.PromptTemplate> fallback = ownPrompt ? Optional.empty()
+                : ownerDefaultTemplate(recording);
+        String systemPrompt = ownPrompt ? recording.getSummaryPrompt().trim()
+                : fallback.map(bbbbot.domain.PromptTemplate::getPrompt)
+                        .orElseGet(() -> settings.get(SettingsService.SUMMARY_SYSTEM_PROMPT));
+        String templateName = ownPrompt ? recording.getSummaryTemplateName()
+                : fallback.map(bbbbot.domain.PromptTemplate::getName).orElse(null);
+        String templateModel = ownPrompt ? recording.getSummaryModel()
+                : fallback.map(bbbbot.domain.PromptTemplate::getModel).orElse(recording.getSummaryModel());
+        Double templateTemperature = ownPrompt ? recording.getSummaryTemperature()
+                : fallback.map(bbbbot.domain.PromptTemplate::getTemperature)
+                        .orElse(recording.getSummaryTemperature());
+        fallback.ifPresent(t -> log.info("Aufnahme {}: Standardvorlage \"{}\" des Besitzers",
+                recording.getId(), t.getName()));
         String language = recording.getSummaryLanguage() != null && !recording.getSummaryLanguage().isBlank()
                 ? recording.getSummaryLanguage().trim()
                 : settings.get(SettingsService.SUMMARY_LANGUAGE);
@@ -110,11 +149,11 @@ public class SummaryService {
         // Modell und Temperatur der Aufnahme gehen vor den Admin-Vorgaben. Sie
         // stammen in der Regel aus der gewaehlten Vorlage - so laesst sich
         // dasselbe Transkript mit zwei Modellen auswerten und vergleichen.
-        String model = recording.getSummaryModel() != null && !recording.getSummaryModel().isBlank()
-                ? recording.getSummaryModel().trim()
+        String model = templateModel != null && !templateModel.isBlank()
+                ? templateModel.trim()
                 : settings.llmModel();
-        Double temperature = recording.getSummaryTemperature() != null
-                ? recording.getSummaryTemperature()
+        Double temperature = templateTemperature != null
+                ? templateTemperature
                 : settings.getDouble(SettingsService.LLM_TEMPERATURE);
         LlmClient.Overrides overrides = LlmClient.Overrides.modelAndTemperature(model, temperature);
 
@@ -124,7 +163,7 @@ public class SummaryService {
         summary.setStatus(Summary.Status.RUNNING);
         summary.setModel(model);
         summary.setTemperature(temperature);
-        summary.setTemplateName(recording.getSummaryTemplateName());
+        summary.setTemplateName(templateName);
         summary.setSystemPrompt(systemPrompt);
         summaryRepo.save(summary);
 

@@ -47,6 +47,17 @@ public class SettingsService {
     public static final String WHISPER_AWS_MAX_SPEAKERS = "whisper.awsMaxSpeakers";
     /** Name eines Custom Vocabulary in Transcribe (z.B. aus dem Glossar uebertragen); leer = keins. */
     public static final String WHISPER_AWS_VOCABULARY = "whisper.awsVocabulary";
+    /** ElevenLabs Scribe (whisper.provider = elevenlabs): Endpunkt, auch fuer die EU-Datenresidenz. */
+    public static final String WHISPER_ELEVENLABS_URL = "whisper.elevenlabsUrl";
+    public static final String WHISPER_ELEVENLABS_API_KEY = "whisper.elevenlabsApiKey";
+    /** Modell, z.B. scribe_v3 oder scribe_v2. */
+    public static final String WHISPER_ELEVENLABS_MODEL = "whisper.elevenlabsModel";
+    /** Hoechstzahl der Sprecher (1-32); 0 = das Modell entscheidet. */
+    public static final String WHISPER_ELEVENLABS_MAX_SPEAKERS = "whisper.elevenlabsMaxSpeakers";
+    /** Begriffe des gemeinsamen Glossars als keyterms mitschicken (ElevenLabs berechnet dafuer einen Aufschlag). */
+    public static final String WHISPER_ELEVENLABS_KEYTERMS = "whisper.elevenlabsKeyterms";
+    /** enable_logging=false: ElevenLabs speichert weder Audio noch Transkript (nur Enterprise-Vertraege). */
+    public static final String WHISPER_ELEVENLABS_ZERO_RETENTION = "whisper.elevenlabsZeroRetention";
 
     /**
      * LLM-Anbieter: "local" = eigener OpenAI-kompatibler Server im Intranet (vLLM,
@@ -199,15 +210,24 @@ public class SettingsService {
     public static final String CLEANUP_ENABLED = "cleanup.enabled";
     public static final String CLEANUP_OLDER_THAN_DAYS = "cleanup.olderThanDays";
 
+    /**
+     * Systemvorgabe fuer Auswertungen ohne Vorlage: "Freie Struktur" - die KI
+     * erkennt den Inhalt und entwirft die Gliederung selbst. Wortgleich mit der
+     * integrierten Vorlage im Frontend (summaryOptions.presets.adaptivePrompt),
+     * damit die Auswahlfelder sie wiedererkennen.
+     */
     private static final String DEFAULT_SUMMARY_PROMPT = """
-        Du bist ein Assistent, der Meetings praezise zusammenfasst. Erstelle eine strukturierte \
-        Zusammenfassung mit folgenden Abschnitten:
-        1. Management-Zusammenfassung (max. 5 Saetze)
-        2. Teilnehmer & Rollen
-        3. Beschluesse und Aufgaben (mit Verantwortlichen und Fristen, falls genannt)
-        4. Offene Fragen
-        5. Chronologischer Ablauf (stichpunktartig)
-        Wichtig: Erfinde nichts. Markiere unklare Stellen ausdruecklich als unklar.""";
+        Du bist ein Assistent, der Aufnahmen präzise zusammenfasst. Es gibt keine feste Gliederung: Analysiere zuerst den gesamten Inhalt – Art der Aufnahme, Zweck, Beteiligte, Themen und was für Leser später wichtig ist – und entwirf daraus selbst die Struktur, die diesen Inhalt am besten erschließt.
+
+        Vorgehen:
+        1. Beginne mit genau einer Zeile in der Form „**Erkannter Inhalt:** <Symbol> <kurze Beschreibung>". Wähle dafür ein einzelnes Emoji, das zum Inhalt passt, und beschreibe Art und Thema in wenigen Worten (z.B. „**Erkannter Inhalt:** 🛠️ Technische Fehleranalyse zum Server-Ausfall" oder „**Erkannter Inhalt:** 📈 Quartalsbericht des Vertriebs").
+        2. Darunter folgt ein Kurzüberblick in höchstens 5 Sätzen.
+        3. Gliedere den Rest mit Markdown-Überschriften, die du aus dem Inhalt ableitest – benenne sie konkret nach dem, was tatsächlich besprochen wurde, statt allgemeine Schablonen zu verwenden. Nimm nur Abschnitte auf, zu denen es Inhalt gibt; leere oder erzwungene Abschnitte lässt du weg.
+        4. Wähle die Darstellung passend zum Stoff: Stichpunkte für Aufzählungen, Tabellen für Vergleiche, Zahlen oder Zuständigkeiten, nummerierte Schritte für Abläufe und Anleitungen, Fließtext für Zusammenhänge und Argumentationen.
+        5. Wurden Entscheidungen, Aufgaben (mit Verantwortlichen und Fristen), offene Fragen oder nächste Schritte genannt, fasse sie in einem eigenen Abschnitt zusammen.
+
+        Werden Teil-Zusammenfassungen zusammengeführt, entwirf die Struktur anhand des Gesamtbilds neu, vereinheitliche die Überschriften und nenne den erkannten Inhalt nur einmal.
+        Wichtig: Erfinde nichts. Markiere unklare Stellen ausdrücklich als unklar.""";
 
     private static final String DEFAULT_CORRECTION_PROMPT = """
         Du glaettest Saetze aus dem Roh-Transkript einer automatischen Spracherkennung. \
@@ -253,6 +273,12 @@ public class SettingsService {
         DEFAULTS.put(WHISPER_AWS_BUCKET, "");
         DEFAULTS.put(WHISPER_AWS_MAX_SPEAKERS, "10");
         DEFAULTS.put(WHISPER_AWS_VOCABULARY, "");
+        DEFAULTS.put(WHISPER_ELEVENLABS_URL, "https://api.elevenlabs.io/v1/speech-to-text");
+        DEFAULTS.put(WHISPER_ELEVENLABS_API_KEY, "");
+        DEFAULTS.put(WHISPER_ELEVENLABS_MODEL, "scribe_v3");
+        DEFAULTS.put(WHISPER_ELEVENLABS_MAX_SPEAKERS, "0");
+        DEFAULTS.put(WHISPER_ELEVENLABS_KEYTERMS, "false");
+        DEFAULTS.put(WHISPER_ELEVENLABS_ZERO_RETENTION, "false");
 
         DEFAULTS.put(LLM_PROVIDER, "local");
         DEFAULTS.put(LLM_BASE_URL, "http://localhost:11434/v1");
@@ -365,7 +391,12 @@ public class SettingsService {
     private static final long NO_LIMIT = Integer.MAX_VALUE;
     private static final Map<String, SettingSpec> SPECS = new LinkedHashMap<>();
     static {
-        SPECS.put(WHISPER_PROVIDER, SettingSpec.choice("local", "openai", "aws-transcribe"));
+        SPECS.put(WHISPER_PROVIDER, SettingSpec.choice("local", "openai", "aws-transcribe", "elevenlabs"));
+        SPECS.put(WHISPER_ELEVENLABS_URL, SettingSpec.of(SettingType.URL));
+        SPECS.put(WHISPER_ELEVENLABS_API_KEY, SettingSpec.of(SettingType.SECRET));
+        SPECS.put(WHISPER_ELEVENLABS_MAX_SPEAKERS, SettingSpec.integer(0, 32));
+        SPECS.put(WHISPER_ELEVENLABS_KEYTERMS, SettingSpec.of(SettingType.BOOLEAN));
+        SPECS.put(WHISPER_ELEVENLABS_ZERO_RETENTION, SettingSpec.of(SettingType.BOOLEAN));
         SPECS.put(WHISPER_AWS_MAX_SPEAKERS, SettingSpec.integer(2, 30));
         SPECS.put(WHISPER_URL, SettingSpec.of(SettingType.URL));
         SPECS.put(WHISPER_OPENAI_URL, SettingSpec.of(SettingType.URL));
@@ -496,6 +527,11 @@ public class SettingsService {
     /** true bei {@code whisper.provider = aws-transcribe}. */
     public boolean isSttTranscribe() {
         return "aws-transcribe".equalsIgnoreCase(get(WHISPER_PROVIDER).trim());
+    }
+
+    /** true bei {@code whisper.provider = elevenlabs}. */
+    public boolean isSttElevenLabs() {
+        return "elevenlabs".equalsIgnoreCase(get(WHISPER_PROVIDER).trim());
     }
 
     public int getInt(String key) { return Integer.parseInt(get(key).trim()); }

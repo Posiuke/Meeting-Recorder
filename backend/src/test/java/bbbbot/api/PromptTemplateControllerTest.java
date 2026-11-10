@@ -2,6 +2,7 @@ package bbbbot.api;
 
 import bbbbot.domain.AppUser;
 import bbbbot.domain.PromptTemplate;
+import bbbbot.repository.Repositories.AppUserRepo;
 import bbbbot.repository.Repositories.PromptTemplateRepo;
 import bbbbot.settings.SettingsService;
 import org.junit.jupiter.api.AfterEach;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.when;
 class PromptTemplateControllerTest {
 
     private PromptTemplateRepo templateRepo;
+    private AppUserRepo userRepo;
     private SettingsService settings;
     private PromptTemplateController controller;
 
@@ -41,10 +43,12 @@ class PromptTemplateControllerTest {
     @BeforeEach
     void setup() {
         templateRepo = mock(PromptTemplateRepo.class);
+        userRepo = mock(AppUserRepo.class);
         settings = mock(SettingsService.class);
-        controller = new PromptTemplateController(templateRepo, settings);
+        controller = new PromptTemplateController(templateRepo, userRepo, settings);
 
         user = AppUser.create("m.mustermann", "Mustermann", "m@example.org");
+        when(userRepo.findById(user.getId())).thenReturn(Optional.of(user));
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(user, null, List.of()));
     }
@@ -168,5 +172,31 @@ class PromptTemplateControllerTest {
                 .hasMessageContaining("nicht gefunden");
 
         verify(templateRepo, never()).delete(any());
+    }
+    @Test
+    void setztEigeneVorlageAlsStandard() {
+        PromptTemplate own = PromptTemplate.create(user.getId(), "Protokoll", "Schreibe ein Protokoll.");
+        when(templateRepo.findById(own.getId())).thenReturn(Optional.of(own));
+
+        controller.setDefault(new Dtos.DefaultTemplateRequest(own.getId()));
+
+        verify(userRepo).setDefaultPromptTemplate(user.getId(), own.getId());
+    }
+
+    @Test
+    void fremdeVorlageKannNichtStandardWerden() {
+        PromptTemplate foreign = PromptTemplate.create(UUID.randomUUID(), "Fremd", "Prompt");
+        when(templateRepo.findById(foreign.getId())).thenReturn(Optional.of(foreign));
+
+        assertThatThrownBy(() -> controller.setDefault(new Dtos.DefaultTemplateRequest(foreign.getId())))
+                .isInstanceOf(ResponseStatusException.class);
+        verify(userRepo, never()).setDefaultPromptTemplate(any(), any());
+    }
+
+    @Test
+    void ohneVorlageGiltWiederDieVorgabeDesAdmins() {
+        controller.setDefault(new Dtos.DefaultTemplateRequest(null));
+
+        verify(userRepo).setDefaultPromptTemplate(user.getId(), null);
     }
 }

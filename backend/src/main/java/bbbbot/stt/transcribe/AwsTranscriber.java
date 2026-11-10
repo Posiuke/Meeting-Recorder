@@ -52,7 +52,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Anmeldung ueber die Standardkette des AWS-SDK (auf ECS die Task-Rolle).
  */
 @Component
-public class AwsTranscriber {
+public class AwsTranscriber implements WholeFileTranscriber {
 
     private static final Logger log = LoggerFactory.getLogger(AwsTranscriber.class);
 
@@ -79,19 +79,17 @@ public class AwsTranscriber {
         this.props = props;
     }
 
-    /** Ergebnis eines Auftrags; bei Erfolg die Aeusserungen und die (erkannte) Sprache. */
-    public record Result(boolean success, List<TranscribeResult.Utterance> utterances, String languageCode,
-                         String error) {
-        static Result failed(String error) {
-            return new Result(false, List.of(), null, error);
-        }
+    @Override
+    public long maxDurationMs() {
+        return MAX_DURATION_MS;
     }
 
-    /**
-     * @param audio    MP3-Datei (lokal)
-     * @param language ISO-Sprache ("de", "en", ...); leer = automatisch erkennen
-     * @param diarize  Sprecher unterscheiden
-     */
+    @Override
+    public String displayName() {
+        return "Amazon Transcribe";
+    }
+
+    @Override
     public Result transcribe(Path audio, String language, boolean diarize) {
         String bucket = bucket();
         if (bucket == null) {

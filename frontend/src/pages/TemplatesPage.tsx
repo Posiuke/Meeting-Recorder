@@ -5,6 +5,7 @@ import {
   deletePromptTemplate,
   fetchDefaultPrompt,
   fetchPromptTemplates,
+  setDefaultPromptTemplate,
   updatePromptTemplate,
 } from '../store/promptTemplatesSlice';
 import Spinner from '../components/Spinner';
@@ -262,6 +263,20 @@ export default function TemplatesPage() {
   }, [filter, items]);
 
   const adminDefault = (defaultPrompt ?? '').trim();
+  const defaultTemplate = items.find((item) => item.isDefault) ?? null;
+  const editorIsDefault = editor?.id != null && editor.id === defaultTemplate?.id;
+
+  const handleDefault = async (templateId: string | null) => {
+    setBusy(true);
+    setFormError(null);
+    try {
+      await dispatch(setDefaultPromptTemplate(templateId)).unwrap();
+    } catch (e) {
+      setFormError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="page">
@@ -281,6 +296,15 @@ export default function TemplatesPage() {
       </div>
 
       <p className="muted">{t('templates.intro')}</p>
+
+      {loaded && (
+        <p className="template-default-info">
+          {defaultTemplate
+            ? t('templates.defaultInfo', { name: defaultTemplate.name })
+            : t('templates.defaultInfoNone')}
+          <HelpTip text={t('templates.defaultInfoHelp')} />
+        </p>
+      )}
 
       {error && <Alert kind="error">{error}</Alert>}
 
@@ -320,7 +344,14 @@ export default function TemplatesPage() {
                   className={`template-list-item${editor?.id === item.id ? ' active' : ''}`}
                   onClick={() => guarded(() => open(editorFor(item)))}
                 >
-                  <span className="template-list-name">{item.name}</span>
+                  <span className="template-list-name">
+                    {item.name}
+                    {item.isDefault && (
+                      <span className="badge badge-green template-default-badge">
+                        {t('templates.defaultBadge')}
+                      </span>
+                    )}
+                  </span>
                   <span className="template-list-meta">
                     {t('templates.updatedAt', {
                       date: formatDateTime(item.updatedAt ?? item.createdAt),
@@ -376,6 +407,9 @@ export default function TemplatesPage() {
             <>
               <div className="template-editor-head">
                 <h2>{editor.id ? editor.base.name : t('templates.newTitle')}</h2>
+                {editorIsDefault && (
+                  <span className="badge badge-green">{t('templates.defaultBadge')}</span>
+                )}
                 {dirty && <span className="badge badge-orange">{t('templates.unsaved')}</span>}
                 {saved && !dirty && (
                   <span className="badge badge-green">{t('templates.savedFlash')}</span>
@@ -519,6 +553,19 @@ export default function TemplatesPage() {
                 </button>
                 {editor.id && (
                   <>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      disabled={busy}
+                      title={
+                        editorIsDefault
+                          ? t('templates.clearDefaultHint')
+                          : t('templates.makeDefaultHint')
+                      }
+                      onClick={() => void handleDefault(editorIsDefault ? null : editor.id)}
+                    >
+                      {editorIsDefault ? t('templates.clearDefault') : t('templates.makeDefault')}
+                    </button>
                     <button
                       type="button"
                       className="btn btn-ghost"

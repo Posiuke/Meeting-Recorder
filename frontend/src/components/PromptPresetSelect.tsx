@@ -6,10 +6,9 @@ import type { PromptTemplateView, SummarySelection } from '../types';
  * kommen aus den Übersetzungen – ein englischsprachiger Nutzer soll keinen
  * deutschen Prompt vorgesetzt bekommen.
  *
- * „Meeting" steht hier als ausgeschriebener Prompt zur Verfügung (anpassbar,
- * unabhängig von späteren Änderungen des Administrators); die Auswahl
- * „Meeting (Standard)" bleibt dagegen ein leerer Prompt und folgt damit immer
- * der aktuellen Vorgabe des Administrators.
+ * Die Auswahl „Standard" bleibt ein leerer Prompt: Der Server nimmt dann die
+ * Standardvorlage des Besitzers, ohne sie die Vorgabe des Administrators – ab
+ * Werk wortgleich mit „Freie Struktur".
  */
 export const PRESET_KEYS = [
   // „Freie Struktur": Die KI erkennt den Inhalt und entwirft die Gliederung
@@ -62,7 +61,7 @@ export function findOwnTemplate(
 
 /**
  * Name der getroffenen Auswahl, wie er einer erzeugten Fassung als Beschriftung
- * mitgegeben wird: `null` bei „Meeting (Standard)" – dort gibt es keine benannte
+ * mitgegeben wird: `null` bei „Standard" – dort gibt es keine benannte
  * Vorlage, sondern die jeweils aktuelle Vorgabe des Administrators.
  */
 export function presetLabel(
@@ -77,7 +76,7 @@ export function presetLabel(
 }
 
 /**
- * Prompt zur getroffenen Auswahl: leerer String bei „Meeting (Standard)" –
+ * Prompt zur getroffenen Auswahl: leerer String bei „Standard" –
  * das bedeutet überall „Standardvorgabe des Administrators verwenden".
  */
 export function resolvePresetPrompt(selection: string, templates: PromptTemplateView[]): string {
@@ -146,9 +145,16 @@ export default function PromptPresetSelect({
   onChange,
 }: PromptPresetSelectProps) {
   const { t } = useI18n();
+  // „Standard" heißt: die Standardvorlage des Nutzers, sonst die Vorgabe des
+  // Administrators – genau das, was der Server bei leerer Auswahl nimmt.
+  const defaultTemplate = templates.find((template) => template.isDefault);
   return (
     <select id={id} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{t('summaryOptions.presetDefault')}</option>
+      <option value="">
+        {defaultTemplate
+          ? t('summaryOptions.presetDefaultTemplate', { name: defaultTemplate.name })
+          : t('summaryOptions.presetDefault')}
+      </option>
       {value === CUSTOM_PRESET && (
         <option value={CUSTOM_PRESET}>{t('summaryOptions.presetCustom')}</option>
       )}

@@ -257,7 +257,7 @@ export const de = {
     },
     presetLabel: 'Auswertungs-Vorlage',
     presetHelp:
-      'Mit dieser Vorlage werden die Aufnahmen des Bots im Anschluss ausgewertet – schon die erste Auswertung. „Meeting (Standard)" folgt der Vorgabe des Administrators. Eine eigene Vorlage wird bei jedem Start frisch gelesen, Änderungen daran wirken also auch hier.',
+      'Mit dieser Vorlage werden die Aufnahmen des Bots im Anschluss ausgewertet – schon die erste Auswertung. „Standard" nimmt deine Standardvorlage, ohne sie die Vorgabe des Administrators (ab Werk „Freie Struktur"). Eine eigene Vorlage wird bei jedem Start frisch gelesen, Änderungen daran wirken also auch hier.',
     presetMissing:
       'Die gewählte eigene Vorlage „{{name}}" wurde gelöscht – der Bot wertet mit ihrem zuletzt gespeicherten Stand aus.',
     presetShort: 'Auswertung: {{name}}',
@@ -505,6 +505,16 @@ export const de = {
     discardDraft: 'Entwurf verwerfen',
     duplicate: 'Duplizieren',
     duplicateHint: 'Legt den aktuellen Text als neue Vorlage an – das Original bleibt unverändert',
+    defaultBadge: 'Standard',
+    makeDefault: 'Als Standard verwenden',
+    makeDefaultHint:
+      'Diese Vorlage gilt dann für jede Auswertung, bei der keine andere Vorlage gewählt ist – bei Bots ohne Vorlage, Uploads mit „Standard", Bildschirmaufnahmen und über die API.',
+    clearDefault: 'Nicht mehr Standard',
+    clearDefaultHint: 'Danach gilt wieder die Standardvorgabe des Administrators.',
+    defaultInfo: 'Standard für deine Auswertungen: {{name}}',
+    defaultInfoNone: 'Standard für deine Auswertungen: Vorgabe des Administrators',
+    defaultInfoHelp:
+      'Die Standardvorlage greift immer dann, wenn bei einer Aufnahme keine Vorlage gewählt ist. Wählst du bei einer Aufnahme eine andere Vorlage, geht diese vor.',
     loadDefault: 'Standard übernehmen',
     loadDefaultHint:
       'Schreibt die Standardvorgabe des Administrators in das Feld – so kannst du sie als Ausgangspunkt anpassen',
@@ -618,7 +628,7 @@ export const de = {
     uploading: 'Wird hochgeladen… {{percent}}%',
     presetLabel: 'Auswertungs-Vorlage',
     presetHelp:
-      'Bestimmt, wie die KI den Inhalt auswertet – „Meeting (Standard)" ist auf Besprechungen ausgelegt (Beschlüsse, Aufgaben). Für Vorträge, Interviews oder Sprachnotizen passt eine andere Vorlage besser – oder „Freie Struktur (automatisch)": Dann erkennt die KI den Inhalt selbst und entwirft eine eigene, passende Gliederung („Automatisch erkennen" wählt dagegen die Gliederung einer der integrierten Vorlagen). Die Wahl gilt schon für die erste Auswertung; sie lässt sich später unter „Auswertung anpassen" ändern.',
+      'Bestimmt, wie die KI den Inhalt auswertet – „Standard" nimmt deine Standardvorlage aus dem Tab „Vorlagen", ohne sie „Freie Struktur": Dann erkennt die KI den Inhalt selbst und entwirft eine eigene, passende Gliederung („Automatisch erkennen" wählt dagegen die Gliederung einer der integrierten Vorlagen). Die Wahl gilt schon für die erste Auswertung; sie lässt sich später unter „Auswertung anpassen" ändern.',
     presetChosenHint:
       'Diese Vorlage wird bei der Auswertung verwendet und ist danach unter „Auswertung anpassen" sichtbar.',
   },
@@ -736,8 +746,9 @@ export const de = {
       'Diese Einstellungen gelten nur für diese Aufnahme und werden bei der nächsten Auswertung verwendet („Jetzt auswerten", „Erneut auswerten" oder „Transkription neu erstellen"). Leere Felder bedeuten: Standardvorgabe des Administrators.',
     presetLabel: 'Vorlage',
     presetHelp:
-      'Füllt den Auswertungs-Prompt mit einer Vorlage vor – integriert für typische Inhaltstypen (z.B. Meeting, Vortrag oder Sprachnotiz) oder eine deiner eigenen gespeicherten Vorlagen. „Freie Struktur (automatisch)" lässt die KI den Inhalt erkennen und die Gliederung selbst entwerfen; „Automatisch erkennen" bestimmt die Art des Inhalts und nimmt die Gliederung der passenden integrierten Vorlage. Beide nennen den erkannten Inhalt samt Symbol am Anfang der Zusammenfassung. Die Vorlage kann anschließend frei angepasst werden. Unterschied zu „Meeting (Standard)": Dort bleibt der Prompt leer und folgt immer der aktuellen Vorgabe des Administrators, während eine Vorlage den Text festschreibt.',
-    presetDefault: 'Meeting (Standard)',
+      'Füllt den Auswertungs-Prompt mit einer Vorlage vor – integriert für typische Inhaltstypen (z.B. Meeting, Vortrag oder Sprachnotiz) oder eine deiner eigenen gespeicherten Vorlagen. „Freie Struktur (automatisch)" lässt die KI den Inhalt erkennen und die Gliederung selbst entwerfen; „Automatisch erkennen" bestimmt die Art des Inhalts und nimmt die Gliederung der passenden integrierten Vorlage. Beide nennen den erkannten Inhalt samt Symbol am Anfang der Zusammenfassung. Die Vorlage kann anschließend frei angepasst werden. Unterschied zu „Standard": Dort bleibt der Prompt leer und folgt immer deiner Standardvorlage bzw. der aktuellen Vorgabe des Administrators, während eine Vorlage den Text festschreibt.',
+    presetDefault: 'Freie Struktur (Standard)',
+    presetDefaultTemplate: 'Standard: {{name}}',
     presetBuiltIn: 'Integrierte Vorlagen',
     presetMine: 'Meine Vorlagen',
     presetCustom: 'Eigener Prompt (angepasst)',
@@ -1148,7 +1159,7 @@ export const de = {
     testAfterSave: 'Zum Testen zuerst speichern.',
     groupWhisper: 'Spracherkennung (Whisper)',
     groupWhisperNote:
-      'provider „local" nutzt den Whisper-Server im Intranet (Einstellung url). provider „openai" nutzt eine OpenAI-kompatible Cloud-API (Einstellungen openaiUrl, openaiApiKey, openaiModel) – z. B. OpenAI oder Groq. Achtung: Bei Cloud-APIs verlassen die Audiodaten das eigene Netz. Sprechererkennung (diarize) braucht lokal WhisperX, in der Cloud ein Diarisierungs-Modell (openaiDiarizeModel, bei OpenAI gpt-4o-transcribe-diarize). provider „aws-transcribe" nutzt Amazon Transcribe (awsRegion, awsBucket, awsMaxSpeakers, awsVocabulary): Die ganze Aufnahme geht in einem Auftrag hin, die Sprecher bleiben so über alle Segmente gleich; Anmeldung über die AWS-Rolle, ohne Schlüssel.',
+      'provider „local" nutzt den Whisper-Server im Intranet (Einstellung url). provider „openai" nutzt eine OpenAI-kompatible Cloud-API (Einstellungen openaiUrl, openaiApiKey, openaiModel) – z. B. OpenAI oder Groq. Achtung: Bei Cloud-APIs verlassen die Audiodaten das eigene Netz. Sprechererkennung (diarize) braucht lokal WhisperX, in der Cloud ein Diarisierungs-Modell (openaiDiarizeModel, bei OpenAI gpt-4o-transcribe-diarize). provider „aws-transcribe" nutzt Amazon Transcribe (awsRegion, awsBucket, awsMaxSpeakers, awsVocabulary): Die ganze Aufnahme geht in einem Auftrag hin, die Sprecher bleiben so über alle Segmente gleich; Anmeldung über die AWS-Rolle, ohne Schlüssel. provider „elevenlabs" nutzt ElevenLabs Scribe (elevenlabsApiKey, elevenlabsModel – Standard scribe_v3): ebenfalls die ganze Aufnahme in einer Anfrage, Fachbegriffe auf Wunsch aus dem gemeinsamen Glossar.',
     groupLlm: 'KI-Modell (LLM)',
     groupLlmNote:
       'provider „local" nutzt den eigenen LLM-Server (baseUrl, apiKey, model). provider „openai" nutzt eine öffentliche Cloud-API (openaiUrl, openaiApiKey, openaiModel) – das Modell wird aus der Liste des Anbieters gewählt („Modelle abrufen"). Neben OpenAI (https://api.openai.com/v1) gehen auch kompatible Anbieter, z. B. Groq https://api.groq.com/openai/v1 oder Mistral https://api.mistral.ai/v1. Parameter, die ein Modell ablehnt, lässt der Bot von selbst weg. Achtung: Bei Cloud-APIs verlassen Transkript und Chat-Protokoll das eigene Netz. provider „bedrock" nutzt Amazon Bedrock (bedrockRegion, bedrockModel) über die AWS-Rolle, ohne Schlüssel.',
@@ -1199,6 +1210,7 @@ export const de = {
     vocabularySyncing: 'Wird übertragen…',
     llmProviderBedrock: 'bedrock – Amazon Bedrock (AWS, Anmeldung über die Task-Rolle)',
     providerAwsTranscribe: 'aws-transcribe – Amazon Transcribe (AWS)',
+    providerElevenlabs: 'elevenlabs – ElevenLabs Scribe (Cloud)',
     reasoningOff: 'off – nicht mitschicken',
     reasoningNone: 'none – kein Nachdenken',
     reasoningMinimal: 'minimal',
@@ -1284,6 +1296,17 @@ export const de = {
         'S3-Bucket, über den Transcribe die Audiodatei liest – sie liegt dort nur für die Dauer des Auftrags. Leer = Bucket der Ablage (STORAGE_BACKEND=s3); ohne S3-Ablage Pflicht.',
       whisperAwsMaxSpeakers:
         'Wie viele Sprecher Transcribe höchstens unterscheidet (2–30). Sind es mehr, werden Stimmen zusammengelegt – lieber etwas großzügiger wählen.',
+      whisperElevenlabsUrl:
+        'Endpunkt der ElevenLabs-API. Standard: https://api.elevenlabs.io/v1/speech-to-text. Mit EU-Datenresidenz (Enterprise): https://api.eu.residency.elevenlabs.io/v1/speech-to-text.',
+      whisperElevenlabsApiKey: 'API-Schlüssel von ElevenLabs (Profil → API Keys). Er braucht die Berechtigung „Speech to Text".',
+      whisperElevenlabsModel:
+        'ElevenLabs-Modell: scribe_v3 (aktuell, beste Erkennung) oder scribe_v2. Die ganze Aufnahme geht in einer Anfrage hin – die Sprecher bleiben so über alle Segmente gleich.',
+      whisperElevenlabsMaxSpeakers:
+        'Höchstzahl der Sprecher, die ElevenLabs unterscheidet (1–32). 0 = das Modell entscheidet selbst – meist die beste Wahl.',
+      whisperElevenlabsKeyterms:
+        'Begriffe aus dem gemeinsamen Glossar als „keyterms" mitschicken – verbessert Eigennamen und Fachbegriffe. ElevenLabs berechnet dafür einen Aufschlag (derzeit 20 %).',
+      whisperElevenlabsZeroRetention:
+        'ElevenLabs speichert weder Audio noch Transkript (enable_logging=false). Nur mit Enterprise-Vertrag möglich – sonst lehnt ElevenLabs die Anfrage ab.',
       whisperAwsVocabulary:
         'Name eines Custom Vocabulary in Transcribe – verbessert Eigennamen, Fachbegriffe und Abkürzungen. „Glossar übertragen" legt es aus dem gemeinsamen Glossar an bzw. aktualisiert es und trägt den Namen hier ein. Leer = ohne.',
       whisperDiarize:
@@ -1303,7 +1326,7 @@ export const de = {
       botPublicUrl:
         'Optional: feste Adresse für den Stopp-Link (z.B. https://recorder.intern). Leer = automatisch die Adresse, unter der der Bot gestartet bzw. seine Vorlage gespeichert wurde. Nur nötig, wenn Teilnehmer die Anwendung unter einer anderen Adresse erreichen als die Nutzer.',
       whisperProvider:
-        'Wo die Spracherkennung läuft: „local" schickt die Audio-Segmente an den eigenen Whisper-Server im Intranet, „openai" an eine Cloud-API im OpenAI-Format (z. B. OpenAI, Groq).',
+        'Wo die Spracherkennung läuft: „local" schickt die Audio-Segmente an den eigenen Whisper-Server im Intranet, „openai" an eine Cloud-API im OpenAI-Format (z. B. OpenAI, Groq), „aws-transcribe" an Amazon Transcribe, „elevenlabs" an ElevenLabs Scribe.',
       whisperUrl: 'Adresse des Whisper-ASR-Webservice im Intranet (nur bei provider = local).',
       whisperOpenaiUrl:
         'Vollständige URL des Cloud-Transkriptions-Endpoints (nur bei provider = openai). Für OpenAI: https://api.openai.com/v1/audio/transcriptions – kompatible Anbieter analog.',

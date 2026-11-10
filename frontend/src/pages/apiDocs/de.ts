@@ -767,6 +767,14 @@ curl -s -H "X-API-Key: $KEY" -F file=@besprechung.mp4 \\
         },
         { method: 'PUT', path: '/api/prompt-templates/{id}', summary: 'Vorlage ändern.' },
         { method: 'DELETE', path: '/api/prompt-templates/{id}', summary: 'Vorlage löschen.' },
+        {
+          method: 'PUT',
+          path: '/api/prompt-templates/default',
+          summary:
+            'Standardvorlage festlegen – sie gilt für jede Auswertung ohne gewählte Vorlage. templateId null = wieder die Vorgabe des Administrators. Antwort: die Vorlagenliste (isDefault markiert die Standardvorlage).',
+          example: `curl -s -X PUT -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \\
+  -d '{"templateId":"<id>"}' "$RECORDER/api/prompt-templates/default"`,
+        },
       ],
     },
 

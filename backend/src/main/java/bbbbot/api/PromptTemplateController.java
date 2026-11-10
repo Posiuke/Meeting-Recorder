@@ -3,6 +3,7 @@ package bbbbot.api;
 import bbbbot.auth.CurrentUser;
 import bbbbot.domain.AppUser;
 import bbbbot.domain.PromptTemplate;
+import bbbbot.repository.Repositories.AppUserRepo;
 import bbbbot.repository.Repositories.PromptTemplateRepo;
 import bbbbot.settings.SettingsService;
 import org.springframework.http.HttpStatus;
@@ -43,19 +44,40 @@ public class PromptTemplateController {
     private static final double MAX_TEMPERATURE = 2.0;
 
     private final PromptTemplateRepo templateRepo;
+    private final AppUserRepo userRepo;
     private final SettingsService settings;
 
-    public PromptTemplateController(PromptTemplateRepo templateRepo, SettingsService settings) {
+    public PromptTemplateController(PromptTemplateRepo templateRepo, AppUserRepo userRepo,
+                                    SettingsService settings) {
         this.templateRepo = templateRepo;
+        this.userRepo = userRepo;
         this.settings = settings;
     }
 
     @GetMapping
     public List<Dtos.PromptTemplateView> list() {
         AppUser user = CurrentUser.get();
+        UUID defaultId = defaultTemplateId(user);
         return templateRepo.findByOwnerIdOrderByNameAsc(user.getId()).stream()
-                .map(Dtos.PromptTemplateView::of)
+                .map(t -> Dtos.PromptTemplateView.of(t, t.getId().equals(defaultId)))
                 .toList();
+    }
+
+    /**
+     * Standardvorlage festlegen: Sie gilt fuer jede Auswertung, bei der keine
+     * Vorlage gewaehlt ist (Bot ohne Vorlage, Upload mit "Standard",
+     * Bildschirmaufnahme, API). {@code templateId = null} = wieder die Vorgabe
+     * des Administrators.
+     *
+     * @return die Vorlagenliste mit der neuen Markierung
+     */
+    @PutMapping("/default")
+    public List<Dtos.PromptTemplateView> setDefault(@RequestBody Dtos.DefaultTemplateRequest request) {
+        AppUser user = CurrentUser.get();
+        UUID templateId = request == null ? null : request.templateId();
+        if (templateId != null) requireOwn(templateId, user);
+        userRepo.setDefaultPromptTemplate(user.getId(), templateId);
+        return list();
     }
 
     /**
@@ -84,7 +106,7 @@ public class PromptTemplateController {
         template.setModel(checkModel(request.model()));
         template.setTemperature(checkTemperature(request.temperature()));
         saveHandlingDuplicate(template);
-        return Dtos.PromptTemplateView.of(template);
+        return Dtos.PromptTemplateView.of(template, false);
     }
 
     @PutMapping("/{id}")
@@ -105,7 +127,7 @@ public class PromptTemplateController {
         template.setTemperature(checkTemperature(request.temperature()));
         template.setUpdatedAt(Instant.now());
         saveHandlingDuplicate(template);
-        return Dtos.PromptTemplateView.of(template);
+        return Dtos.PromptTemplateView.of(template, template.getId().equals(defaultTemplateId(user)));
     }
 
     /**
@@ -126,6 +148,14 @@ public class PromptTemplateController {
     public void delete(@PathVariable UUID id) {
         AppUser user = CurrentUser.get();
         templateRepo.delete(requireOwn(id, user));
+    }
+
+    /**
+     * Frisch gelesen statt vom angemeldeten Konto: Dessen Stand stammt vom
+     * Anfang der Anfrage, die Wahl kann sich seitdem geaendert haben.
+     */
+    private UUID defaultTemplateId(AppUser user) {
+        return userRepo.findById(user.getId()).map(AppUser::getDefaultPromptTemplateId).orElse(null);
     }
 
     private PromptTemplate requireOwn(UUID id, AppUser user) {

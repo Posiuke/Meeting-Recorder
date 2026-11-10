@@ -59,6 +59,15 @@ public class AppUser {
     @Column(name = "external_subject")
     private String externalSubject;
 
+    /**
+     * Persoenliche Standardvorlage fuer Auswertungen ohne gewaehlte Vorlage;
+     * NULL = Vorgabe des Administrators. Nur lesbar: geschrieben wird gezielt
+     * ueber {@code AppUserRepo#setDefaultPromptTemplate}, damit das haeufige
+     * Speichern des Kontos (letzte Aktivitaet) die Wahl nie ueberschreibt.
+     */
+    @Column(name = "default_prompt_template_id", insertable = false, updatable = false)
+    private UUID defaultPromptTemplateId;
+
     public static AppUser create(String username, String displayName, String email) {
         AppUser u = new AppUser();
         u.id = UUID.randomUUID();
@@ -93,4 +102,5 @@ public class AppUser {
     public void setAuthProvider(String authProvider) { this.authProvider = authProvider; }
     public String getExternalSubject() { return externalSubject; }
     public void setExternalSubject(String externalSubject) { this.externalSubject = externalSubject; }
+    public UUID getDefaultPromptTemplateId() { return defaultPromptTemplateId; }
 }
