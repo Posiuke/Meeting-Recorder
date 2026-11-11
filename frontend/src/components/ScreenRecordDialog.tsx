@@ -11,6 +11,7 @@ import {
   captureSupport,
   useScreenRecorder,
   type CaptureQuality,
+  type CaptureSourceKind,
 } from '../hooks/useScreenRecorder';
 import { useInputLevels } from '../hooks/useInputLevels';
 import type { RecordingView } from '../types';
@@ -38,6 +39,10 @@ export default function ScreenRecordDialog({ onClose, onFinished }: ScreenRecord
   const [configError, setConfigError] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [wantVideo, setWantVideo] = useState(true);
+  const [sourceChoice, setSourceChoice] = useState<CaptureSourceKind>('screen');
+  // '' = Standardkamera des Browsers
+  const [cameraChoice, setCameraChoice] = useState('');
+  const [cameraSwitchChoice, setCameraSwitchChoice] = useState('');
   const [quality, setQuality] = useState<CaptureQuality>('standard');
   const [useMic, setUseMic] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState(true);
@@ -152,12 +157,46 @@ export default function ScreenRecordDialog({ onClose, onFinished }: ScreenRecord
           />
         </div>
 
-        <label className="checkbox-field">
-          <input type="checkbox" checked={wantVideo} onChange={(e) => setWantVideo(e.target.checked)} />
-          {t('capture.withVideo')}
-        </label>
+        <fieldset className="form-field capture-source-kind">
+          <legend>{t('capture.sourceLabel')}</legend>
+          <label className="checkbox-field">
+            <input
+              type="radio"
+              name="capture-source-kind"
+              checked={sourceChoice === 'screen'}
+              onChange={() => setSourceChoice('screen')}
+            />
+            {t('capture.sourceScreen')}
+          </label>
+          <label className="checkbox-field">
+            <input
+              type="radio"
+              name="capture-source-kind"
+              checked={sourceChoice === 'camera'}
+              onChange={() => setSourceChoice('camera')}
+            />
+            {t('capture.sourceCamera')}
+          </label>
+        </fieldset>
 
-        {wantVideo && (
+        {sourceChoice === 'screen' && (
+          <label className="checkbox-field">
+            <input type="checkbox" checked={wantVideo} onChange={(e) => setWantVideo(e.target.checked)} />
+            {t('capture.withVideo')}
+          </label>
+        )}
+
+        {sourceChoice === 'camera' && (
+          <>
+            <div className="form-field">
+              <label htmlFor="capture-camera">{t('capture.cameraLabel')}</label>
+              {renderCameraSelect('capture-camera', cameraChoice, setCameraChoice, true)}
+            </div>
+            <p className="muted capture-devices-hint">{t('capture.cameraHint')}</p>
+          </>
+        )}
+
+        {(wantVideo || sourceChoice === 'camera') && (
           <div className="form-field">
             <label htmlFor="capture-quality">{t('capture.qualityLabel')}</label>
             <select
@@ -174,6 +213,37 @@ export default function ScreenRecordDialog({ onClose, onFinished }: ScreenRecord
         {renderMicControls()}
         {renderAnalysisOptions()}
       </>
+    );
+  }
+
+  /**
+   * Kameraliste. Vor der ersten Freigabe kennt der Browser nur anonyme Geräte –
+   * dann stehen dort Platzhalter, nach dem ersten Öffnen die echten Namen.
+   */
+  function renderCameraSelect(
+    id: string,
+    value: string,
+    onChange: (deviceId: string) => void,
+    withDefault: boolean,
+  ) {
+    const named = recorder.cameraDevices.filter((device) => device.deviceId);
+    return (
+      <select
+        id={id}
+        value={value}
+        disabled={phase === 'starting' || recorder.switching}
+        onFocus={() => void recorder.refreshDevices()}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {(withDefault || named.length === 0) && (
+          <option value="">{t('capture.cameraDefault')}</option>
+        )}
+        {named.map((device, index) => (
+          <option key={device.deviceId} value={device.deviceId}>
+            {device.label || t('capture.cameraFallback', { index: index + 1 })}
+          </option>
+        ))}
+      </select>
     );
   }
 
@@ -340,7 +410,11 @@ export default function ScreenRecordDialog({ onClose, onFinished }: ScreenRecord
           <Alert kind="info">{t('capture.audioOnlyNote')}</Alert>
         )}
 
-        {recorder.systemAudio ? (
+        {recorder.sourceKind === 'camera' ? (
+          <Alert kind={recorder.micActive ? 'info' : 'error'}>
+            {t('capture.cameraNoAudio')}
+          </Alert>
+        ) : recorder.systemAudio ? (
           <Alert kind="success">{t('capture.systemAudioOk')}</Alert>
         ) : (
           <Alert kind="error">
@@ -359,6 +433,13 @@ export default function ScreenRecordDialog({ onClose, onFinished }: ScreenRecord
   }
 
   function renderRecording() {
+    // Kamera für den Wechsel: die gewählte, sonst die laufende, sonst die erste bekannte.
+    const switchCamera =
+      cameraSwitchChoice ||
+      recorder.cameraDeviceId ||
+      recorder.cameraDevices.find((device) => device.deviceId)?.deviceId ||
+      '';
+    const setSwitchCamera = setCameraSwitchChoice;
     const limitReached =
       config != null && config.maxBytes > 0 && recorder.uploadedBytes >= config.maxBytes;
     return (
@@ -380,9 +461,12 @@ export default function ScreenRecordDialog({ onClose, onFinished }: ScreenRecord
 
         {renderLevels()}
 
-        {!recorder.systemAudio && (
-          <Alert kind="info">{t('capture.systemAudioMissingShort')}</Alert>
-        )}
+        {!recorder.systemAudio &&
+          (recorder.sourceKind === 'camera' ? (
+            !recorder.micActive && <Alert kind="info">{t('capture.cameraNoAudio')}</Alert>
+          ) : (
+            <Alert kind="info">{t('capture.systemAudioMissingShort')}</Alert>
+          ))}
 
         <div className="capture-actions">
           {recorder.canSwitchSource ? (
@@ -394,12 +478,35 @@ export default function ScreenRecordDialog({ onClose, onFinished }: ScreenRecord
             >
               {recorder.switching
                 ? t('capture.switching')
-                : recorder.withVideo
-                  ? t('capture.switchSource')
-                  : t('capture.switchSourceAudio')}
+                : !recorder.withVideo
+                  ? t('capture.switchSourceAudio')
+                  : recorder.sourceKind === 'camera'
+                    ? t('capture.switchToScreen')
+                    : t('capture.switchSource')}
             </button>
           ) : (
             <span className="muted">{t('capture.switchUnsupported')}</span>
+          )}
+          {recorder.canSwitchSource && recorder.withVideo && (
+            <span className="capture-camera-switch">
+              {renderCameraSelect(
+                'capture-camera-switch',
+                switchCamera,
+                setSwitchCamera,
+                recorder.cameraDevices.every((device) => !device.deviceId),
+              )}
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={
+                  recorder.switching ||
+                  (recorder.sourceKind === 'camera' && switchCamera === recorder.cameraDeviceId)
+                }
+                onClick={() => void recorder.switchToCamera(switchCamera)}
+              >
+                {t('capture.switchToCamera')}
+              </button>
+            </span>
           )}
           {useMic && recorder.micActive && (
             <button
@@ -460,7 +567,11 @@ export default function ScreenRecordDialog({ onClose, onFinished }: ScreenRecord
           <button
             type="button"
             className="btn btn-primary"
-            onClick={() => void recorder.chooseSource(wantVideo, quality)}
+            onClick={() =>
+              void (sourceChoice === 'camera'
+                ? recorder.chooseCamera(cameraChoice, quality)
+                : recorder.chooseSource(wantVideo, quality))
+            }
           >
             {t('capture.chooseSource')}
           </button>

@@ -126,6 +126,33 @@ die Seite dann als unsicher und blockiert die Medienzugriffe weiterhin.
 Der Tab muss offen bleiben: Die Aufnahme entsteht im Browser, nicht auf dem
 Server. Beim Versuch, das Fenster zu schließen, warnt der Browser.
 
+### Kamera als Bildquelle
+
+Statt Bildschirm/Fenster/Tab lässt sich unter **Bildquelle → Kamera** jede
+Kamera wählen, die der Browser kennt, auch virtuelle Kameras. Die Kamera liefert
+nur Bild, den Ton bitte über das Mikrofon dazunehmen. Während der Aufnahme kann
+man in Chrome/Edge zwischen Bildschirm und Kamera hin- und herwechseln. Die
+Datei bleibt dabei ein durchgehender Strom mit der Auflösung der ersten Quelle.
+
+**Anwendungsfall Remotedesktop:** Aus einer RDP-Sitzung heraus sieht der
+Browser nur den Remote-Desktop, nicht den Bildschirm des Rechners, von dem aus
+man verbunden ist. Über einen Umweg geht es trotzdem:
+
+1. Auf dem Client in OBS eine Bildschirmaufnahme als Szene anlegen und
+   **„Virtuelle Kamera starten"**.
+2. In der RDP-Verbindung (mstsc → *Lokale Ressourcen → Weitere… →
+   Videoaufnahmegeräte*) die OBS-Kamera umleiten. Für den Ton des Clients
+   *Remoteaudio → Aufnahme → Von diesem Computer aufzeichnen* einstellen und
+   auf dem Client ein Loopback-Gerät (VB-Cable/Stereomix) als Standard-
+   Aufnahmegerät setzen.
+3. Im Recorder in der Sitzung **Bildquelle → Kamera** wählen, die OBS-Kamera
+   auswählen und das Mikrofon dazunehmen.
+
+Das Bild läuft dabei komprimiert über RDP. Für Folien reicht das, für
+flüssige Bewegung nicht. Die Kamera-Umleitung kann per Gruppenrichtlinie
+gesperrt sein. Einfacher ist es meist, den Recorder direkt im Browser des
+Clients zu öffnen.
+
 ### Größenordnung
 
 | Einstellung | Bedarf |

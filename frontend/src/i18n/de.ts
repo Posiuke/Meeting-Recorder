@@ -661,6 +661,18 @@ export const de = {
       'Nimmt einen Bildschirm, ein Fenster oder einen Browser-Tab samt Ton auf und legt daraus eine Aufnahme an – nützlich überall dort, wo kein Bot ins Meeting kann. Die Auswahl erscheint gleich im Dialog des Browsers; für den Ton dort „Systemaudio übertragen" bzw. „Audio des Tabs teilen" ankreuzen.',
     titleLabel: 'Titel (optional)',
     titlePlaceholder: 'Bildschirmaufnahme mit Datum und Uhrzeit',
+    sourceLabel: 'Bildquelle',
+    sourceScreen: 'Bildschirm, Fenster oder Tab',
+    sourceCamera: 'Kamera (auch virtuelle Kamera, z. B. von OBS)',
+    cameraLabel: 'Kamera',
+    cameraDefault: 'Standardkamera',
+    cameraFallback: 'Kamera {{index}}',
+    cameraHint:
+      'Eine Kamera liefert nur Bild – Ton bitte über das Mikrofon dazunehmen. Tipp für Remotedesktop: Den Bildschirm des eigenen Rechners mit der virtuellen Kamera von OBS ausgeben und die Kamera per RDP-Geräteumleitung („Videoaufnahmegeräte") in die Sitzung holen.',
+    cameraNoAudio:
+      'Die Kamera liefert keinen Ton. Für Ton bitte das Mikrofon zusätzlich aufnehmen.',
+    switchToScreen: 'Zum Bildschirm wechseln',
+    switchToCamera: 'Zur Kamera wechseln',
     withVideo: 'Bild aufzeichnen (ohne Haken wird nur der Ton aufgenommen – deutlich kleinere Dateien)',
     qualityLabel: 'Bildqualität',
     qualityStandard: 'Standard – 10 Bilder/s, ca. 0,5 GB pro Stunde',
@@ -681,7 +693,7 @@ export const de = {
     micMute: 'Stummschalten',
     micUnmute: 'Stumm aufheben',
     micPickerHint:
-      'Die Balken zeigen, auf welchem Eingang gerade Ton ankommt – einfach kurz sprechen und das passende Gerät wählen.',
+      'Die Balken zeigen, auf welchem Eingang gerade Ton ankommt – einfach kurz sprechen und das passende Gerät wählen. Wiedergabegeräte (Lautsprecher, Headset-Ausgang) kann der Browser nicht direkt abgreifen; dafür ein Loopback-Gerät wie „Stereomix" oder VB-Cable einrichten, das hier als Eingang erscheint.',
     micPickerShow: 'Mikrofon wechseln',
     micPickerHide: 'Mikrofonliste schließen',
     deviceUnavailable: 'belegt',
@@ -716,6 +728,8 @@ export const de = {
       micDenied: 'Zugriff auf das Mikrofon wurde abgelehnt.',
       micFailed: 'Mikrofon konnte nicht geöffnet werden: {{message}}',
       displayFailed: 'Bildschirm konnte nicht geöffnet werden: {{message}}',
+      cameraDenied: 'Zugriff auf die Kamera wurde abgelehnt.',
+      cameraFailed: 'Kamera konnte nicht geöffnet werden: {{message}}',
       switchFailed:
         'Quelle konnte nicht gewechselt werden: {{message}} — die Aufnahme läuft mit der bisherigen Quelle weiter.',
       noFormat: 'Dieser Browser unterstützt kein passendes Aufnahmeformat.',

@@ -25,6 +25,14 @@ export type CapturePhase =
 
 export type CaptureQuality = 'standard' | 'high';
 
+/**
+ * Woher das Bild kommt: Bildschirm/Fenster/Tab über den Auswahldialog des
+ * Browsers – oder eine Kamera. Die Kamera ist auch der Weg, ein Bild von außen
+ * hereinzuholen, etwa den Bildschirm des RDP-Clients über eine virtuelle Kamera
+ * (OBS) und die Kamera-Umleitung von Remotedesktop.
+ */
+export type CaptureSourceKind = 'screen' | 'camera';
+
 /** Länge eines Aufnahmestücks. Kurz genug, dass ein Absturz wenig kostet. */
 const CHUNK_MS = 5000;
 
@@ -101,6 +109,17 @@ function displayOptions(quality: CaptureQuality): DisplayMediaOptions {
   };
 }
 
+/** Einschränkungen für eine Kamera – gleiche Bildrate und Obergrenze wie beim Bildschirm. */
+function cameraConstraints(deviceId: string, quality: CaptureQuality): MediaTrackConstraints {
+  const preset = QUALITY_PRESETS[quality];
+  return {
+    ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+    frameRate: { ideal: preset.frameRate, max: preset.frameRate },
+    width: { ideal: 1920, max: 1920 },
+    height: { ideal: 1080, max: 1080 },
+  };
+}
+
 /** Auswahldialog abgebrochen – kein Fehler, sondern eine Entscheidung des Nutzers. */
 function isUserAbort(e: unknown): boolean {
   return e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'AbortError');
@@ -144,6 +163,9 @@ export function useScreenRecorder() {
   const [withVideo, setWithVideo] = useState(true);
   const [quality, setQuality] = useState<CaptureQuality>('standard');
   const [systemAudio, setSystemAudio] = useState(false);
+  const [sourceKind, setSourceKind] = useState<CaptureSourceKind>('screen');
+  const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
+  const [cameraDeviceId, setCameraDeviceId] = useState<string>('');
   const [micDevices, setMicDevices] = useState<MediaDeviceInfo[]>([]);
   const [micDeviceId, setMicDeviceId] = useState<string>('');
   const [micActive, setMicActive] = useState(false);
@@ -334,23 +356,32 @@ export function useScreenRecorder() {
     return () => window.removeEventListener('pagehide', handler);
   }, [phase]);
 
-  const refreshMicDevices = useCallback(async () => {
+  /** Mikrofone und Kameras neu einlesen (Namen gibt es erst nach erteilter Berechtigung). */
+  const refreshDevices = useCallback(async () => {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       setMicDevices(devices.filter((d) => d.kind === 'audioinput'));
+      setCameraDevices(devices.filter((d) => d.kind === 'videoinput'));
     } catch {
       setMicDevices([]);
+      setCameraDevices([]);
     }
   }, []);
+
+  // Kameraliste für die Quellenauswahl schon vor der ersten Freigabe füllen
+  // (dann noch ohne Namen – die gibt der Browser erst nach der Berechtigung her).
+  useEffect(() => {
+    void refreshDevices();
+  }, [refreshDevices]);
 
   // Neu angesteckte oder entfernte Geräte (Headset!) gleich in der Liste zeigen.
   useEffect(() => {
     const devices = navigator.mediaDevices;
     if (!devices?.addEventListener) return;
-    const handler = () => void refreshMicDevices();
+    const handler = () => void refreshDevices();
     devices.addEventListener('devicechange', handler);
     return () => devices.removeEventListener('devicechange', handler);
-  }, [refreshMicDevices]);
+  }, [refreshDevices]);
 
   /**
    * Mikrofon aktivieren oder wechseln – auch während der Aufnahme. Die
@@ -374,7 +405,7 @@ export function useScreenRecorder() {
           const active = stream.getAudioTracks()[0]?.getSettings().deviceId;
           if (active) setMicDeviceId(active);
         }
-        await refreshMicDevices();
+        await refreshDevices();
         return true;
       } catch (e) {
         // Schlägt nur der Wechsel fehl, bleibt das bisherige Mikrofon aktiv.
@@ -387,7 +418,7 @@ export function useScreenRecorder() {
         return false;
       }
     },
-    [connectMic, refreshMicDevices],
+    [connectMic, refreshDevices],
   );
 
   const disableMic = useCallback(() => {
@@ -421,6 +452,7 @@ export function useScreenRecorder() {
         releaseDisplay();
         displayStreamRef.current = stream;
         setSystemAudio(stream.getAudioTracks().length > 0);
+        setSourceKind('screen');
         setWithVideo(video);
         withVideoRef.current = video;
         setQuality(selectedQuality);
@@ -444,6 +476,44 @@ export function useScreenRecorder() {
       }
     },
     [connectSystem, releaseDisplay],
+  );
+
+  /**
+   * Eine Kamera als Bildquelle öffnen. Sie liefert nur Bild – Ton kommt über
+   * das Mikrofon dazu. Ohne `deviceId` nimmt der Browser die Standardkamera
+   * (und fragt dabei die Berechtigung an, danach tragen die Geräte Namen).
+   */
+  const chooseCamera = useCallback(
+    async (deviceId: string, selectedQuality: CaptureQuality) => {
+      setError(null);
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: cameraConstraints(deviceId, selectedQuality),
+          audio: false,
+        });
+        releaseDisplay();
+        displayStreamRef.current = stream;
+        setSystemAudio(false);
+        setSourceKind('camera');
+        setWithVideo(true);
+        withVideoRef.current = true;
+        setQuality(selectedQuality);
+        qualityRef.current = selectedQuality;
+        setCameraDeviceId(stream.getVideoTracks()[0]?.getSettings().deviceId ?? deviceId);
+        setPreviewStream(stream);
+        setPhase('ready');
+        await refreshDevices();
+        return true;
+      } catch (e) {
+        setError(
+          e instanceof DOMException && e.name === 'NotAllowedError'
+            ? translate('capture.errors.cameraDenied')
+            : translate('capture.errors.cameraFailed', { message: errorMessage(e) }),
+        );
+        return false;
+      }
+    },
+    [refreshDevices, releaseDisplay],
   );
 
   /** Gewählten Bildschirm wieder freigeben; Mikrofon und dessen Auswahl bleiben. */
@@ -670,14 +740,50 @@ export function useScreenRecorder() {
   );
 
   /**
+   * Während der Aufnahme eine neue Bildquelle einhängen. Die Aufnahme läuft
+   * weiter, solange die neue Quelle geöffnet wird (das Bild steht kurz).
+   */
+  const replaceSource = useCallback(
+    (stream: MediaStream, kind: CaptureSourceKind) => {
+      // Die Aufnahme kann geendet haben, während der Dialog offen war.
+      if (!recordingIdRef.current || finishingRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return false;
+      }
+      if (withVideoRef.current) {
+        const videoTrack = stream.getVideoTracks()[0];
+        if (!videoTrack || !relayRef.current) {
+          stream.getTracks().forEach((t) => t.stop());
+          return false;
+        }
+        relayRef.current.setSource(videoTrack);
+        setPreviewStream(stream);
+      } else {
+        stream.getVideoTracks().forEach((t) => t.stop());
+      }
+      // Erst jetzt die alte Quelle schließen – ohne Ende-Handler, sonst würde das
+      // als „Freigabe beendet" die ganze Aufnahme abschließen.
+      displayStreamRef.current?.getTracks().forEach((t) => {
+        t.onended = null;
+        t.stop();
+      });
+      displayStreamRef.current = stream;
+      connectSystem(stream);
+      setSystemAudio(stream.getAudioTracks().length > 0);
+      setSourceKind(kind);
+      watchDisplayEnd(stream, finish);
+      return true;
+    },
+    [connectSystem, finish],
+  );
+
+  /**
    * Während der Aufnahme eine andere Bildschirmquelle wählen. Öffnet erneut den
-   * Auswahldialog des Browsers; die Aufnahme läuft solange weiter (das Bild
-   * steht kurz). Bricht der Nutzer ab, bleibt die bisherige Quelle.
+   * Auswahldialog des Browsers. Bricht der Nutzer ab, bleibt die bisherige Quelle.
    */
   const switchSource = useCallback(async () => {
     if (!recordingIdRef.current || finishingRef.current) return false;
-    const video = withVideoRef.current;
-    if (video && !relayRef.current) return false;
+    if (withVideoRef.current && !relayRef.current) return false;
     setError(null);
     setSwitching(true);
     let stream: MediaStream;
@@ -691,35 +797,37 @@ export function useScreenRecorder() {
     } finally {
       setSwitching(false);
     }
-    // Die Aufnahme kann geendet haben, während der Dialog offen war.
-    if (!recordingIdRef.current || finishingRef.current) {
-      stream.getTracks().forEach((t) => t.stop());
-      return false;
-    }
+    return replaceSource(stream, 'screen');
+  }, [replaceSource]);
 
-    if (video) {
-      const videoTrack = stream.getVideoTracks()[0];
-      if (!videoTrack || !relayRef.current) {
-        stream.getTracks().forEach((t) => t.stop());
+  /** Während der Aufnahme auf eine (andere) Kamera umschalten. */
+  const switchToCamera = useCallback(
+    async (deviceId: string) => {
+      if (!recordingIdRef.current || finishingRef.current) return false;
+      if (!withVideoRef.current || !relayRef.current) return false;
+      setError(null);
+      setSwitching(true);
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: cameraConstraints(deviceId, qualityRef.current),
+          audio: false,
+        });
+      } catch (e) {
+        setError(translate('capture.errors.switchFailed', { message: errorMessage(e) }));
         return false;
+      } finally {
+        setSwitching(false);
       }
-      relayRef.current.setSource(videoTrack);
-      setPreviewStream(stream);
-    } else {
-      stream.getVideoTracks().forEach((t) => t.stop());
-    }
-    // Erst jetzt die alte Quelle schließen – ohne Ende-Handler, sonst würde das
-    // als „Freigabe beendet" die ganze Aufnahme abschließen.
-    displayStreamRef.current?.getTracks().forEach((t) => {
-      t.onended = null;
-      t.stop();
-    });
-    displayStreamRef.current = stream;
-    connectSystem(stream);
-    setSystemAudio(stream.getAudioTracks().length > 0);
-    watchDisplayEnd(stream, finish);
-    return true;
-  }, [connectSystem, finish]);
+      const ok = replaceSource(stream, 'camera');
+      if (ok) {
+        setCameraDeviceId(stream.getVideoTracks()[0]?.getSettings().deviceId ?? deviceId);
+        void refreshDevices();
+      }
+      return ok;
+    },
+    [refreshDevices, replaceSource],
+  );
 
   const pause = useCallback(() => {
     const recorder = recorderRef.current;
@@ -771,6 +879,9 @@ export function useScreenRecorder() {
     result,
     previewStream,
     withVideo,
+    sourceKind,
+    cameraDevices,
+    cameraDeviceId,
     systemAudio,
     micDevices,
     micDeviceId,
@@ -785,10 +896,13 @@ export function useScreenRecorder() {
     pendingChunks,
     chooseSource,
     discardSource,
+    chooseCamera,
+    refreshDevices,
     enableMic,
     disableMic,
     setMicMute,
     switchSource,
+    switchToCamera,
     beginRecording,
     pause,
     resume,
