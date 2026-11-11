@@ -13,7 +13,7 @@
 
   <groupId>bbbbot</groupId>
   <artifactId>bbb-bot-backend</artifactId>
-  <version>1.3.0</version>
+  <version>1.3.1</version>
   <name>BBB Bot Backend</name>
   <description>Backend fuer den BigBlueButton Aufzeichnungs- und Auswertungs-Bot</description>
 
